@@ -8,13 +8,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'inline',
       includeAssets: ['calendar-icon.svg', 'pwa-192x192.svg', 'pwa-512x512.svg'],
       manifest: {
-        name: 'Agenda - Organización Familiar',
-        short_name: 'Agenda',
+        name: 'Dommuss Agenda - Organización Familiar',
+        short_name: 'Dommuss Agenda',
         description: 'Gestión de turnos y agenda compartida familiar',
-        theme_color: '#1E88E5',
-        background_color: '#FAFAFA',
+        theme_color: '#2D3E50',
+        background_color: '#F7F9FC',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',
