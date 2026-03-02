@@ -71,6 +71,45 @@
   gap: var(--spacing-xs);
 }
 
+/* Filtro por miembro */
+.top-app-bar-filter {
+  display: flex;
+  align-items: center;
+}
+
+.top-app-bar-filter-select {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  padding-right: var(--spacing-md);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: white;
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 16px;
+}
+
+.top-app-bar-filter-select option {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.top-app-bar-filter-select:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.top-app-bar-filter-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.3);
+}
+
 .top-app-bar-icon-btn {
   display: flex;
   align-items: center;

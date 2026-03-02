@@ -1,4 +1,4 @@
-import type { CalendarView } from '../types';
+import type { CalendarView, Profile } from '../types';
 import './TopAppBar.css';
 
 interface TopAppBarProps {
@@ -12,6 +12,9 @@ interface TopAppBarProps {
   profileInitials?: string;
   onDarkModeToggle?: () => void;
   darkMode?: boolean;
+  profiles?: Profile[];
+  filterProfileId?: string | null;
+  onFilterChange?: (profileId: string | null) => void;
 }
 
 // Dommuss Logo SVG - Casa azul con tilde naranja (oficial)
@@ -46,6 +49,9 @@ export function TopAppBar({
   profileInitials,
   onDarkModeToggle,
   darkMode,
+  profiles,
+  filterProfileId,
+  onFilterChange,
 }: TopAppBarProps) {
   return (
     <header className="top-app-bar">
@@ -62,6 +68,25 @@ export function TopAppBar({
         </div>
 
         <div className="top-app-bar-actions">
+          {/* Botón de filtro por miembro */}
+          {profiles && profiles.length > 0 && (
+            <div className="top-app-bar-filter">
+              <select
+                className="top-app-bar-filter-select"
+                value={filterProfileId || ''}
+                onChange={(e) => onFilterChange?.(e.target.value || null)}
+                aria-label="Filtrar por miembro"
+              >
+                <option value="">Todos</option>
+                {profiles.map(profile => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             className="top-app-bar-icon-btn"
             onClick={onViewToggle}

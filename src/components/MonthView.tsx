@@ -7,14 +7,29 @@ interface MonthViewProps {
   currentDate: Date;
   events: ExpandedEvent[];
   onDayClick: (date: Date) => void;
+  filterProfileId?: string | null;
 }
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+// Iconos de categoría
+const getCategoryIcon = (category?: string) => {
+  const icons: Record<string, string> = {
+    salud: '🏥',
+    deporte: '⚽',
+    comida: '🍴',
+    cumple: '🎂',
+    colegio: '📚',
+    otro: '📌',
+  };
+  return category ? (icons[category] || '📌') : '📌';
+};
 
 export function MonthView({
   currentDate,
   events,
   onDayClick,
+  filterProfileId,
 }: MonthViewProps) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -35,8 +50,13 @@ export function MonthView({
     days.push(day);
   }
 
+  // Filtrar eventos por perfil si hay filtro activo
+  const filteredEvents = filterProfileId
+    ? events.filter(event => event.assignedProfileIds.includes(filterProfileId))
+    : events;
+
   // Agrupar eventos por día
-  const eventsByDay = events.reduce((acc, event) => {
+  const eventsByDay = filteredEvents.reduce((acc, event) => {
     const dayKey = format(event.startDate, 'yyyy-MM-dd');
     if (!acc[dayKey]) {
       acc[dayKey] = [];
@@ -75,7 +95,7 @@ export function MonthView({
 
               {dayEvents.length > 0 && (
                 <div className="month-day-events">
-                  {dayEvents.slice(0, 5).map((event) => (
+                  {dayEvents.slice(0, 4).map((event) => (
                     <div
                       key={event.id}
                       className="month-day-event-bar"
@@ -83,18 +103,14 @@ export function MonthView({
                       title={`${event.title} - ${format(event.startDate, 'HH:mm')}`}
                     >
                       <span className="month-day-event-category">
-                        {event.category === 'salud' && '🏥'}
-                        {event.category === 'deporte' && '⚽'}
-                        {event.category === 'comida' && '🍴'}
-                        {event.category === 'cumple' && '🎂'}
-                        {event.category === 'colegio' && '📚'}
-                        {event.category === 'otro' && '📌'}
+                        {getCategoryIcon(event.category)}
                       </span>
+                      <span className="month-day-event-title">{event.title}</span>
                     </div>
                   ))}
-                  {dayEvents.length > 5 && (
+                  {dayEvents.length > 4 && (
                     <span className="month-day-more">
-                      +{dayEvents.length - 5}
+                      +{dayEvents.length - 4}
                     </span>
                   )}
                 </div>

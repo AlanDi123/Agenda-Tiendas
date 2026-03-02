@@ -107,12 +107,13 @@
 .month-day-event-bar {
   height: 18px;
   font-size: 10px;
-  padding: 0 4px;
+  padding: 0 6px;
   margin: 1px 0;
   border-radius: 4px;
   color: white;
   display: flex;
   align-items: center;
+  gap: 4px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -124,8 +125,14 @@
 
 .month-day-event-category {
   font-size: 11px;
-  margin-right: 4px;
   flex-shrink: 0;
+}
+
+.month-day-event-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
 }
 
 .month-day:hover .month-day-event-bar {

@@ -2,6 +2,14 @@
 
 export type EventCategory = 'salud' | 'deporte' | 'comida' | 'cumple' | 'colegio' | 'otro';
 
+export interface EventComment {
+  profileId: string;
+  profileName: string;
+  profileAvatarColor: string;
+  text: string;
+  timestamp: Date;
+}
+
 export interface Profile {
   id: string;
   name: string;
@@ -38,6 +46,10 @@ export interface Event {
   rrule?: string;
   createdAt: Date;
   updatedAt: Date;
+  createdBy?: string;
+  lastModifiedBy?: string;
+  attachments?: string[];
+  comments?: EventComment[];
 }
 
 export interface ExpandedEvent {
@@ -55,6 +67,10 @@ export interface ExpandedEvent {
   category?: EventCategory;
   isRecurring: boolean;
   originalDate?: Date;
+  createdBy?: string;
+  lastModifiedBy?: string;
+  attachments?: string[];
+  comments?: EventComment[];
 }
 
 export type CalendarView = 'month' | 'week' | 'day';

@@ -10,6 +10,14 @@ import {
 import { expandRecurringEvents } from '../services/recurrence';
 import { generateId } from '../utils/helpers';
 
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
+
+interface Toast {
+  id: string;
+  message: string;
+  type: ToastType;
+}
+
 interface EventsContextType {
   events: Event[];
   expandedEvents: ExpandedEvent[];
@@ -21,6 +29,10 @@ interface EventsContextType {
   getEventById: (id: string) => Promise<Event | undefined>;
   setViewDate: (date: Date) => void;
   viewDate: Date;
+  notifyFamily: (event: Event, action: 'create' | 'update' | 'delete') => void;
+  addToast: (message: string, type: ToastType) => void;
+  removeToast: (id: string) => void;
+  toasts: Toast[];
 }
 
 const EventsContext = createContext<EventsContextType | undefined>(undefined);
@@ -30,6 +42,26 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const [expandedEvents, setExpandedEvents] = useState<ExpandedEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewDate, setViewDate] = useState(new Date());
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const addToast = useCallback((message: string, type: ToastType) => {
+    const id = generateId();
+    setToasts(prev => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // Notificación a la familia (simulada)
+  const notifyFamily = useCallback((event: Event, action: 'create' | 'update' | 'delete') => {
+    const messages = {
+      create: `📅 Nuevo evento: "${event.title}"`,
+      update: `✏️ Evento actualizado: "${event.title}"`,
+      delete: `🗑️ Evento eliminado: "${event.title}"`,
+    };
+    addToast(messages[action], action === 'delete' ? 'warning' : 'info');
+  }, [addToast]);
 
   const loadEvents = useCallback(async () => {
     setIsLoading(true);
@@ -65,8 +97,9 @@ export function EventsProvider({ children }: { children: ReactNode }) {
 
     await saveEvent(event);
     setEvents(prev => [...prev, event]);
+    notifyFamily(event, 'create');
     return event;
-  }, []);
+  }, [notifyFamily]);
 
   const updateEvent = useCallback(async (
     event: Event,
@@ -90,22 +123,28 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       await saveEvent(updatedEvent);
       setEvents(prev => prev.map(e => e.id === event.id ? updatedEvent : e));
     }
-  }, []);
+    
+    notifyFamily(updatedEvent, 'update');
+  }, [notifyFamily]);
 
   const deleteEvent = useCallback(async (
     eventId: string,
     scope: 'single' | 'future' | 'all'
   ) => {
+    const event = events.find(e => e.id === eventId);
+    
     if (scope === 'all') {
       await deleteEventFromDB(eventId);
       setEvents(prev => prev.filter(e => e.id !== eventId));
+      if (event) notifyFamily(event, 'delete');
     } else {
       // Para 'single' o 'future', en una implementación completa
       // manejaríamos las excepciones de recurrencia
       await deleteEventFromDB(eventId);
       setEvents(prev => prev.filter(e => e.id !== eventId));
+      if (event) notifyFamily(event, 'delete');
     }
-  }, []);
+  }, [events, notifyFamily]);
 
   const getEventById = useCallback(async (id: string): Promise<Event | undefined> => {
     return getEvent(id);
@@ -123,6 +162,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       getEventById,
       viewDate,
       setViewDate,
+      notifyFamily,
+      addToast,
+      removeToast,
+      toasts,
     }}>
       {children}
     </EventsContext.Provider>

@@ -16,6 +16,7 @@ import { Button } from './components/Button';
 import { UserAuthModal } from './components/UserAuth';
 import { UserSettingsModal } from './components/UserSettings';
 import { SplashScreen } from './components/SplashScreen';
+import { ToastContainer } from './components/Toast';
 import { useTouchGestures } from './hooks/useTouchGestures';
 import type { CalendarView, ExpandedEvent, Event, DeleteScope, Profile } from './types';
 import { formatMonthYear } from './utils/helpers';
@@ -45,6 +46,8 @@ function AppContent() {
     deleteEvent,
     viewDate,
     setViewDate,
+    toasts,
+    removeToast,
   } = useEvents();
 
   // UI State
@@ -59,6 +62,7 @@ function AppContent() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const [filterProfileId, setFilterProfileId] = useState<string | null>(null);
   const [environments, setEnvironments] = useState<Array<{ id: string; name: string; pin?: string }>>([]);
   
   // User auth state
@@ -446,6 +450,7 @@ function AppContent() {
             currentDate={viewDate}
             events={expandedEvents}
             onDayClick={handleDayClick}
+            filterProfileId={filterProfileId}
           />
         );
       case 'day':
@@ -465,6 +470,7 @@ function AppContent() {
             currentDate={viewDate}
             events={expandedEvents}
             onDayClick={handleDayClick}
+            filterProfileId={filterProfileId}
           />
         );
     }
@@ -534,6 +540,9 @@ function AppContent() {
         onProfileClick={() => setShowUserSettings(true)}
         onDarkModeToggle={toggleDarkMode}
         darkMode={darkMode}
+        profiles={environment?.profiles || []}
+        filterProfileId={filterProfileId}
+        onFilterChange={setFilterProfileId}
       />
       
       <main className="app-main">
@@ -680,6 +689,9 @@ function AppContent() {
         onConfirm={() => handleEditScopeSelect(editScope)}
         onCancel={() => setShowEditScopeDialog(false)}
       />
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }
