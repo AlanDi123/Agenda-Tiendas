@@ -1,0 +1,240 @@
+.input-wrapper {
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+}
+
+.input-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input {
+  width: 100%;
+  padding: var(--spacing-sm) 0;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--color-text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-divider);
+  transition: border-color var(--transition-fast);
+  /* Prevent zoom on iOS */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Mobile optimization - larger font to prevent zoom */
+@media (max-width: 480px) {
+  .input {
+    font-size: 16px; /* iOS requires 16px minimum to prevent zoom */
+  }
+  
+  .input-label {
+    font-size: 0.8125rem;
+  }
+  
+  .input-container {
+    min-height: 48px;
+  }
+}
+
+.input:focus {
+  outline: none;
+  border-bottom-color: var(--color-primary);
+}
+
+.input::placeholder {
+  color: var(--color-text-disabled);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input-icon-left,
+.input-icon-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.input-icon-left {
+  left: 0;
+}
+
+.input-icon-right {
+  right: 0;
+}
+
+.input-icon-left ~ .input {
+  padding-left: 32px;
+}
+
+.input-icon-right ~ .input {
+  padding-right: 32px;
+}
+
+.input-icon-left svg,
+.input-icon-right svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Error state */
+.input-error .input {
+  border-bottom-color: var(--color-error);
+}
+
+.input-error-message {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-error);
+  margin-top: var(--spacing-xs);
+}
+
+/* Textarea */
+.textarea {
+  width: 100%;
+  padding: var(--spacing-sm) 0;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--color-text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-divider);
+  resize: vertical;
+  transition: border-color var(--transition-fast);
+}
+
+.textarea:focus {
+  outline: none;
+  border-bottom-color: var(--color-primary);
+}
+
+.textarea::placeholder {
+  color: var(--color-text-disabled);
+}
+
+.textarea-expandable {
+  min-height: 80px;
+}
+
+/* Toggle */
+.toggle-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) 0;
+}
+
+.toggle-label {
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+
+.toggle {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.toggle-off {
+  background-color: var(--color-divider);
+}
+
+.toggle-on {
+  background-color: var(--color-primary);
+}
+
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  background-color: white;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast);
+}
+
+.toggle-on .toggle-thumb {
+  transform: translateX(24px);
+}
+
+.toggle-disabled .toggle-label {
+  opacity: 0.5;
+}
+
+/* Select */
+.select {
+  width: 100%;
+  padding: var(--spacing-sm) 0;
+  padding-right: 32px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--color-text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-divider);
+  appearance: none;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.select:focus {
+  outline: none;
+  border-bottom-color: var(--color-primary);
+}
+
+.select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+.select-arrow svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Date/Time input specific */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  min-height: 48px;
+}

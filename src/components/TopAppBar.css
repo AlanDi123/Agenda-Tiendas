@@ -1,0 +1,95 @@
+.top-app-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-height);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  z-index: 100;
+  padding-top: env(safe-area-inset-top);
+}
+
+.top-app-bar-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 var(--spacing-md);
+}
+
+.top-app-bar-title-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.top-app-bar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.top-app-bar-subtitle {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.top-app-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.top-app-bar-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.top-app-bar-icon-btn:hover {
+  background-color: var(--color-surface-variant);
+  color: var(--color-text-primary);
+}
+
+.top-app-bar-icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.top-app-bar-profile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.top-app-bar-profile:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-md);
+}
+
+.top-app-bar-profile:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

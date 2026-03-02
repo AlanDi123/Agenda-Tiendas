@@ -1,0 +1,226 @@
+.day-view {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: 300px;
+  overflow: visible;
+}
+
+.day-view-header {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-divider);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex-shrink: 0;
+}
+
+.day-view-header-today {
+  background-color: var(--color-primary-light);
+}
+
+[data-theme="dark"] .day-view-header-today {
+  background-color: rgba(25, 118, 210, 0.15);
+}
+
+.day-view-date {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.day-view-event-count {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin: var(--spacing-xs) 0 0;
+}
+
+.day-view-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Empty state */
+.day-view-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl) var(--spacing-md);
+  text-align: center;
+}
+
+.day-view-empty-icon {
+  width: 120px;
+  height: 120px;
+  margin-bottom: var(--spacing-lg);
+  color: var(--color-text-disabled);
+}
+
+.day-view-empty-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.day-view-empty-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.day-view-empty-text {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  max-width: 280px;
+}
+
+/* Sections */
+.day-view-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.day-view-section:last-child {
+  margin-bottom: 0;
+}
+
+.day-view-section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-sm);
+}
+
+/* Event cards */
+.day-view-events {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.day-view-event-card {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  overflow: hidden;
+}
+
+.day-view-event-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.day-view-event-card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.day-view-event-color {
+  width: 4px;
+  flex-shrink: 0;
+}
+
+.day-view-event-content {
+  flex: 1;
+  padding: var(--spacing-md);
+  text-align: left;
+}
+
+.day-view-event-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.day-view-event-title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin: 0;
+  flex: 1;
+}
+
+.day-view-event-recurring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.day-view-event-recurring svg {
+  width: 16px;
+  height: 16px;
+}
+
+.day-view-event-time,
+.day-view-event-location {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.day-view-event-time:last-child,
+.day-view-event-location:last-child,
+.day-view-event-notes:last-child {
+  margin-bottom: 0;
+}
+
+.day-view-event-notes {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.day-view-event-notes-text {
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.day-view-event-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.day-view-event-profiles {
+  margin-top: var(--spacing-xs);
+}
+
+.day-view-event-arrow {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacing-md);
+  color: var(--color-text-disabled);
+}
+
+.day-view-event-arrow svg {
+  width: 20px;
+  height: 20px;
+}

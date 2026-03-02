@@ -1,0 +1,115 @@
+.phone-input-wrapper {
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+}
+
+.phone-input-group {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: flex-start;
+}
+
+.phone-input-country {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.phone-input-prefix {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-variant);
+  border: 1px solid var(--color-divider);
+  border-right: none;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  min-height: 48px;
+  min-width: 50px;
+}
+
+.phone-input-area {
+  flex: 0 0 100px;
+  position: relative;
+}
+
+.phone-input-area-hint {
+  position: absolute;
+  bottom: -18px;
+  left: 0;
+  font-size: 0.625rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.phone-input-number {
+  flex: 1;
+  min-width: 120px;
+}
+
+.phone-input-field {
+  width: 100%;
+  padding: var(--spacing-sm);
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+  min-height: 48px;
+}
+
+.phone-input-field:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.phone-input-number-field {
+  letter-spacing: 0.5px;
+}
+
+/* Error state */
+.phone-input-wrapper.input-error .phone-input-field {
+  border-color: var(--color-error);
+}
+
+/* Mobile optimization */
+@media (max-width: 480px) {
+  .phone-input-group {
+    flex-wrap: wrap;
+  }
+  
+  .phone-input-country {
+    width: 100%;
+  }
+  
+  .phone-input-prefix {
+    border-radius: var(--radius-md);
+    width: 100%;
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .phone-input-area {
+    flex: 0 0 calc(50% - var(--spacing-xs));
+  }
+  
+  .phone-input-number {
+    flex: 0 0 calc(50% - var(--spacing-xs));
+  }
+  
+  .phone-input-area-hint {
+    max-width: 100%;
+  }
+}
+
+/* Dark mode */
+[data-theme="dark"] .phone-input-prefix {
+  background-color: var(--color-surface-variant);
+}

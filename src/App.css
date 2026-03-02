@@ -1,0 +1,293 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding-top: var(--header-height);
+  padding-bottom: var(--bottom-nav-height);
+  overscroll-behavior-y: contain;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  min-height: 0;
+}
+
+/* Contenedor scroll unificado para calendario + turnos */
+.app-scroll-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+
+/* Vista del calendario - altura fija pero scrollea junto con turnos */
+.app-scroll-container > :first-child {
+  flex-shrink: 0;
+  flex-grow: 0;
+}
+
+/* TurnosGrid - sin sticky, fluye naturalmente */
+.turnos-grid-container {
+  flex-shrink: 0;
+  margin-top: var(--spacing-md);
+}
+
+/* Mobile optimizations */
+@media (max-width: 480px) {
+  .app {
+    padding-top: calc(var(--header-height) - 8px);
+  }
+  
+  .top-app-bar-title {
+    font-size: 1.125rem;
+  }
+  
+  .app-calendar-nav {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+  
+  .app-nav-btn {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .app-nav-today {
+    padding: 0 var(--spacing-sm);
+    font-size: 0.8125rem;
+  }
+}
+
+/* Calendar Navigation */
+.app-calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-divider);
+  touch-action: pan-y;
+}
+
+/* View animations */
+.app-view {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Button animations */
+.btn {
+  transition: all var(--transition-fast);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* FAB animation */
+.btn-fab {
+  animation: fabEntrance 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes fabEntrance {
+  from {
+    opacity: 0;
+    transform: scale(0) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Modal animations */
+.modal-content {
+  animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpModal {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Input focus animation */
+.input:focus {
+  animation: inputFocus 0.2s ease-out;
+}
+
+@keyframes inputFocus {
+  0% {
+    border-bottom-width: 1px;
+  }
+  50% {
+    border-bottom-width: 2px;
+  }
+  100% {
+    border-bottom-width: 1px;
+  }
+}
+
+/* Pull to refresh indicator */
+.pull-refresh-indicator {
+  position: fixed;
+  top: calc(var(--header-height) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  z-index: 90;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+}
+
+.pull-refresh-indicator.visible {
+  opacity: 1;
+}
+
+.pull-refresh-indicator svg {
+  width: 20px;
+  height: 20px;
+  color: var(--color-primary);
+}
+
+.pull-refresh-indicator span {
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+}
+
+.app-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.app-nav-btn:hover {
+  background-color: var(--color-surface-variant);
+  color: var(--color-primary);
+}
+
+.app-nav-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.app-nav-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.app-nav-today {
+  font-size: 0.875rem;
+  font-weight: 500;
+  width: auto;
+  padding: 0 var(--spacing-md);
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.app-nav-today:hover {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+/* View Container */
+.app-view-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* FAB positioning adjustment for mobile */
+@media (max-width: 480px) {
+  .btn-fab {
+    bottom: calc(var(--bottom-nav-height) + var(--spacing-md));
+    right: var(--spacing-md);
+  }
+}
+
+/* Animations for view transitions */
+.app-view-enter {
+  animation: slideIn var(--transition-normal);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .app-view-enter {
+    animation: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .app-calendar-nav,
+  .bottom-nav,
+  .btn-fab {
+    display: none !important;
+  }
+  
+  .app {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  
+  .app-main {
+    overflow: visible;
+  }
+}

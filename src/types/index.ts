@@ -1,0 +1,70 @@
+// Tipos principales de la aplicación
+
+export interface Profile {
+  id: string;
+  name: string;
+  email: string;
+  avatarColor: string;
+  initials: string;
+  permissions: 'admin' | 'readonly';
+  pin?: string;
+  recoveryEmail?: string;
+  createdAt: Date;
+}
+
+export interface Environment {
+  id: string;
+  name: string;
+  pin?: string;
+  profiles: Profile[];
+  activeProfileId?: string;
+  createdAt: Date;
+}
+
+export interface Event {
+  id: string;
+  title: string;
+  phone?: string;
+  allDay: boolean;
+  startDate: Date;
+  endDate: Date;
+  location?: string;
+  notes?: string;
+  assignedProfileIds: string[];
+  color: string;
+  rrule?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ExpandedEvent {
+  id: string;
+  baseEventId: string;
+  title: string;
+  phone?: string;
+  allDay: boolean;
+  startDate: Date;
+  endDate: Date;
+  location?: string;
+  notes?: string;
+  assignedProfileIds: string[];
+  color: string;
+  isRecurring: boolean;
+  originalDate?: Date;
+}
+
+export type CalendarView = 'month' | 'week' | 'day';
+
+export type RecurrencePattern = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export type DeleteScope = 'single' | 'future' | 'all';
+
+export type EditScope = 'single' | 'future' | 'all';
+
+export interface AppState {
+  environment: Environment | null;
+  isAuthenticated: boolean;
+  darkMode: boolean;
+  currentView: CalendarView;
+  currentDate: Date;
+}

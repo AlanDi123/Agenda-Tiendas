@@ -1,0 +1,183 @@
+.user-auth {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.user-auth-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.user-auth-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto;
+  color: var(--color-primary);
+}
+
+.user-auth-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.user-auth-description {
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.user-auth-avatar-preview {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-sm);
+}
+
+.user-auth-section {
+  margin-top: var(--spacing-sm);
+}
+
+.user-auth-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.user-auth-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.user-auth-color {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.user-auth-color:hover {
+  transform: scale(1.1);
+}
+
+.user-auth-color.selected {
+  border-color: var(--color-text-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.user-auth-color:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.user-auth-error {
+  color: var(--color-error);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.user-auth-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-divider);
+}
+
+.user-auth-actions .btn {
+  flex: 1;
+}
+
+/* PIN Pad */
+.user-auth-pin-display {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+}
+
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-divider);
+  background: transparent;
+  transition: all var(--transition-fast);
+}
+
+.pin-dot.filled {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.user-auth-pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-md);
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.user-auth-pin-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.user-auth-pin-btn:hover {
+  background: var(--color-surface-variant);
+}
+
+.user-auth-pin-btn:active {
+  background: var(--color-primary-light);
+  transform: scale(0.95);
+}
+
+.user-auth-submit {
+  margin-top: var(--spacing-md);
+}
+
+.user-auth-forgot-pin {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.user-auth-forgot-pin:hover {
+  color: var(--color-primary-dark);
+}
+
+/* Mobile optimization */
+@media (max-width: 480px) {
+  .user-auth-pin-btn {
+    width: 56px;
+    height: 56px;
+    font-size: 1.25rem;
+  }
+  
+  .user-auth-pin-pad {
+    gap: var(--spacing-sm);
+  }
+}
