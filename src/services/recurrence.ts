@@ -28,6 +28,7 @@ export function expandRecurringEvents(
             id: `${event.id}-${occurrence.toISOString()}`,
             baseEventId: event.id,
             title: event.title,
+            phone: event.phone,
             allDay: event.allDay,
             startDate: occurrence,
             endDate: occEnd,
@@ -35,31 +36,42 @@ export function expandRecurringEvents(
             notes: event.notes,
             assignedProfileIds: event.assignedProfileIds,
             color: event.color,
+            category: event.category,
             isRecurring: true,
             originalDate: occurrence,
+            createdBy: event.createdBy,
+            lastModifiedBy: event.lastModifiedBy,
+            attachments: event.attachments,
+            comments: event.comments,
           });
         }
       } catch (error) {
         console.error('Error expanding RRULE:', error);
       }
     } else {
-      // Evento no recurrente - verificar si está en el rango
+      // Evento no recurrente - verificar si la fecha está dentro del rango
       const eventStart = new Date(event.startDate);
-      const eventEnd = new Date(event.endDate);
-
-      if (eventStart <= endDate && eventEnd >= startDate) {
+      
+      // Solo incluir si la fecha de inicio del evento está dentro del rango visible
+      if (eventStart >= startDate && eventStart <= endDate) {
         expanded.push({
           id: event.id,
           baseEventId: event.id,
           title: event.title,
+          phone: event.phone,
           allDay: event.allDay,
           startDate: eventStart,
-          endDate: eventEnd,
+          endDate: new Date(event.endDate),
           location: event.location,
           notes: event.notes,
           assignedProfileIds: event.assignedProfileIds,
           color: event.color,
+          category: event.category,
           isRecurring: false,
+          createdBy: event.createdBy,
+          lastModifiedBy: event.lastModifiedBy,
+          attachments: event.attachments,
+          comments: event.comments,
         });
       }
     }
