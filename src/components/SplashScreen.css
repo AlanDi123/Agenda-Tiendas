@@ -1,0 +1,90 @@
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  background-color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: splashFadeOut 0.5s ease-out forwards;
+  animation-delay: 1.5s;
+}
+
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  animation: splashContentFadeIn 0.8s ease-out;
+}
+
+.splash-logo {
+  animation: splashLogoPulse 2s ease-in-out infinite;
+}
+
+.splash-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.splash-subtitle {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+  font-weight: 500;
+}
+
+@keyframes splashContentFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes splashLogoPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes splashFadeOut {
+  0% {
+    opacity: 1;
+    visibility: visible;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Prevent splash from blocking interactions after animation */
+.splash-screen.animation-complete {
+  display: none;
+}
+
+/* Mobile optimization */
+@media (max-width: 480px) {
+  .splash-logo {
+    width: 100px;
+    height: 100px;
+  }
+
+  .splash-title {
+    font-size: 1.75rem;
+  }
+
+  .splash-subtitle {
+    font-size: 0.8125rem;
+  }
+}

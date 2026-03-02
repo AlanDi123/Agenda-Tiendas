@@ -75,17 +75,26 @@ export function MonthView({
 
               {dayEvents.length > 0 && (
                 <div className="month-day-events">
-                  {dayEvents.slice(0, 4).map((event) => (
+                  {dayEvents.slice(0, 5).map((event) => (
                     <div
                       key={event.id}
                       className="month-day-event-bar"
                       style={{ backgroundColor: event.color }}
                       title={`${event.title} - ${format(event.startDate, 'HH:mm')}`}
-                    />
+                    >
+                      <span className="month-day-event-category">
+                        {event.category === 'salud' && '🏥'}
+                        {event.category === 'deporte' && '⚽'}
+                        {event.category === 'comida' && '🍴'}
+                        {event.category === 'cumple' && '🎂'}
+                        {event.category === 'colegio' && '📚'}
+                        {event.category === 'otro' && '📌'}
+                      </span>
+                    </div>
                   ))}
-                  {dayEvents.length > 4 && (
+                  {dayEvents.length > 5 && (
                     <span className="month-day-more">
-                      +{dayEvents.length - 4}
+                      +{dayEvents.length - 5}
                     </span>
                   )}
                 </div>

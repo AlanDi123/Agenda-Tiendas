@@ -17,6 +17,11 @@
   }
 }
 
+/* Bottom Sheet variant */
+.modal-overlay-bottom-sheet {
+  align-items: flex-end;
+}
+
 .modal-content {
   background-color: var(--color-surface);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
@@ -30,11 +35,55 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Bottom Sheet specific styles */
+.modal-bottom-sheet {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  border-radius: var(--radius-xxl) var(--radius-xxl) 0 0;
+  max-height: 92vh;
+  animation: slideUpBottomSheet var(--transition-normal);
+}
+
+.bottom-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background-color: var(--color-text-disabled);
+  border-radius: var(--radius-full);
+  margin: 12px auto;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  opacity: 0.5;
+}
+
+.bottom-sheet-handle:hover {
+  opacity: 1;
+  background-color: var(--color-text-secondary);
+}
+
+.bottom-sheet-handle:active {
+  background-color: var(--color-primary);
+}
+
+@keyframes slideUpBottomSheet {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 @media (min-width: 600px) {
   .modal-content {
     border-radius: var(--radius-xl);
     margin: var(--spacing-md);
     max-height: 85vh;
+  }
+
+  .modal-bottom-sheet {
+    max-width: 500px;
+    margin: 0 auto;
   }
 }
 

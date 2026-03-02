@@ -8,6 +8,8 @@ interface ModalProps {
   children: React.ReactNode;
   showCloseButton?: boolean;
   closeOnOverlay?: boolean;
+  variant?: 'modal' | 'bottom-sheet';
+  showHandle?: boolean;
 }
 
 export function Modal({
@@ -17,6 +19,8 @@ export function Modal({
   children,
   showCloseButton = true,
   closeOnOverlay = true,
+  variant = 'modal',
+  showHandle = variant === 'bottom-sheet',
 }: ModalProps) {
   const handleOverlayClick = useCallback(() => {
     if (closeOnOverlay) {
@@ -51,6 +55,21 @@ export function Modal({
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  if (variant === 'bottom-sheet') {
+    return (
+      <div className="modal-overlay modal-overlay-bottom-sheet" onClick={handleOverlayClick} role="dialog" aria-modal="true">
+        <div className="modal-content modal-bottom-sheet" onClick={(e) => e.stopPropagation()}>
+          {showHandle && (
+            <div className="bottom-sheet-handle" onClick={onClose} role="button" aria-label="Cerrar" />
+          )}
+          <div className="modal-body">
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay" onClick={handleOverlayClick} role="dialog" aria-modal="true">

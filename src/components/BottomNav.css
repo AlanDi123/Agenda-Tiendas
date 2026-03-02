@@ -51,17 +51,18 @@
 
 /* Disabled state - items no activos */
 .bottom-nav-item.disabled {
-  opacity: 0.4;
+  opacity: 1;
   pointer-events: none;
   cursor: default;
 }
 
-.bottom-nav-item.disabled svg {
-  stroke: var(--color-text-disabled);
+.bottom-nav-item.disabled .bottom-nav-icon svg {
+  stroke: #94A3B8;
+  color: #94A3B8;
 }
 
 .bottom-nav-item.disabled span:last-child {
-  color: var(--color-text-disabled);
+  color: #94A3B8;
 }
 
 /* Hover state for enabled items */
@@ -74,15 +75,15 @@
   stroke: var(--color-text-primary);
 }
 
-/* Active state */
+/* Active state - Calendario activo */
 .bottom-nav-item.active {
   color: var(--color-accent);
 }
 
-.bottom-nav-item.active svg {
+.bottom-nav-item.active .bottom-nav-icon svg {
   fill: var(--color-accent);
   stroke: var(--color-accent);
-  stroke-width: 2.5;
+  stroke-width: 2;
   transform: scale(1.1);
 }
 

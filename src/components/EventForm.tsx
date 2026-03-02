@@ -226,10 +226,14 @@ export function EventForm({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={isEditing ? 'Editar evento' : 'Nuevo evento'}
-      showCloseButton={true}
+      variant="bottom-sheet"
+      showHandle={true}
+      showCloseButton={false}
     >
       <div className="event-form">
+        <div className="event-form-header">
+          <h2 className="event-form-title">{isEditing ? 'Editar evento' : 'Nuevo evento'}</h2>
+        </div>
         <Input
           label="📝 Título *"
           value={title}
@@ -301,20 +305,20 @@ export function EventForm({
 
         <div className="event-form-section">
           <label className="event-form-label">🏷️ Categoría:</label>
-          <div className="event-form-categories">
+          <div className="event-form-categories-grid">
             {CATEGORIES.map(cat => (
               <button
                 key={cat.value}
-                className={`event-form-category ${category === cat.value ? 'selected' : ''}`}
+                className={`event-form-category-circle ${category === cat.value ? 'selected' : ''}`}
                 onClick={() => setCategory(cat.value)}
                 type="button"
                 style={{
                   borderColor: category === cat.value ? cat.color : 'var(--color-divider)',
-                  backgroundColor: category === cat.value ? `${cat.color}20` : 'transparent',
+                  backgroundColor: category === cat.value ? `${cat.color}15` : 'transparent',
                 }}
               >
-                <span className="event-form-category-icon">{cat.icon}</span>
-                <span className="event-form-category-label">{cat.label}</span>
+                <span className="event-form-category-circle-icon">{cat.icon}</span>
+                <span className="event-form-category-circle-label">{cat.label}</span>
               </button>
             ))}
           </div>

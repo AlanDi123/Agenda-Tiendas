@@ -45,12 +45,11 @@ export function EventDetail({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      variant="bottom-sheet"
+      showHandle={true}
       showCloseButton={false}
     >
-      <div className="event-detail-bottom-sheet">
-        {/* Handle para arrastrar */}
-        <div className="event-detail-handle" onClick={onClose} />
-
+      <div className="event-detail-content">
         {/* Avatares en la parte superior */}
         {avatarProfiles.length > 0 && (
           <div className="event-detail-avatars">

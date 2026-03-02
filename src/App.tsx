@@ -15,9 +15,10 @@ import { ConfirmDialog } from './components/Modal';
 import { Button } from './components/Button';
 import { UserAuthModal } from './components/UserAuth';
 import { UserSettingsModal } from './components/UserSettings';
+import { SplashScreen } from './components/SplashScreen';
 import { useTouchGestures } from './hooks/useTouchGestures';
 import type { CalendarView, ExpandedEvent, Event, DeleteScope, Profile } from './types';
-import { formatMonthYear, formatFullDate } from './utils/helpers';
+import { formatMonthYear } from './utils/helpers';
 import { getAllEnvironments, saveUserSession, getAllUserSessions, getEnvironment } from './services/database';
 import './styles/global.css';
 import './App.css';
@@ -57,6 +58,7 @@ function AppContent() {
   const [deleteScope, setDeleteScope] = useState<DeleteScope>('single');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const [environments, setEnvironments] = useState<Array<{ id: string; name: string; pin?: string }>>([]);
   
   // User auth state
@@ -133,6 +135,13 @@ function AppContent() {
       }
     };
     loadEnvs();
+
+    // Hide splash screen after delay
+    const splashTimer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2000);
+
+    return () => clearTimeout(splashTimer);
   }, []);
 
   // Load events when authenticated
@@ -460,7 +469,12 @@ function AppContent() {
         );
     }
   };
-  
+
+  // Show splash screen
+  if (showSplash) {
+    return <SplashScreen />;
+  }
+
   // Show onboarding
   if (showOnboarding) {
     return <Onboarding onComplete={handleOnboardingComplete} existingEnvName={environment?.name} />;
@@ -510,8 +524,8 @@ function AppContent() {
       onTouchEnd={onTouchEnd}
     >
       <TopAppBar
-        title={`📅 ${formatMonthYear(viewDate)}`}
-        subtitle={currentView === 'day' ? formatFullDate(viewDate) : undefined}
+        title={environment?.name || 'Mi Familia'}
+        subtitle={formatMonthYear(viewDate)}
         onViewToggle={handleViewToggle}
         currentView={currentView}
         profileName={activeProfile.name}
