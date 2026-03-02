@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.importmania.agenda',
   appName: 'Dommuss',
   webDir: 'dist',
-  bundledWebRuntime: false,
   server: {
     // URL de producción en Vercel
     url: 'https://agenda-tienda.vercel.app',
