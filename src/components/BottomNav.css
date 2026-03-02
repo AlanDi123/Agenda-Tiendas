@@ -51,7 +51,7 @@
 
 /* Disabled state - items no activos */
 .bottom-nav-item.disabled {
-  opacity: 1;
+  opacity: 0.4;
   pointer-events: none;
   cursor: default;
 }
