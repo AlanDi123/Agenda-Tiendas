@@ -6,8 +6,8 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   bundledWebRuntime: false,
   server: {
-    // ⚠️ IMPORTANTE: Reemplaza esta URL con la de tu proyecto en Vercel
-    url: 'https://TU-URL-DE-VERCEL.vercel.app',
+    // URL de producción en Vercel
+    url: 'https://agenda-tienda.vercel.app',
     cleartext: true
   },
   plugins: {
