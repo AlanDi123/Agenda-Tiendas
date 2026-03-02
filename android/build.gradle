@@ -24,6 +24,20 @@ allprojects {
     }
 }
 
+// Configure Java compatibility for all modules
+subprojects {
+    afterEvaluate {
+        if (it.hasProperty('android')) {
+            android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+            }
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
