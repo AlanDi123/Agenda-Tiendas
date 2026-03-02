@@ -454,14 +454,23 @@ function AppContent() {
           />
         );
       case 'day':
-        // Vista diaria solo cuando se hace click en un día específico
+        // Vista diaria con grilla de turnos
         return (
-          <DayView
-            currentDate={viewDate}
-            events={expandedEvents}
-            profiles={environment?.profiles || []}
-            onEventClick={handleEventClick}
-          />
+          <>
+            <DayView
+              currentDate={viewDate}
+              events={expandedEvents}
+              profiles={environment?.profiles || []}
+              onEventClick={handleEventClick}
+            />
+            <TurnosGrid
+              currentDate={viewDate}
+              events={expandedEvents}
+              profiles={environment?.profiles || []}
+              onSlotClick={handleTurnoSlotClick}
+              onEventClick={handleTurnoEventClick}
+            />
+          </>
         );
       default:
         // Por defecto, vista mensual
@@ -564,15 +573,6 @@ function AppContent() {
 
         <div className="app-scroll-container">
           {renderView()}
-          
-          {/* Grilla de Turnos Diarios */}
-          <TurnosGrid
-            currentDate={viewDate}
-            events={expandedEvents}
-            profiles={environment?.profiles || []}
-            onSlotClick={handleTurnoSlotClick}
-            onEventClick={handleTurnoEventClick}
-          />
         </div>
       </main>
       
