@@ -14,24 +14,20 @@ interface TopAppBarProps {
   darkMode?: boolean;
 }
 
-// Dommuss Logo SVG - Casa azul con tilde naranja
+// Dommuss Logo SVG - Casa azul con tilde naranja (oficial)
 function DommussLogo() {
   return (
-    <svg viewBox="0 0 48 48" className="dommuss-logo" aria-label="Dommuss">
+    <svg width="28" height="28" viewBox="0 0 100 100" fill="none" className="dommuss-logo" aria-label="Dommuss">
       {/* Casa azul */}
       <path
-        d="M24 4L4 20v24h14V30h12v14h14V20L24 4z"
+        d="M10 40L50 10L90 40V85H10V40Z"
         fill="#2D3E50"
-        stroke="#2D3E50"
-        strokeWidth="2"
-        strokeLinejoin="round"
       />
-      {/* Tilde naranja dentro de la casa */}
+      {/* Tilde naranja central */}
       <path
-        d="M14 26l6 6 14-14"
-        fill="none"
+        d="M35 55L45 65L70 40"
         stroke="#FF6B35"
-        strokeWidth="4"
+        strokeWidth="10"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
