@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
-import type { Event, Profile } from '../types';
+import type { Event, Profile, EventCategory } from '../types';
 import { Modal } from './Modal';
 import { Input, Textarea, Toggle } from './Input';
 import { PhoneInput } from './PhoneInput';
@@ -16,6 +16,16 @@ interface EventFormProps {
   profiles: Profile[];
   initialDate?: Date;
 }
+
+// Categorías con iconos y colores
+const CATEGORIES: { value: EventCategory; label: string; icon: string; color: string }[] = [
+  { value: 'salud', label: 'Salud', icon: '🏥', color: '#E57373' },
+  { value: 'deporte', label: 'Deporte', icon: '⚽', color: '#81C784' },
+  { value: 'comida', label: 'Comida', icon: '🍴', color: '#FFB74D' },
+  { value: 'cumple', label: 'Cumple', icon: '🎂', color: '#BA68C8' },
+  { value: 'colegio', label: 'Colegio', icon: '📚', color: '#64B5F6' },
+  { value: 'otro', label: 'Otro', icon: '📌', color: '#9E9E9E' },
+];
 
 export function EventForm({
   isOpen,
@@ -38,6 +48,7 @@ export function EventForm({
   const [endTime, setEndTime] = useState(formatTimeForInput(oneHourLater));
   const [notes, setNotes] = useState('');
   const [assignedProfileIds, setAssignedProfileIds] = useState<string[]>([]);
+  const [category, setCategory] = useState<EventCategory>('otro');
 
   const [titleError, setTitleError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -66,6 +77,7 @@ export function EventForm({
       setEndTime(formatTimeForInput(end));
       setNotes(event.notes || '');
       setAssignedProfileIds(event.assignedProfileIds);
+      setCategory(event.category || 'otro');
     } else if (isOpen) {
       // Reset form for new event
       resetForm();
@@ -85,6 +97,7 @@ export function EventForm({
     setEndTime(formatTimeForInput(oneHourLater));
     setNotes('');
     setAssignedProfileIds([]);
+    setCategory('otro');
     setTitleError('');
   }
   
@@ -177,10 +190,11 @@ export function EventForm({
         ? new Date(`${endDate}T23:59:59`)
         : new Date(`${endDate}T${endTime}`);
 
-      // Obtener color del primer perfil asignado
+      // Obtener color: prioridad al perfil asignado, luego a la categoría
+      const categoryColor = CATEGORIES.find(c => c.value === category)?.color || '#9E9E9E';
       const eventColor = assignedProfileIds.length > 0
-        ? profiles.find(p => p.id === assignedProfileIds[0])?.avatarColor || '#1E88E5'
-        : '#1E88E5';
+        ? profiles.find(p => p.id === assignedProfileIds[0])?.avatarColor || categoryColor
+        : categoryColor;
 
       const eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'> = {
         title: title.trim(),
@@ -191,6 +205,7 @@ export function EventForm({
         notes: notes.trim() || undefined,
         assignedProfileIds,
         color: eventColor,
+        category,
       };
 
       await onSave(eventData);
@@ -283,6 +298,27 @@ export function EventForm({
           expandable
           rows={4}
         />
+
+        <div className="event-form-section">
+          <label className="event-form-label">🏷️ Categoría:</label>
+          <div className="event-form-categories">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat.value}
+                className={`event-form-category ${category === cat.value ? 'selected' : ''}`}
+                onClick={() => setCategory(cat.value)}
+                type="button"
+                style={{
+                  borderColor: category === cat.value ? cat.color : 'var(--color-divider)',
+                  backgroundColor: category === cat.value ? `${cat.color}20` : 'transparent',
+                }}
+              >
+                <span className="event-form-category-icon">{cat.icon}</span>
+                <span className="event-form-category-label">{cat.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="event-form-section">
           <label className="event-form-label">👥 Asignar a:</label>

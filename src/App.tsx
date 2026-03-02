@@ -4,7 +4,6 @@ import { EventsProvider, useEvents } from './contexts/EventsContext';
 import { TopAppBar } from './components/TopAppBar';
 import { BottomNav } from './components/BottomNav';
 import { MonthView } from './components/MonthView';
-import { WeekView } from './components/WeekView';
 import { DayView } from './components/DayView';
 import { TurnosGrid } from './components/TurnosGrid';
 import { EventForm } from './components/EventForm';
@@ -155,8 +154,9 @@ function AppContent() {
     setCurrentView(view);
   }, []);
 
+  // Vista toggle - Solo vista mensual (Dommuss Agenda)
   const handleViewToggle = useCallback(() => {
-    setCurrentView(prev => prev === 'month' ? 'day' : 'month');
+    // No-op: Solo vista mensual disponible
   }, []);
 
   const handleDayClick = useCallback((date: Date) => {
@@ -406,31 +406,29 @@ function AppContent() {
     };
   }, [handleNext, handlePrev]);
   
-  // Keyboard navigation
+  // Keyboard navigation - Solo vista mensual
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showEventForm || showEventDetail || showProfileSelector || showAddProfile) return;
-      
+
       if (e.key === 'ArrowLeft') {
         handlePrev();
       } else if (e.key === 'ArrowRight') {
         handleNext();
       } else if (e.key === 't') {
         handleToday();
-      } else if (e.key === '1') {
+      }
+      // Solo permite vista mensual (tecla 1)
+      if (e.key === '1') {
         setCurrentView('month');
-      } else if (e.key === '2') {
-        setCurrentView('week');
-      } else if (e.key === '3') {
-        setCurrentView('day');
       }
     };
-    
+
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handlePrev, handleNext, handleToday, showEventForm, showEventDetail, showProfileSelector, showAddProfile]);
   
-  // Render views
+  // Render views - Dommuss Agenda (principalmente vista mensual)
   const renderView = () => {
     switch (currentView) {
       case 'month':
@@ -441,16 +439,8 @@ function AppContent() {
             onDayClick={handleDayClick}
           />
         );
-      case 'week':
-        return (
-          <WeekView
-            currentDate={viewDate}
-            events={expandedEvents}
-            onDayClick={handleDayClick}
-            onEventClick={handleEventClick}
-          />
-        );
       case 'day':
+        // Vista diaria solo cuando se hace click en un día específico
         return (
           <DayView
             currentDate={viewDate}
@@ -460,7 +450,14 @@ function AppContent() {
           />
         );
       default:
-        return null;
+        // Por defecto, vista mensual
+        return (
+          <MonthView
+            currentDate={viewDate}
+            events={expandedEvents}
+            onDayClick={handleDayClick}
+          />
+        );
     }
   };
   

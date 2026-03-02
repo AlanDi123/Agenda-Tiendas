@@ -24,31 +24,41 @@ export function EventDetail({
   onClose,
 }: EventDetailProps) {
   if (!event) return null;
-  
+
   const assignedProfiles = profiles.filter(p => event.assignedProfileIds.includes(p.id));
   const startDate = new Date(event.startDate);
   const endDate = new Date(event.endDate);
-  
+
   const avatarProfiles = assignedProfiles.map(p => ({
     name: p.name,
     initials: p.initials,
     color: p.avatarColor,
   }));
-  
+
   const formatDate = (date: Date) => format(date, "EEEE, d 'de' MMMM yyyy", { locale: es });
   const formatTime = (date: Date) => format(date, 'HH:mm');
-  
+
   // Capitalize
   const formattedStartDate = formatDate(startDate).charAt(0).toUpperCase() + formatDate(startDate).slice(1);
-  
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Detalles del evento"
-      showCloseButton={true}
+      showCloseButton={false}
     >
-      <div className="event-detail">
+      <div className="event-detail-bottom-sheet">
+        {/* Handle para arrastrar */}
+        <div className="event-detail-handle" onClick={onClose} />
+
+        {/* Avatares en la parte superior */}
+        {avatarProfiles.length > 0 && (
+          <div className="event-detail-avatars">
+            <AvatarGroup profiles={avatarProfiles} max={5} size="lg" />
+          </div>
+        )}
+
+        {/* Header con color del evento */}
         <div
           className="event-detail-header"
           style={{ backgroundColor: event.color }}
@@ -65,7 +75,7 @@ export function EventDetail({
             </span>
           )}
         </div>
-        
+
         <div className="event-detail-body">
           <div className="event-detail-row">
             <span className="event-detail-icon">
@@ -80,7 +90,7 @@ export function EventDetail({
               <span className="event-detail-value">{formattedStartDate}</span>
             </div>
           </div>
-          
+
           <div className="event-detail-row">
             <span className="event-detail-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -95,7 +105,7 @@ export function EventDetail({
               </span>
             </div>
           </div>
-          
+
           {event.location && (
             <div className="event-detail-row">
               <span className="event-detail-icon">
@@ -110,26 +120,17 @@ export function EventDetail({
               </div>
             </div>
           )}
-          
-          {avatarProfiles.length > 0 && (
+
+          {event.category && (
             <div className="event-detail-row">
-              <span className="event-detail-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 00-3-3.87" />
-                  <path d="M16 3.13a4 4 0 010 7.75" />
-                </svg>
-              </span>
+              <span className="event-detail-icon">🏷️</span>
               <div className="event-detail-info">
-                <span className="event-detail-label">Asignado a</span>
-                <div className="event-detail-profiles">
-                  <AvatarGroup profiles={avatarProfiles} max={4} size="md" />
-                </div>
+                <span className="event-detail-label">Categoría</span>
+                <span className="event-detail-value">{event.category.charAt(0).toUpperCase() + event.category.slice(1)}</span>
               </div>
             </div>
           )}
-          
+
           {event.notes && (
             <div className="event-detail-notes">
               <span className="event-detail-label">Notas</span>
@@ -137,7 +138,7 @@ export function EventDetail({
             </div>
           )}
         </div>
-        
+
         <div className="event-detail-actions">
           <Button variant="secondary" onClick={onDelete} type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

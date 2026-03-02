@@ -85,55 +85,43 @@
 }
 
 .month-day-number-today {
-  background-color: var(--color-primary);
+  background-color: var(--color-accent);
   color: white;
   font-weight: 600;
 }
 
-.month-day-dots {
-  display: flex;
-  gap: 3px;
-  margin-top: 6px;
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: 100%;
-}
-
-.month-day-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-.month-day-dot-more {
-  font-size: 0.625rem;
-  color: var(--color-text-secondary);
-  display: flex;
-  align-items: center;
-}
-
-/* Eventos en la vista mensual (opcional, para mostrar títulos truncados) */
+/* Barras horizontales de eventos - Dommuss style */
 .month-day-events {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 2px 4px;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 40px;
+  max-height: 32px;
   overflow: hidden;
 }
 
-.month-day-event {
-  font-size: 0.625rem;
-  padding: 2px 4px;
-  border-radius: 2px;
-  color: white;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.month-day-event-bar {
+  height: 4px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  min-width: 20%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: transform var(--transition-fast);
 }
+
+.month-day:hover .month-day-event-bar {
+  transform: scaleX(1.05);
+}
+
+.month-day-more {
+  font-size: 0.5625rem;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  text-align: center;
+  padding: 2px;
+}
+
+/* Mobile optimization */

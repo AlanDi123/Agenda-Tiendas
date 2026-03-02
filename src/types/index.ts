@@ -1,5 +1,7 @@
 // Tipos principales de la aplicación
 
+export type EventCategory = 'salud' | 'deporte' | 'comida' | 'cumple' | 'colegio' | 'otro';
+
 export interface Profile {
   id: string;
   name: string;
@@ -32,6 +34,7 @@ export interface Event {
   notes?: string;
   assignedProfileIds: string[];
   color: string;
+  category?: EventCategory;
   rrule?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -49,6 +52,7 @@ export interface ExpandedEvent {
   notes?: string;
   assignedProfileIds: string[];
   color: string;
+  category?: EventCategory;
   isRecurring: boolean;
   originalDate?: Date;
 }

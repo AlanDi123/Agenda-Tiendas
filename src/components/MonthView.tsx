@@ -18,23 +18,23 @@ export function MonthView({
 }: MonthViewProps) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
-  
+
   const firstDayOfMonth = new Date(year, month, 1);
-  
+
   // Ajustar para comenzar en lunes
   const startDay = firstDayOfMonth.getDay() || 7; // 0 (domingo) -> 7
   const daysBeforeMonth = startDay - 1;
-  
+
   const firstDay = new Date(year, month, 1 - daysBeforeMonth);
   const totalDays = 42; // 6 semanas para cubrir todos los casos
-  
+
   const days: Date[] = [];
   for (let i = 0; i < totalDays; i++) {
     const day = new Date(firstDay);
     day.setDate(day.getDate() + i);
     days.push(day);
   }
-  
+
   // Agrupar eventos por día
   const eventsByDay = events.reduce((acc, event) => {
     const dayKey = format(event.startDate, 'yyyy-MM-dd');
@@ -44,13 +44,7 @@ export function MonthView({
     acc[dayKey].push(event);
     return acc;
   }, {} as Record<string, ExpandedEvent[]>);
-  
-  // Obtener colores únicos de eventos para un día
-  const getUniqueColors = (dayEvents: ExpandedEvent[]) => {
-    const colors = new Set(dayEvents.map(e => e.color));
-    return Array.from(colors);
-  };
-  
+
   return (
     <div className="month-view">
       <div className="month-view-header">
@@ -60,15 +54,14 @@ export function MonthView({
           </div>
         ))}
       </div>
-      
+
       <div className="month-view-grid">
         {days.map((day, index) => {
           const dayKey = format(day, 'yyyy-MM-dd');
           const dayEvents = eventsByDay[dayKey] || [];
           const isCurrentMonth = isSameMonth(day, currentDate);
           const isTodayDate = isToday(day);
-          const uniqueColors = getUniqueColors(dayEvents);
-          
+
           return (
             <button
               key={index}
@@ -79,19 +72,20 @@ export function MonthView({
               <span className={`month-day-number ${isTodayDate ? 'month-day-number-today' : ''}`}>
                 {format(day, 'd')}
               </span>
-              
-              {uniqueColors.length > 0 && (
-                <div className="month-day-dots">
-                  {uniqueColors.slice(0, 4).map((color, i) => (
-                    <span
-                      key={i}
-                      className="month-day-dot"
-                      style={{ backgroundColor: color }}
+
+              {dayEvents.length > 0 && (
+                <div className="month-day-events">
+                  {dayEvents.slice(0, 4).map((event) => (
+                    <div
+                      key={event.id}
+                      className="month-day-event-bar"
+                      style={{ backgroundColor: event.color }}
+                      title={`${event.title} - ${format(event.startDate, 'HH:mm')}`}
                     />
                   ))}
-                  {uniqueColors.length > 4 && (
-                    <span className="month-day-dot-more">
-                      +{uniqueColors.length - 4}
+                  {dayEvents.length > 4 && (
+                    <span className="month-day-more">
+                      +{dayEvents.length - 4}
                     </span>
                   )}
                 </div>

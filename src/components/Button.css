@@ -122,22 +122,23 @@
   position: relative;
 }
 
-/* FAB (Floating Action Button) */
+/* FAB (Floating Action Button) - Dommuss style */
 .btn-fab {
   position: fixed;
-  bottom: calc(var(--bottom-nav-height) + var(--spacing-md));
-  right: var(--spacing-md);
+  bottom: calc(var(--bottom-nav-height) + var(--spacing-lg));
+  right: var(--spacing-lg);
   width: var(--fab-size);
   height: var(--fab-size);
   border-radius: var(--radius-full);
   background-color: var(--color-accent);
-  color: #212121;
-  box-shadow: var(--shadow-lg);
+  color: white;
+  box-shadow: var(--shadow-fab);
   z-index: 100;
   font-size: 1.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all var(--transition-fast);
 }
 
 .fab-emoji {
@@ -147,10 +148,19 @@
 
 .btn-fab:hover:not(:disabled) {
   background-color: var(--color-accent-dark);
-  box-shadow: var(--shadow-xl);
-  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(255, 107, 53, 0.5);
+  transform: scale(1.08);
 }
 
 .btn-fab:active:not(:disabled) {
   transform: scale(0.95);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+/* Mobile optimization */
+@media (max-width: 480px) {
+  .btn-fab {
+    bottom: calc(var(--bottom-nav-height) + var(--spacing-md));
+    right: var(--spacing-md);
+  }
 }

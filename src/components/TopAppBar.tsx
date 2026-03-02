@@ -14,6 +14,31 @@ interface TopAppBarProps {
   darkMode?: boolean;
 }
 
+// Dommuss Logo SVG - Casa azul con tilde naranja
+function DommussLogo() {
+  return (
+    <svg viewBox="0 0 48 48" className="dommuss-logo" aria-label="Dommuss">
+      {/* Casa azul */}
+      <path
+        d="M24 4L4 20v24h14V30h12v14h14V20L24 4z"
+        fill="#2D3E50"
+        stroke="#2D3E50"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      {/* Tilde naranja dentro de la casa */}
+      <path
+        d="M14 26l6 6 14-14"
+        fill="none"
+        stroke="#FF6B35"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function TopAppBar({
   title,
   subtitle,
@@ -30,10 +55,16 @@ export function TopAppBar({
     <header className="top-app-bar">
       <div className="top-app-bar-content">
         <div className="top-app-bar-title-section">
-          <h1 className="top-app-bar-title">{title}</h1>
-          {subtitle && <p className="top-app-bar-subtitle">{subtitle}</p>}
+          <div className="top-app-bar-logo">
+            <DommussLogo />
+            <span className="top-app-bar-brand">Dommuss</span>
+          </div>
+          <div className="top-app-bar-title-info">
+            <h1 className="top-app-bar-title">{title}</h1>
+            {subtitle && <p className="top-app-bar-subtitle">{subtitle}</p>}
+          </div>
         </div>
-        
+
         <div className="top-app-bar-actions">
           <button
             className="top-app-bar-icon-btn"
@@ -58,7 +89,7 @@ export function TopAppBar({
               </svg>
             )}
           </button>
-          
+
           {onDarkModeToggle && (
             <button
               className="top-app-bar-icon-btn"
@@ -85,7 +116,7 @@ export function TopAppBar({
               )}
             </button>
           )}
-          
+
           {onProfileClick && profileInitials && (
             <button
               className="top-app-bar-profile"
