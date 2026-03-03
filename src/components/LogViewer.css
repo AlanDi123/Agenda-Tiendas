@@ -1,0 +1,157 @@
+.log-viewer {
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+
+.log-viewer-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-divider);
+  background-color: var(--color-surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.log-viewer-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.log-viewer-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+}
+
+.log-viewer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+}
+
+.log-viewer-empty {
+  text-align: center;
+  padding: var(--spacing-xl);
+}
+
+.log-viewer-empty-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.log-viewer-empty-text {
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.log-viewer-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.log-viewer-item {
+  padding: var(--spacing-md);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--color-divider);
+  box-shadow: var(--shadow-sm);
+}
+
+.log-viewer-item-error {
+  border-left-color: #E53935;
+  background-color: rgba(229, 57, 53, 0.05);
+}
+
+.log-viewer-item-warn {
+  border-left-color: #FB8C00;
+  background-color: rgba(251, 140, 0, 0.05);
+}
+
+.log-viewer-item-info {
+  border-left-color: #1E88E5;
+  background-color: rgba(30, 136, 229, 0.05);
+}
+
+.log-viewer-item-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.log-viewer-item-icon {
+  font-size: 1rem;
+}
+
+.log-viewer-item-level {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.log-viewer-item-time {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  margin-left: auto;
+}
+
+.log-viewer-item-message {
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-sm);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.log-viewer-item-stack {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-divider);
+}
+
+.log-viewer-item-stack summary {
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.log-viewer-item-stack pre {
+  margin: var(--spacing-sm) 0 0;
+  padding: var(--spacing-sm);
+  background-color: var(--color-surface-variant);
+  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+  font-family: 'Courier New', monospace;
+  color: var(--color-text-secondary);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Mobile optimization */
+@media (max-width: 480px) {
+  .log-viewer-header {
+    padding: var(--spacing-md);
+  }
+
+  .log-viewer-title {
+    font-size: 1.125rem;
+  }
+
+  .log-viewer-actions {
+    flex-direction: column;
+  }
+
+  .log-viewer-actions .btn {
+    width: 100%;
+  }
+}

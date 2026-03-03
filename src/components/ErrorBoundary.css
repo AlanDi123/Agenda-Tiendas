@@ -1,0 +1,120 @@
+.error-boundary {
+  position: fixed;
+  inset: 0;
+  background-color: var(--color-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: var(--spacing-lg);
+}
+
+.error-boundary-content {
+  max-width: 400px;
+  text-align: center;
+  padding: var(--spacing-xl);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+}
+
+.error-boundary-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.error-boundary-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-sm);
+}
+
+.error-boundary-message {
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-lg);
+  line-height: 1.5;
+}
+
+.error-boundary-details {
+  text-align: left;
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background-color: var(--color-surface-variant);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+}
+
+.error-boundary-details summary {
+  cursor: pointer;
+  color: var(--color-primary);
+  font-weight: 500;
+  margin-bottom: var(--spacing-sm);
+}
+
+.error-boundary-error-message {
+  margin: 0;
+  font-family: monospace;
+  color: var(--color-error);
+  word-break: break-word;
+}
+
+.error-boundary-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.error-boundary-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: 48px;
+}
+
+.error-boundary-btn-primary {
+  background-color: var(--color-accent);
+  color: white;
+}
+
+.error-boundary-btn-primary:hover {
+  background-color: var(--color-accent-dark);
+  transform: scale(1.02);
+}
+
+.error-boundary-btn-secondary {
+  background-color: var(--color-surface-variant);
+  color: var(--color-text-primary);
+}
+
+.error-boundary-btn-secondary:hover {
+  background-color: var(--color-surface);
+}
+
+/* Mobile optimization */
+@media (max-width: 480px) {
+  .error-boundary {
+    padding: var(--spacing-md);
+  }
+
+  .error-boundary-content {
+    padding: var(--spacing-lg);
+  }
+
+  .error-boundary-title {
+    font-size: 1.25rem;
+  }
+
+  .error-boundary-icon {
+    font-size: 2.5rem;
+  }
+}

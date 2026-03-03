@@ -4,6 +4,7 @@ import { Modal } from './Modal';
 import { Input } from './Input';
 import { Button } from './Button';
 import { Avatar } from './Avatar';
+import { LogViewer } from './LogViewer';
 import './UserSettings.css';
 
 interface UserSettingsModalProps {
@@ -28,6 +29,7 @@ export function UserSettingsModal({
   const [recoveryEmail, setRecoveryEmail] = useState(profile?.recoveryEmail || '');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showLogViewer, setShowLogViewer] = useState(false);
 
   const colors = [
     '#1E88E5', '#43A047', '#FB8C00', '#8E24AA',
@@ -215,11 +217,27 @@ export function UserSettingsModal({
         {success && <p className="user-settings-success">{success}</p>}
 
         <div className="user-settings-footer">
-          <Button variant="text" fullWidth onClick={onLogout} className="user-settings-logout">
+          <Button
+            variant="text"
+            fullWidth
+            onClick={() => setShowLogViewer(true)}
+            className="user-settings-logs"
+          >
+            🛠️ Ver Registro de Errores
+          </Button>
+          <Button
+            variant="text"
+            fullWidth
+            onClick={onLogout}
+            className="user-settings-logout"
+          >
             Cerrar sesión
           </Button>
         </div>
       </div>
+
+      {/* Log Viewer Modal */}
+      <LogViewer isOpen={showLogViewer} onClose={() => setShowLogViewer(false)} />
     </Modal>
   );
 }

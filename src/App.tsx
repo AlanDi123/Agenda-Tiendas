@@ -17,7 +17,9 @@ import { UserAuthModal } from './components/UserAuth';
 import { UserSettingsModal } from './components/UserSettings';
 import { SplashScreen } from './components/SplashScreen';
 import { ToastContainer } from './components/Toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useTouchGestures } from './hooks/useTouchGestures';
+import { App as CapacitorApp } from '@capacitor/app';
 import type { CalendarView, ExpandedEvent, Event, DeleteScope, Profile } from './types';
 import { formatMonthYear } from './utils/helpers';
 import { getAllEnvironments, saveUserSession, getAllUserSessions, getEnvironment } from './services/database';
@@ -64,7 +66,8 @@ function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
   const [filterProfileId, setFilterProfileId] = useState<string | null>(null);
   const [environments, setEnvironments] = useState<Array<{ id: string; name: string; pin?: string }>>([]);
-  
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
   // User auth state
   const [showUserAuth, setShowUserAuth] = useState(false);
   const [showUserSettings, setShowUserSettings] = useState(false);
@@ -148,6 +151,70 @@ function AppContent() {
 
     return () => clearTimeout(splashTimer);
   }, []);
+
+  // Online/Offline detection
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Android back button handler
+  useEffect(() => {
+    // Only add listener in Capacitor environment
+    const isCapacitor = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return !!(window as any).Capacitor;
+    };
+
+    if (!isCapacitor()) return;
+
+    const hasOpenModals = () => {
+      return showEventForm || showEventDetail || showUserSettings ||
+             showProfileSelector || showAddProfile || showDeleteConfirm ||
+             showEditScopeDialog;
+    };
+
+    let backButtonListener: Awaited<ReturnType<typeof CapacitorApp.addListener>> | null = null;
+
+    CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      // If there are open modals, close them instead of exiting
+      if (hasOpenModals()) {
+        // Close modals in reverse order of priority
+        if (showEventForm) setShowEventForm(false);
+        if (showEventDetail) setShowEventDetail(false);
+        if (showUserSettings) setShowUserSettings(false);
+        if (showProfileSelector) setShowProfileSelector(false);
+        if (showAddProfile) setShowAddProfile(false);
+        if (showDeleteConfirm) setShowDeleteConfirm(false);
+        if (showEditScopeDialog) setShowEditScopeDialog(false);
+        return;
+      }
+
+      // If can go back in history, let the browser handle it
+      if (canGoBack) {
+        window.history.back();
+      }
+      // Otherwise, do nothing (don't exit app on first back press)
+    }).then(listener => {
+      backButtonListener = listener;
+    });
+
+    return () => {
+      backButtonListener?.remove();
+    };
+  }, [
+    showEventForm, showEventDetail, showUserSettings,
+    showProfileSelector, showAddProfile, showDeleteConfirm,
+    showEditScopeDialog
+  ]);
 
   // Load events when authenticated
   useEffect(() => {
@@ -554,7 +621,17 @@ function AppContent() {
         filterProfileId={filterProfileId}
         onFilterChange={setFilterProfileId}
       />
-      
+
+      {/* Offline Banner */}
+      {!isOnline && (
+        <div className="offline-banner">
+          <span className="offline-banner-icon">📡</span>
+          <span className="offline-banner-text">
+            Sin conexión. Los cambios se guardarán localmente.
+          </span>
+        </div>
+      )}
+
       <main className="app-main">
         <div className="app-calendar-nav">
           <button className="app-nav-btn" onClick={handlePrev} aria-label="Anterior">
@@ -701,7 +778,9 @@ function App() {
   return (
     <AuthProvider>
       <EventsProvider>
-        <AppContent />
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
       </EventsProvider>
     </AuthProvider>
   );
