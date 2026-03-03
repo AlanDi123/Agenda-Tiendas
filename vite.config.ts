@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       injectRegister: 'inline',
       includeAssets: ['calendar-icon.svg', 'pwa-192x192.svg', 'pwa-512x512.svg'],
       manifest: {

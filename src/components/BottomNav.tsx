@@ -4,7 +4,6 @@ import './BottomNav.css';
 interface BottomNavProps {
   currentView: CalendarView;
   onViewChange: (view: CalendarView) => void;
-  onProfilesClick?: () => void;
 }
 
 // Iconos Dommuss style - SVG
@@ -61,7 +60,7 @@ function MenuIcon() {
   );
 }
 
-export function BottomNav({ currentView, onViewChange, onProfilesClick }: BottomNavProps) {
+export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   return (
     <nav className="bottom-nav" role="navigation" aria-label="Navegación principal">
       {/* Casa - Deshabilitado */}
@@ -89,11 +88,12 @@ export function BottomNav({ currentView, onViewChange, onProfilesClick }: Bottom
         <span>Agenda</span>
       </button>
 
-      {/* Lista - Deshabilitado */}
+      {/* Lista - Habilitado */}
       <button
-        className="bottom-nav-item disabled"
-        aria-label="Lista (deshabilitado)"
-        disabled
+        className={`bottom-nav-item ${currentView === 'lists' ? 'active' : ''}`}
+        onClick={() => onViewChange('lists')}
+        aria-label="Lista de compras"
+        aria-current={currentView === 'lists' ? 'page' : undefined}
       >
         <span className="bottom-nav-icon">
           <ListIcon />
@@ -113,12 +113,12 @@ export function BottomNav({ currentView, onViewChange, onProfilesClick }: Bottom
         <span>Tienda</span>
       </button>
 
-      {/* Menú - Deshabilitado */}
+      {/* Menú - Habilitado */}
       <button
-        className="bottom-nav-item disabled"
-        onClick={onProfilesClick}
-        aria-label="Menú"
-        disabled
+        className={`bottom-nav-item ${currentView === 'menu' ? 'active' : ''}`}
+        onClick={() => onViewChange('menu')}
+        aria-label="Menú semanal"
+        aria-current={currentView === 'menu' ? 'page' : undefined}
       >
         <span className="bottom-nav-icon">
           <MenuIcon />

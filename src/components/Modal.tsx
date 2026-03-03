@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import './Modal.css';
 
 interface ModalProps {
@@ -27,6 +27,38 @@ export function Modal({
       onClose();
     }
   }, [closeOnOverlay, onClose]);
+
+  // Swipe-to-close for bottom-sheet
+  const [touchStartY, setTouchStartY] = useState(0);
+  const [translateY, setTranslateY] = useState(0);
+  const modalContentRef = useRef<HTMLDivElement>(null);
+  const SWIPE_THRESHOLD = 100;
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (variant !== 'bottom-sheet') return;
+    setTouchStartY(e.targetTouches[0].clientY);
+  }, [variant]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (variant !== 'bottom-sheet') return;
+    const currentY = e.targetTouches[0].clientY;
+    const diff = currentY - touchStartY;
+    
+    // Only allow swipe down
+    if (diff > 0) {
+      setTranslateY(diff);
+    }
+  }, [variant, touchStartY]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (variant !== 'bottom-sheet') return;
+    
+    if (translateY > SWIPE_THRESHOLD) {
+      onClose();
+    }
+    setTranslateY(0);
+    setTouchStartY(0);
+  }, [variant, translateY, onClose, SWIPE_THRESHOLD]);
 
   // Close on Escape key
   useEffect(() => {
@@ -59,7 +91,18 @@ export function Modal({
   if (variant === 'bottom-sheet') {
     return (
       <div className="modal-overlay modal-overlay-bottom-sheet" onClick={handleOverlayClick} role="dialog" aria-modal="true">
-        <div className="modal-content modal-bottom-sheet" onClick={(e) => e.stopPropagation()}>
+        <div
+          ref={modalContentRef}
+          className="modal-content modal-bottom-sheet"
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{
+            transform: translateY > 0 ? `translateY(${translateY}px)` : undefined,
+            transition: translateY > 0 ? 'none' : 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
           {showHandle && (
             <div className="bottom-sheet-handle" onClick={onClose} role="button" aria-label="Cerrar" />
           )}

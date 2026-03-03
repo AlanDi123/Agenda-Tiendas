@@ -18,8 +18,13 @@ import { UserSettingsModal } from './components/UserSettings';
 import { SplashScreen } from './components/SplashScreen';
 import { ToastContainer } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ReloadPrompt } from './components/ReloadPrompt';
+import { ListsView } from './components/ListsView';
+import { MenuView } from './components/MenuView';
 import { useTouchGestures } from './hooks/useTouchGestures';
 import { App as CapacitorApp } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { Capacitor } from '@capacitor/core';
 import type { CalendarView, ExpandedEvent, Event, DeleteScope, Profile } from './types';
 import { formatMonthYear } from './utils/helpers';
 import { getAllEnvironments, saveUserSession, getAllUserSessions, getEnvironment } from './services/database';
@@ -152,6 +157,14 @@ function AppContent() {
     return () => clearTimeout(splashTimer);
   }, []);
 
+  // Status Bar dinámica para nativo
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      StatusBar.setStyle({ style: Style.Dark });
+      StatusBar.setBackgroundColor({ color: '#2D3E50' });
+    }
+  }, []);
+
   // Online/Offline detection
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -188,13 +201,27 @@ function AppContent() {
       // If there are open modals, close them instead of exiting
       if (hasOpenModals()) {
         // Close modals in reverse order of priority
-        if (showEventForm) setShowEventForm(false);
-        if (showEventDetail) setShowEventDetail(false);
-        if (showUserSettings) setShowUserSettings(false);
-        if (showProfileSelector) setShowProfileSelector(false);
-        if (showAddProfile) setShowAddProfile(false);
-        if (showDeleteConfirm) setShowDeleteConfirm(false);
         if (showEditScopeDialog) setShowEditScopeDialog(false);
+        if (showDeleteConfirm) setShowDeleteConfirm(false);
+        if (showAddProfile) setShowAddProfile(false);
+        if (showProfileSelector) setShowProfileSelector(false);
+        if (showUserSettings) setShowUserSettings(false);
+        if (showEventDetail) {
+          setShowEventDetail(false);
+          setSelectedEvent(null);
+          return;
+        }
+        if (showEventForm) {
+          setShowEventForm(false);
+          setSelectedEvent(null);
+          return;
+        }
+        return;
+      }
+
+      // If in Lists or Menu view, go back to month (Agenda)
+      if (currentView === 'lists' || currentView === 'menu') {
+        setCurrentView('month');
         return;
       }
 
@@ -213,7 +240,7 @@ function AppContent() {
   }, [
     showEventForm, showEventDetail, showUserSettings,
     showProfileSelector, showAddProfile, showDeleteConfirm,
-    showEditScopeDialog
+    showEditScopeDialog, currentView, setCurrentView
   ]);
 
   // Load events when authenticated
@@ -540,6 +567,10 @@ function AppContent() {
             />
           </>
         );
+      case 'lists':
+        return <ListsView />;
+      case 'menu':
+        return <MenuView />;
       default:
         // Por defecto, vista mensual
         return (
@@ -608,7 +639,7 @@ function AppContent() {
     >
       <TopAppBar
         title={environment?.name || 'Mi Familia'}
-        subtitle={formatMonthYear(viewDate)}
+        subtitle={currentView === 'lists' ? 'Lista de compras' : currentView === 'menu' ? 'Menú semanal' : formatMonthYear(viewDate)}
         onViewToggle={handleViewToggle}
         currentView={currentView}
         profileName={activeProfile.name}
@@ -633,28 +664,32 @@ function AppContent() {
       )}
 
       <main className="app-main">
-        <div className="app-calendar-nav">
-          <button className="app-nav-btn" onClick={handlePrev} aria-label="Anterior">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <button className="app-nav-btn app-nav-today" onClick={handleToday}>
-            Hoy
-          </button>
-          <button className="app-nav-btn" onClick={handleNext} aria-label="Siguiente">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        </div>
+        {(currentView === 'month' || currentView === 'day') && (
+          <>
+            <div className="app-calendar-nav">
+              <button className="app-nav-btn" onClick={handlePrev} aria-label="Anterior">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <button className="app-nav-btn app-nav-today" onClick={handleToday}>
+                Hoy
+              </button>
+              <button className="app-nav-btn" onClick={handleNext} aria-label="Siguiente">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </div>
+          </>
+        )}
 
         <div className="app-scroll-container">
           {renderView()}
         </div>
       </main>
       
-      {!isReadOnly && (
+      {(currentView === 'month' || currentView === 'day') && !isReadOnly && (
         <Button
           className="btn-fab"
           onClick={() => {
@@ -671,7 +706,6 @@ function AppContent() {
       <BottomNav
         currentView={currentView}
         onViewChange={handleViewChange}
-        onProfilesClick={() => setShowUserSettings(true)}
       />
       
       {/* Event Form Modal */}
@@ -770,6 +804,9 @@ function AppContent() {
 
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {/* PWA Reload Prompt */}
+      <ReloadPrompt />
     </div>
   );
 }

@@ -13,6 +13,7 @@
     "@capacitor/android": "^8.1.0",
     "@capacitor/app": "^8.0.1",
     "@capacitor/core": "^8.1.0",
+    "@capacitor/status-bar": "^8.0.1",
     "date-fns": "^4.1.0",
     "idb": "^8.0.3",
     "react": "^19.2.0",

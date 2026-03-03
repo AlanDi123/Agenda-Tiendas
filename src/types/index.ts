@@ -73,7 +73,7 @@ export interface ExpandedEvent {
   comments?: EventComment[];
 }
 
-export type CalendarView = 'month' | 'week' | 'day';
+export type CalendarView = 'month' | 'week' | 'day' | 'lists' | 'menu';
 
 export type RecurrencePattern = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 

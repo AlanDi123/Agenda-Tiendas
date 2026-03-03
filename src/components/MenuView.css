@@ -1,0 +1,202 @@
+.menu-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--color-background);
+}
+
+.menu-header {
+  padding: var(--spacing-md);
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.menu-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.menu-days-container {
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-divider);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.menu-days-scroll {
+  display: flex;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  min-width: max-content;
+}
+
+.menu-day-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background-color: var(--color-surface-variant);
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.menu-day-tab:hover {
+  background-color: var(--color-primary-light);
+  color: white;
+}
+
+.menu-day-tab.active {
+  background-color: var(--color-accent);
+  color: white;
+  font-weight: 600;
+}
+
+.menu-content {
+  flex: 1;
+  padding: var(--spacing-md);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-md));
+}
+
+.menu-day-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.menu-day-icon {
+  font-size: 1.5rem;
+}
+
+.menu-day-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.menu-meals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.menu-meal-card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all var(--transition-fast);
+}
+
+.menu-meal-card:focus-within {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.menu-meal-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.menu-meal-icon {
+  font-size: 1.25rem;
+}
+
+.menu-meal-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.menu-meal-input {
+  width: 100%;
+  padding: var(--spacing-sm);
+  font-size: 0.9375rem;
+  font-family: inherit;
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-variant);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  resize: none;
+  transition: all var(--transition-fast);
+}
+
+.menu-meal-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background-color: var(--color-surface);
+}
+
+.menu-meal-input::placeholder {
+  color: var(--color-text-disabled);
+}
+
+.menu-tips {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+  background-color: var(--color-primary-light);
+  border-radius: var(--radius-lg);
+}
+
+.menu-tips-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.menu-tips-text {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Animation for day switch */
+.menu-content {
+  animation: fadeInMenu 0.3s ease-out;
+}
+
+@keyframes fadeInMenu {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mobile optimization */
+@media (max-width: 480px) {
+  .menu-title {
+    font-size: 1.25rem;
+  }
+
+  .menu-content {
+    padding: var(--spacing-sm);
+    padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-sm));
+  }
+
+  .menu-day-tab {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.8125rem;
+  }
+
+  .menu-meal-card {
+    padding: var(--spacing-sm);
+  }
+}

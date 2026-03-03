@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  padding-top: var(--header-height);
+  padding-top: calc(var(--header-height) + env(safe-area-inset-top, 0px));
   padding-bottom: var(--bottom-nav-height);
   overscroll-behavior-y: contain;
 }
@@ -264,6 +264,22 @@
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+/* View transition animations for Lists and Menu */
+.app-scroll-container > * {
+  animation: viewFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
