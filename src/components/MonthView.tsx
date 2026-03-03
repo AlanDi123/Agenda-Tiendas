@@ -66,7 +66,7 @@ export function MonthView({
   }, {} as Record<string, ExpandedEvent[]>);
 
   return (
-    <div className="month-view">
+    <div className="month-view" onClick={(e) => e.stopPropagation()}>
       <div className="month-view-header">
         {WEEKDAYS.map(day => (
           <div key={day} className="month-weekday">
@@ -86,7 +86,10 @@ export function MonthView({
             <button
               key={index}
               className={`month-day ${!isCurrentMonth ? 'month-day-other' : ''} ${isTodayDate ? 'month-day-today' : ''}`}
-              onClick={() => onDayClick(day)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDayClick(day);
+              }}
               aria-label={`${format(day, 'd MMMM yyyy', { locale: es })}, ${dayEvents.length} eventos`}
             >
               <span className={`month-day-number ${isTodayDate ? 'month-day-number-today' : ''}`}>

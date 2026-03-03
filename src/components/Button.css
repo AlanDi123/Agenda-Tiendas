@@ -133,12 +133,13 @@
   background-color: var(--color-accent);
   color: white;
   box-shadow: var(--shadow-fab);
-  z-index: 100;
+  z-index: 1000; /* Aumentado para estar sobre BottomNav */
   font-size: 1.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all var(--transition-fast);
+  pointer-events: auto; /* Asegurar que sea clicable */
 }
 
 .fab-emoji {
@@ -162,5 +163,6 @@
   .btn-fab {
     bottom: calc(var(--bottom-nav-height) + var(--spacing-md));
     right: var(--spacing-md);
+    z-index: 1000;
   }
 }

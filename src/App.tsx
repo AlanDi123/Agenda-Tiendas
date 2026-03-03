@@ -111,7 +111,7 @@ function AppContent() {
     setViewDate(new Date());
   }, [setViewDate]);
 
-  // Touch gestures for calendar navigation
+  // Touch gestures for calendar navigation - SOLO en MonthView
   const handleSwipeLeft = useCallback(() => {
     handleNext();
   }, [handleNext]);
@@ -120,10 +120,11 @@ function AppContent() {
     handlePrev();
   }, [handlePrev]);
 
+  // Solo aplicar gestos si estamos en vista mensual
   const { onTouchStart, onTouchMove, onTouchEnd } = useTouchGestures({
-    onSwipeLeft: handleSwipeLeft,
-    onSwipeRight: handleSwipeRight,
-    threshold: 50,
+    onSwipeLeft: currentView === 'month' ? handleSwipeLeft : undefined,
+    onSwipeRight: currentView === 'month' ? handleSwipeRight : undefined,
+    threshold: 80, // Aumentar threshold para evitar swipes accidentales
   });
 
   // Load environments on mount
@@ -532,11 +533,11 @@ function AppContent() {
   const isReadOnly = activeProfile.permissions === 'readonly';
 
   return (
-    <div 
+    <div
       className="app"
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
+      onTouchStart={currentView === 'month' ? onTouchStart : undefined}
+      onTouchMove={currentView === 'month' ? onTouchMove : undefined}
+      onTouchEnd={currentView === 'month' ? onTouchEnd : undefined}
     >
       <TopAppBar
         title={environment?.name || 'Mi Familia'}
