@@ -10,93 +10,99 @@ interface WeekViewProps {
 }
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const HOUR_HEIGHT = 64; // pixels per hour
+const START_HOUR = 6; // 6:00 AM
+const END_HOUR = 23; // 11:00 PM
+const VISIBLE_HOURS = END_HOUR - START_HOUR;
 
-// Calcular eventos superpuestos para un día específico
-function getOverlappingEventsForDay(dayEvents: ExpandedEvent[]): Array<{
-  event: ExpandedEvent;
-  row: number;
-  column: number;
-  totalRows: number;
-  totalColumns: number;
-}> {
-  if (dayEvents.length === 0) return [];
-  if (dayEvents.length === 1) {
-    return [{ event: dayEvents[0], row: 0, column: 0, totalRows: 1, totalColumns: 1 }];
-  }
+// Check if two events overlap
+function eventsOverlap(e1: ExpandedEvent, e2: ExpandedEvent): boolean {
+  const e1Start = e1.startDate.getTime();
+  const e1End = e1.endDate.getTime();
+  const e2Start = e2.startDate.getTime();
+  const e2End = e2.endDate.getTime();
+  return e1Start < e2End && e2Start < e1End;
+}
 
-  // Ordenar eventos por hora de inicio
-  const sortedEvents = [...dayEvents].sort((a, b) => {
-    const startA = a.startDate.getHours() * 60 + a.startDate.getMinutes();
-    const startB = b.startDate.getHours() * 60 + b.startDate.getMinutes();
-    return startA - startB;
-  });
-
-  // Agrupar eventos que se superponen en el mismo bloque de tiempo
-  const overlappingGroups: ExpandedEvent[][] = [];
+// Group overlapping events
+function groupOverlappingEvents(events: ExpandedEvent[]): ExpandedEvent[][] {
+  const groups: ExpandedEvent[][] = [];
   const processed = new Set<string>();
 
-  for (const event of sortedEvents) {
+  for (const event of events) {
     if (processed.has(event.id)) continue;
 
     const group: ExpandedEvent[] = [event];
     processed.add(event.id);
 
-    const eventStart = event.startDate.getHours() * 60 + event.startDate.getMinutes();
-    const eventEnd = event.endDate.getHours() * 60 + event.endDate.getMinutes();
-
-    for (const other of sortedEvents) {
+    for (const other of events) {
       if (processed.has(other.id)) continue;
-
-      const otherStart = other.startDate.getHours() * 60 + other.startDate.getMinutes();
-      const otherEnd = other.endDate.getHours() * 60 + other.endDate.getMinutes();
-
-      // Verificar superposición
-      if (otherStart < eventEnd && otherEnd > eventStart) {
+      if (eventsOverlap(event, other)) {
         group.push(other);
         processed.add(other.id);
       }
     }
 
-    overlappingGroups.push(group);
+    groups.push(group);
   }
 
-  // Calcular posiciones para cada grupo
-  const result: Array<{
-    event: ExpandedEvent;
-    row: number;
-    column: number;
-    totalRows: number;
-    totalColumns: number;
-  }> = [];
+  return groups;
+}
 
-  for (const group of overlappingGroups) {
-    const groupSize = group.length;
+// Calculate column positions for overlapping events
+function calculateEventColumns(group: ExpandedEvent[]): Map<string, { column: number; totalColumns: number }> {
+  const result = new Map<string, { column: number; totalColumns: number }>();
+  
+  // Sort by start time
+  const sorted = [...group].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 
-    if (groupSize === 1) {
-      result.push({ event: group[0], row: 0, column: 0, totalRows: 1, totalColumns: 1 });
-    } else if (groupSize === 2) {
-      // 2 eventos: uno arriba (100%), uno abajo (100%)
-      result.push({ event: group[0], row: 0, column: 0, totalRows: 2, totalColumns: 1 });
-      result.push({ event: group[1], row: 1, column: 0, totalRows: 2, totalColumns: 1 });
-    } else {
-      // 3+ eventos: grilla cuadrada
-      // Primera fila: 1 evento (100% ancho, 50% alto)
-      // Segunda fila: eventos restantes divididos horizontalmente
-      result.push({ event: group[0], row: 0, column: 0, totalRows: 2, totalColumns: groupSize - 1 });
+  // Greedy algorithm
+  const columns: ExpandedEvent[][] = [];
 
-      for (let i = 1; i < group.length; i++) {
-        result.push({
-          event: group[i],
-          row: 1,
-          column: i - 1,
-          totalRows: 2,
-          totalColumns: groupSize - 1,
-        });
+  for (const event of sorted) {
+    const eventStart = event.startDate.getTime();
+
+    let placed = false;
+
+    for (let colIndex = 0; colIndex < columns.length; colIndex++) {
+      const column = columns[colIndex];
+      const lastEvent = column[column.length - 1];
+      const lastEnd = lastEvent.endDate.getTime();
+
+      if (eventStart >= lastEnd) {
+        column.push(event);
+        result.set(event.id, { column: colIndex, totalColumns: columns.length });
+        placed = true;
+        break;
       }
+    }
+
+    if (!placed) {
+      columns.push([event]);
+      result.set(event.id, { column: columns.length - 1, totalColumns: columns.length });
     }
   }
 
   return result;
+}
+
+// Calculate event position
+function calculateEventPosition(event: ExpandedEvent) {
+  const startHour = event.startDate.getHours();
+  const startMinute = event.startDate.getMinutes();
+  const endHour = event.endDate.getHours();
+  const endMinute = event.endDate.getMinutes();
+
+  const startMinutesFromVisible = (startHour - START_HOUR) * 60 + startMinute;
+  const endMinutesFromVisible = (endHour - START_HOUR) * 60 + endMinute;
+
+  const top = (startMinutesFromVisible / 60) * HOUR_HEIGHT;
+  const height = ((endMinutesFromVisible - startMinutesFromVisible) / 60) * HOUR_HEIGHT;
+
+  return {
+    top: Math.max(0, top),
+    height: Math.max(24, height),
+  };
 }
 
 export function WeekView({
@@ -109,7 +115,7 @@ export function WeekView({
   const month = currentDate.getMonth();
   const day = currentDate.getDate();
 
-  // Obtener el lunes de la semana actual
+  // Get Monday of current week
   const currentDay = new Date(year, month, day).getDay() || 7;
   const monday = new Date(year, month, day - (currentDay - 1));
 
@@ -120,18 +126,47 @@ export function WeekView({
     weekDays.push(d);
   }
 
-  // Agrupar eventos por día
-  const eventsByDay = events.reduce((acc, event) => {
-    const dayKey = format(event.startDate, 'yyyy-MM-dd');
-    if (!acc[dayKey]) {
-      acc[dayKey] = [];
-    }
-    acc[dayKey].push(event);
-    return acc;
-  }, {} as Record<string, ExpandedEvent[]>);
+  // Hours for the grid
+  const hours = Array.from({ length: VISIBLE_HOURS }, (_, i) => i + START_HOUR);
 
-  // Horas del día para la grilla (6:00 a 23:00)
-  const hours = Array.from({ length: 18 }, (_, i) => i + 6);
+  // Group events by day with overlap calculation
+  const eventsByDay = weekDays.map((day) => {
+    const dayKey = format(day, 'yyyy-MM-dd');
+    const dayEvents = events.filter(event => {
+      const eventDate = format(event.startDate, 'yyyy-MM-dd');
+      return eventDate === dayKey;
+    });
+
+    // Calculate overlap positions
+    const groups = groupOverlappingEvents(dayEvents);
+    const positionedEvents: Array<{
+      event: ExpandedEvent;
+      column: number;
+      totalColumns: number;
+      position: { top: number; height: number };
+    }> = [];
+
+    for (const group of groups) {
+      const columns = calculateEventColumns(group);
+      columns.forEach((data, eventId) => {
+        const event = group.find(e => e.id === eventId);
+        if (event) {
+          positionedEvents.push({
+            event,
+            column: data.column,
+            totalColumns: data.totalColumns,
+            position: calculateEventPosition(event),
+          });
+        }
+      });
+    }
+
+    return {
+      date: day,
+      dayKey,
+      events: positionedEvents,
+    };
+  });
 
   return (
     <div className="week-view">
@@ -164,52 +199,33 @@ export function WeekView({
           ))}
         </div>
 
-        {weekDays.map((day, dayIndex) => {
-          const dayKey = format(day, 'yyyy-MM-dd');
-          const dayEvents = eventsByDay[dayKey] || [];
-          const isTodayDate = isToday(day);
-
-          // Calcular posiciones para eventos superpuestos
-          const positionedEvents = getOverlappingEventsForDay(dayEvents);
+        {eventsByDay.map(({ date, events: positionedEvents }, dayIndex) => {
+          const isTodayDate = isToday(date);
 
           return (
             <div
               key={dayIndex}
               className={`week-view-column ${isTodayDate ? 'week-view-column-today' : ''}`}
             >
+              {/* Hour cells */}
               {hours.map(hour => (
                 <div key={hour} className="week-view-cell" />
               ))}
 
-              {positionedEvents.map(({ event, row: _row, column, totalRows, totalColumns }) => {
-                const startHour = new Date(event.startDate).getHours();
-                const startMinute = new Date(event.startDate).getMinutes();
-                const endHour = new Date(event.endDate).getHours();
-                const endMinute = new Date(event.endDate).getMinutes();
-
-                // Solo mostrar si está dentro del rango visible (6:00 - 23:00)
-                if (startHour < 6) return null;
-
-                const top = ((startHour - 6) * 60 + startMinute) / 60;
-                const durationMinutes = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
-                const durationHours = durationMinutes / 60;
-                const baseHeight = Math.max(durationHours, 0.5);
-
-                // Calcular posición y tamaño para grilla cuadrada
-                const widthPercent = totalColumns > 1 ? 100 / totalColumns : 100;
+              {/* Positioned events */}
+              {positionedEvents.map(({ event, column, totalColumns, position }) => {
+                const widthPercent = 100 / totalColumns;
                 const leftPercent = column * widthPercent;
-                const heightMultiplier = totalRows > 1 ? 0.5 : 1;
-                const finalHeight = baseHeight * heightMultiplier;
 
                 return (
                   <button
                     key={event.id}
-                    className="week-view-event week-view-event-grid"
+                    className="week-view-event"
                     style={{
-                      top: `${top}rem`,
-                      height: `${finalHeight}rem`,
+                      top: `${position.top}px`,
+                      height: `${position.height}px`,
                       backgroundColor: event.color,
-                      left: `calc(2px + ${leftPercent}%)`,
+                      left: `calc(${leftPercent}%)`,
                       width: `calc(${widthPercent}% - 4px)`,
                     }}
                     onClick={(e) => {

@@ -1,19 +1,14 @@
 .turnos-grid-container {
-  display: flex;
-  flex-direction: column;
   background-color: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  margin: var(--spacing-md);
+  margin-top: var(--spacing-md);
 }
 
 .turnos-grid-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: 2px solid var(--color-divider);
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--color-divider);
   background-color: var(--color-surface);
   position: sticky;
   top: 0;
@@ -27,305 +22,245 @@
   margin: 0;
 }
 
-.turnos-grid-legend {
-  display: flex;
-  gap: var(--spacing-md);
+.turnos-grid {
+  position: relative;
+  height: calc(var(--visible-hours, 17) * var(--hour-height, 64px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
-.legend-item {
+/* Time slots */
+.turno-slot {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-}
-
-.legend-disponible {
-  background-color: var(--color-surface-variant);
-  border: 1px solid var(--color-divider);
-}
-
-.legend-reservado {
-  background-color: var(--color-primary);
-}
-
-.legend-current {
-  background-color: var(--color-error);
-}
-
-.turnos-grid {
-  display: flex;
-  flex-direction: column;
-  overflow: visible;
-}
-
-.turno-slot {
-  display: grid;
-  grid-template-columns: 55px 1fr;
-  min-height: 1.5rem; /* 5 minutos = 1.5rem de altura (más compacto) */
+  padding: 0 var(--spacing-md);
+  min-height: calc(var(--hour-height, 64px) / 4);
   border-bottom: 1px solid var(--color-divider);
   cursor: pointer;
   transition: background-color var(--transition-fast);
-  gap: 0;
 }
 
 .turno-slot:hover {
   background-color: var(--color-surface-variant);
 }
 
-/* Slot disponible */
-.turno-slot-disponible {
-  background-color: var(--color-surface);
-  border-bottom: 1px solid var(--color-divider);
-}
-
-.turno-slot-disponible:hover {
-  background-color: var(--color-primary-light);
+.turno-slot-current {
+  background-color: rgba(255, 107, 53, 0.1);
 }
 
 .turno-slot-time {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 2px;
-  font-size: 0.6875rem;
-  font-weight: 500;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
-  border-right: 1px solid var(--color-divider);
-  background-color: var(--color-surface);
-  flex-shrink: 0;
+  font-weight: 500;
+  min-width: 50px;
 }
 
 .turno-slot-content {
+  flex: 1;
   display: flex;
   align-items: center;
-  padding: 4px 8px;
-  overflow: hidden;
-  min-width: 0;
+  justify-content: space-between;
 }
 
 .turno-slot-available {
   font-size: 0.75rem;
   color: var(--color-text-disabled);
   font-style: italic;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-/* Slot reservado */
-.turno-slot-reservado {
-  background-color: var(--event-color, #1E88E5);
-  color: white;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  grid-row: span var(--span-rows, 1);
-  min-height: calc(var(--span-rows, 1) * 1.5rem);
-  position: relative;
-  border-left: 3px solid rgba(255, 255, 255, 0.5);
-}
-
-.turno-slot-reservado:hover {
-  opacity: 0.9;
-}
-
-/* Superposición de turnos (Google Calendar style) */
-.turno-slot-overlapping {
+/* Event cards - positioned absolutely by time */
+.turno-event-card {
   position: absolute;
-  left: calc(var(--overlap-column, 0) * var(--overlap-width, 50)% + 2px);
-  width: calc(var(--overlap-width, 50)% - 4px);
-  height: calc(var(--span-rows, 1) * 1.5rem - 2px);
-  border-radius: 4px;
+  left: var(--event-left);
+  top: var(--event-top);
+  width: var(--event-width);
+  height: var(--event-height);
+  background-color: var(--event-color);
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  z-index: calc(var(--overlap-column, 0) + 1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  z-index: 5;
+  text-align: left;
 }
 
-.turno-slot-overlapping .turno-slot-time {
-  font-size: 0.5rem;
-  padding: 1px 2px;
+.turno-event-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.turno-event-card:active {
+  transform: scale(0.98);
+}
+
+.turno-event-time {
+  font-size: 0.6875rem;
   font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.turno-slot-overlapping .turno-slot-title {
-  font-size: 0.625rem;
-  font-weight: 500;
-}
-
-.turno-slot-overlapping .turno-slot-profile {
-  width: 16px;
-  height: 16px;
-  font-size: 0.5rem;
-}
-
-.turno-slot-time {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: var(--spacing-xs);
-  font-size: 0.6875rem;
-  color: var(--color-text-secondary);
-  border-right: 1px solid var(--color-divider);
-  background-color: var(--color-surface);
-}
-
-.turno-slot-reservado .turno-slot-time {
-  color: rgba(255, 255, 255, 0.9);
-  background-color: rgba(0, 0, 0, 0.1);
-}
-
-.turno-slot-content {
+.turno-event-content {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2px var(--spacing-sm);
-  overflow: hidden;
+  gap: 4px;
+  min-width: 0;
 }
 
-.turno-slot-title {
+.turno-event-title {
   font-size: 0.75rem;
   font-weight: 500;
+  color: white;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
 }
 
-.turno-slot-reservado .turno-slot-title {
-  color: white;
-}
-
-.turno-slot-disponible .turno-slot-title {
-  color: var(--color-text-primary);
-}
-
-.turno-slot-profile {
+.turno-event-profile {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: var(--radius-full);
+  border-radius: 50%;
   font-size: 0.625rem;
-  font-weight: 600;
+  font-weight: 700;
   color: white;
-  margin-left: var(--spacing-xs);
   flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
-/* Hora actual */
-.turno-slot-current {
-  background-color: var(--color-error);
-  position: relative;
-}
-
-.turno-slot-current .turno-slot-available {
-  color: white;
-  font-weight: 600;
-}
-
-.turno-slot-current .turno-slot-time {
-  color: white;
-  background-color: rgba(229, 57, 53, 0.3);
-}
-
-/* Línea de hora actual */
+/* Current time line */
 .turnos-current-time-line {
-  position: sticky;
+  position: absolute;
   left: 0;
   right: 0;
   height: 2px;
-  background-color: var(--color-error);
+  background-color: var(--color-accent);
   z-index: 20;
   pointer-events: none;
-  top: calc(48px + 1px); /* header height + border */
+}
+
+.turnos-current-time-line::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background-color: var(--color-accent);
+  border-radius: 50%;
 }
 
 .current-time-label {
   position: absolute;
-  left: 60px;
-  top: -9px;
+  left: 55px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 0.6875rem;
-  color: var(--color-error);
   font-weight: 600;
+  color: var(--color-accent);
   background-color: var(--color-surface);
-  padding: 2px var(--spacing-xs);
+  padding: 2px 6px;
   border-radius: var(--radius-sm);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* Empty state */
+.turnos-grid-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  min-height: 200px;
+  text-align: center;
+}
+
+.turnos-grid-empty-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+  opacity: 0.5;
+}
+
+.turnos-grid-empty-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.turnos-grid-empty-text {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Scrollbar styles */
+.turnos-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.turnos-grid::-webkit-scrollbar-track {
+  background: var(--color-surface-variant);
+}
+
+.turnos-grid::-webkit-scrollbar-thumb {
+  background: var(--color-text-disabled);
+  border-radius: var(--radius-full);
+}
+
+.turnos-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
 /* Mobile optimization */
 @media (max-width: 480px) {
-  .turnos-grid-container {
-    margin: var(--spacing-sm);
-    border-radius: var(--radius-md);
+  .turnos-grid {
+    --hour-height: 56px;
   }
-  
-  .turnos-grid-header {
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
-  }
-  
-  .turnos-grid-title {
-    font-size: 0.875rem;
-  }
-  
-  .turnos-grid-legend {
-    flex-wrap: wrap;
-    gap: var(--spacing-xs);
-  }
-  
-  .legend-item {
-    font-size: 0.6875rem;
-  }
-  
-  .turno-slot {
-    grid-template-columns: 50px 1fr;
-  }
-  
+
   .turno-slot-time {
-    font-size: 0.625rem;
-    padding: 2px;
-  }
-  
-  .turno-slot-content {
-    padding: 2px 4px;
-  }
-  
-  .turno-slot-title {
+    min-width: 45px;
     font-size: 0.6875rem;
   }
-  
-  .turno-slot-profile {
-    width: 18px;
-    height: 18px;
-    font-size: 0.5625rem;
+
+  .turno-event-title {
+    font-size: 0.6875rem;
   }
-  
-  .current-time-label {
-    left: 50px;
+
+  .turno-event-time {
     font-size: 0.625rem;
   }
+
+  .current-time-label {
+    font-size: 0.625rem;
+    left: 50px;
+  }
 }
 
-/* Dark mode adjustments */
-[data-theme="dark"] .turno-slot-disponible {
-  background-color: var(--color-surface);
-}
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .turno-event-card {
+    transition: none;
+  }
 
-[data-theme="dark"] .turno-slot-disponible:hover {
-  background-color: rgba(30, 136, 229, 0.2);
-}
-
-[data-theme="dark"] .current-time-label {
-  background-color: var(--color-surface);
+  .turno-slot {
+    transition: none;
+  }
 }

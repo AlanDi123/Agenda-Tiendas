@@ -41,6 +41,7 @@ export function EventForm({
   // Form state
   const [title, setTitle] = useState('');
   const [phone, setPhone] = useState('');
+  const [location, setLocation] = useState('');
   const [allDay, setAllDay] = useState(false);
   const [startDate, setStartDate] = useState(formatDateForInput(initialDate || now));
   const [startTime, setStartTime] = useState(formatTimeForInput(initialDate || now));
@@ -51,6 +52,7 @@ export function EventForm({
   const [category, setCategory] = useState<EventCategory>('otro');
 
   const [titleError, setTitleError] = useState('');
+  const [dateError, setDateError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   // Refs para validación con focus
@@ -70,6 +72,7 @@ export function EventForm({
 
       setTitle(event.title);
       setPhone(event.phone || '');
+      setLocation(event.location || '');
       setAllDay(event.allDay);
       setStartDate(formatDateForInput(start));
       setStartTime(formatTimeForInput(start));
@@ -78,6 +81,8 @@ export function EventForm({
       setNotes(event.notes || '');
       setAssignedProfileIds(event.assignedProfileIds);
       setCategory(event.category || 'otro');
+      setTitleError('');
+      setDateError('');
     } else if (isOpen) {
       // Reset form for new event
       resetForm();
@@ -90,6 +95,7 @@ export function EventForm({
 
     setTitle('');
     setPhone('');
+    setLocation('');
     setAllDay(false);
     setStartDate(formatDateForInput(initialDate || now));
     setStartTime(formatTimeForInput(initialDate || now));
@@ -99,6 +105,7 @@ export function EventForm({
     setAssignedProfileIds([]);
     setCategory('otro');
     setTitleError('');
+    setDateError('');
   }
   
   function formatDateForInput(date: Date): string {
@@ -143,54 +150,64 @@ export function EventForm({
   }, []);
 
   const handleSave = useCallback(async () => {
-    // Validar título
+    // Reset errors
+    setTitleError('');
+    setDateError('');
+
+    // Validate title
     if (!title.trim()) {
       setTitleError('El título es obligatorio');
       titleRef.current?.focus();
       return;
     }
 
-    // Validar fecha de inicio
+    // Validate start date
     if (!startDate) {
       alert('⚠️ La fecha de inicio es obligatoria');
       startDateRef.current?.focus();
       return;
     }
 
-    // Validar hora de inicio si no es todo el día
+    // Validate start time if not all day
     if (!allDay && !startTime) {
       alert('⚠️ La hora de inicio es obligatoria');
       startTimeRef.current?.focus();
       return;
     }
 
-    // Validar fecha de fin
+    // Validate end date
     if (!endDate) {
       alert('⚠️ La fecha de fin es obligatoria');
       endDateRef.current?.focus();
       return;
     }
 
-    // Validar hora de fin si no es todo el día
+    // Validate end time if not all day
     if (!allDay && !endTime) {
       alert('⚠️ La hora de fin es obligatoria');
       endTimeRef.current?.focus();
       return;
     }
 
-    setTitleError('');
+    // Validate end >= start
+    const startDateTime = allDay
+      ? new Date(`${startDate}T00:00:00`)
+      : new Date(`${startDate}T${startTime}`);
+
+    const endDateTime = allDay
+      ? new Date(`${endDate}T23:59:59`)
+      : new Date(`${endDate}T${endTime}`);
+
+    if (endDateTime <= startDateTime) {
+      setDateError('La fecha/hora de fin debe ser posterior al inicio');
+      endDateRef.current?.focus();
+      return;
+    }
+
     setIsSaving(true);
 
     try {
-      const startDateTime = allDay
-        ? new Date(`${startDate}T00:00:00`)
-        : new Date(`${startDate}T${startTime}`);
-
-      const endDateTime = allDay
-        ? new Date(`${endDate}T23:59:59`)
-        : new Date(`${endDate}T${endTime}`);
-
-      // Obtener color: prioridad al perfil asignado, luego a la categoría
+      // Get color: priority to assigned profile, then category
       const categoryColor = CATEGORIES.find(c => c.value === category)?.color || '#9E9E9E';
       const eventColor = assignedProfileIds.length > 0
         ? profiles.find(p => p.id === assignedProfileIds[0])?.avatarColor || categoryColor
@@ -199,6 +216,7 @@ export function EventForm({
       const eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'> = {
         title: title.trim(),
         phone: phone.trim() || undefined,
+        location: location.trim() || undefined,
         allDay,
         startDate: startDateTime,
         endDate: endDateTime,
@@ -215,7 +233,7 @@ export function EventForm({
     } finally {
       setIsSaving(false);
     }
-  }, [title, phone, allDay, startDate, startTime, endDate, endTime, location, notes, assignedProfileIds, profiles, onSave]);
+  }, [title, phone, location, allDay, startDate, startTime, endDate, endTime, notes, assignedProfileIds, profiles, onSave]);
   
   const handleClose = () => {
     resetForm();
@@ -249,6 +267,20 @@ export function EventForm({
           value={phone}
           onChange={setPhone}
         />
+
+        <Input
+          label="📍 Ubicación (opcional)"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="Dirección, enlace de Zoom, etc."
+        />
+
+        {dateError && (
+          <div className="event-form-error">
+            <span className="event-form-error-icon">⚠️</span>
+            {dateError}
+          </div>
+        )}
 
         <Toggle
           label="🌞 Todo el día"
