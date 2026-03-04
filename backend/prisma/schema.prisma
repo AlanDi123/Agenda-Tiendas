@@ -1,0 +1,180 @@
+// Prisma Schema for Dommuss Agenda Subscription Backend
+// Production-safe with proper indexing and constraints
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Change to "sqlite" for development
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MODEL
+// ============================================
+model User {
+  id              String       @id @default(uuid())
+  email           String       @unique
+  planType        PlanType     @default(FREE)
+  planStatus      PlanStatus   @default(active)
+  currentPeriodEnd DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  subscriptions   Subscription[]
+  paymentLogs     PaymentLog[]
+  discountUsages  DiscountUsage[]
+
+  // Indexes for performance
+  @@index([email])
+  @@index([planType, planStatus])
+}
+
+// ============================================
+// SUBSCRIPTION MODEL
+// ============================================
+model Subscription {
+  id              String   @id @default(uuid())
+  userId          String
+  planType        PlanType
+  paymentGateway  String
+  externalPaymentId String @unique
+  status          SubscriptionStatus @default(pending)
+  startDate       DateTime @default(now())
+  endDate         DateTime?
+  isLifetime      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([userId])
+  @@index([externalPaymentId])
+  @@index([status])
+  @@index([isLifetime])
+}
+
+// ============================================
+// DISCOUNT CODE MODEL
+// ============================================
+model DiscountCode {
+  code            String   @id
+  type            DiscountType @default(percentage)
+  value           Float
+  currency        String?  // For fixed discounts
+  maxUses         Int?     // null = unlimited
+  perUserLimit    Int?     // null = unlimited per user
+  applicablePlans String   // JSON array of PlanType
+  expiresAt       DateTime?
+  totalUsed       Int      @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  usages          DiscountUsage[]
+
+  // Indexes
+  @@index([active, expiresAt])
+}
+
+// ============================================
+// DISCOUNT USAGE TRACKING
+// ============================================
+model DiscountUsage {
+  id            String       @id @default(uuid())
+  userId        String
+  discountCode  String
+  paymentId     String
+  createdAt     DateTime     @default(now())
+
+  // Relations
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discount      DiscountCode @relation(fields: [discountCode], references: [code], onDelete: Cascade)
+
+  // Indexes
+  @@index([userId])
+  @@index([discountCode])
+  @@unique([userId, discountCode]) // One use per user per code
+}
+
+// ============================================
+// PAYMENT LOG MODEL
+// ============================================
+model PaymentLog {
+  id            String   @id @default(uuid())
+  userId        String
+  gateway       String
+  amount        Float
+  currency      String
+  status        String
+  rawPayload    String   // JSON string of full webhook payload
+  signature     String?  // For verification audit
+  createdAt     DateTime @default(now())
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([userId])
+  @@index([gateway])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================
+// WEBHOOK EVENT LOG (for audit)
+// ============================================
+model WebhookEvent {
+  id            String   @id @default(uuid())
+  gateway       String
+  eventType     String
+  paymentId     String
+  status        String
+  amount        Float
+  currency      String
+  signature     String
+  rawPayload    String
+  processed     Boolean  @default(false)
+  error         String?
+  createdAt     DateTime @default(now())
+
+  // Indexes
+  @@index([gateway, paymentId])
+  @@index([processed])
+  @@index([createdAt])
+}
+
+// ============================================
+// ENUMS
+// ============================================
+enum PlanType {
+  FREE
+  PREMIUM_MONTHLY
+  PREMIUM_YEARLY
+  PREMIUM_LIFETIME
+}
+
+enum PlanStatus {
+  active
+  expired
+  grace_period
+  cancelled
+}
+
+enum SubscriptionStatus {
+  pending
+  active
+  failed
+  refunded
+  cancelled
+}
+
+enum DiscountType {
+  percentage
+  fixed
+}
