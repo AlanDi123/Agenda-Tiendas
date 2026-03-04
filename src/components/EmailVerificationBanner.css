@@ -1,0 +1,86 @@
+.email-verification-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-warning);
+  color: white;
+  font-size: 0.875rem;
+  gap: var(--spacing-md);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.evb-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+}
+
+.evb-icon {
+  font-size: 1.25rem;
+}
+
+.evb-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.evb-text strong {
+  font-weight: 600;
+}
+
+.evb-text span {
+  font-size: 0.8125rem;
+  opacity: 0.9;
+}
+
+.evb-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.evb-actions .btn {
+  min-height: 32px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  color: white;
+}
+
+.evb-actions .btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Mobile optimization */
+@media (max-width: 480px) {
+  .email-verification-banner {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+  }
+
+  .evb-content {
+    width: 100%;
+  }
+
+  .evb-text span {
+    display: none;
+  }
+
+  .evb-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

@@ -4,13 +4,13 @@ import { EventsProvider, useEvents } from './contexts/EventsContext';
 import { TopAppBar } from './components/TopAppBar';
 import { BottomNav } from './components/BottomNav';
 import { MonthView } from './components/MonthView';
+import { WeekView } from './components/WeekView';
 import { DayView } from './components/DayView';
 import { TurnosGrid } from './components/TurnosGrid';
 import { EventForm } from './components/EventForm';
 import { EventDetail } from './components/EventDetail';
 import { ProfileSelector, AddProfileModal } from './components/ProfileSelector';
 import { Onboarding } from './components/Onboarding';
-import { LoginScreen } from './components/Login';
 import { ConfirmDialog } from './components/Modal';
 import { Button } from './components/Button';
 import { UserAuthModal } from './components/UserAuth';
@@ -21,21 +21,35 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReloadPrompt } from './components/ReloadPrompt';
 import { ListsView } from './components/ListsView';
 import { MenuView } from './components/MenuView';
+import { Login } from './components/Auth/Login';
+import { Register } from './components/Auth/Register';
+import { VerifyEmail } from './components/Auth/VerifyEmail';
+import { PasswordReset } from './components/Auth/PasswordReset';
+import { NewPassword } from './components/Auth/NewPassword';
+import { PaymentModal } from './components/Payment/PaymentModal';
+import { EmailVerificationBanner } from './components/EmailVerificationBanner';
 import { useTouchGestures } from './hooks/useTouchGestures';
 import { App as CapacitorApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
 import type { CalendarView, ExpandedEvent, Event, DeleteScope, Profile } from './types';
 import { formatMonthYear } from './utils/helpers';
-import { getAllEnvironments, saveUserSession, getAllUserSessions, getEnvironment } from './services/database';
+import { saveUserSession, getEnvironment } from './services/database';
 import './styles/global.css';
 import './App.css';
 
+// Auth flow states
+type AuthState = 'loading' | 'login' | 'register' | 'verify-email' | 'password-reset' | 'new-password' | 'authenticated';
+
 function AppContent() {
   const {
+    currentUser,
+    isAuthenticated,
+    isEmailVerified,
+    isPremium,
+    isLoading: isAuthLoading,
     environment,
     activeProfile,
-    isAuthenticated,
     createEnvironment,
     loadEnvironment,
     addProfile,
@@ -57,6 +71,11 @@ function AppContent() {
     removeToast,
   } = useEvents();
 
+  // Auth flow state
+  const [authState, setAuthState] = useState<AuthState>('loading');
+  const [pendingToken, setPendingToken] = useState('');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
   // UI State
   const [currentView, setCurrentView] = useState<CalendarView>('month');
   const [showEventForm, setShowEventForm] = useState(false);
@@ -66,14 +85,11 @@ function AppContent() {
   const [showAddProfile, setShowAddProfile] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteScope, setDeleteScope] = useState<DeleteScope>('single');
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [filterProfileId, setFilterProfileId] = useState<string | null>(null);
-  const [environments, setEnvironments] = useState<Array<{ id: string; name: string; pin?: string }>>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // User auth state
+  // User auth modal state
   const [showUserAuth, setShowUserAuth] = useState(false);
   const [showUserSettings, setShowUserSettings] = useState(false);
   const [pendingEnvironmentId, setPendingEnvironmentId] = useState('');
@@ -82,87 +98,31 @@ function AppContent() {
   const [editScope, setEditScope] = useState<'single' | 'future' | 'all'>('single');
   const [showEditScopeDialog, setShowEditScopeDialog] = useState(false);
 
-  // Navigation handlers (defined early for gesture hooks)
-  const handlePrev = useCallback(() => {
-    if (currentView === 'month') {
-      const newDate = new Date(viewDate);
-      newDate.setMonth(newDate.getMonth() - 1);
-      setViewDate(newDate);
-    } else if (currentView === 'week') {
-      const newDate = new Date(viewDate);
-      newDate.setDate(newDate.getDate() - 7);
-      setViewDate(newDate);
-    } else {
-      const newDate = new Date(viewDate);
-      newDate.setDate(newDate.getDate() - 1);
-      setViewDate(newDate);
-    }
-  }, [currentView, viewDate, setViewDate]);
-  
-  const handleNext = useCallback(() => {
-    if (currentView === 'month') {
-      const newDate = new Date(viewDate);
-      newDate.setMonth(newDate.getMonth() + 1);
-      setViewDate(newDate);
-    } else if (currentView === 'week') {
-      const newDate = new Date(viewDate);
-      newDate.setDate(newDate.getDate() + 7);
-      setViewDate(newDate);
-    } else {
-      const newDate = new Date(viewDate);
-      newDate.setDate(newDate.getDate() + 1);
-      setViewDate(newDate);
-    }
-  }, [currentView, viewDate, setViewDate]);
-  
-  const handleToday = useCallback(() => {
-    setViewDate(new Date());
-  }, [setViewDate]);
-
-  // Touch gestures for calendar navigation - SOLO en MonthView
-  const handleSwipeLeft = useCallback(() => {
-    handleNext();
-  }, [handleNext]);
-
-  const handleSwipeRight = useCallback(() => {
-    handlePrev();
-  }, [handlePrev]);
-
-  // Solo aplicar gestos si estamos en vista mensual
-  const { onTouchStart, onTouchMove, onTouchEnd } = useTouchGestures({
-    onSwipeLeft: currentView === 'month' ? handleSwipeLeft : undefined,
-    onSwipeRight: currentView === 'month' ? handleSwipeRight : undefined,
-    threshold: 80, // Aumentar threshold para evitar swipes accidentales
-  });
-
-  // Load environments on mount
-  useEffect(() => {
-    const loadEnvs = async () => {
-      const envs = await getAllEnvironments();
-      setEnvironments(envs.map(e => ({ id: e.id, name: e.name, pin: e.pin })));
-
-      if (envs.length === 0) {
-        setShowOnboarding(true);
-      } else {
-        setShowLogin(true);
-      }
-    };
-    loadEnvs();
-
-    // Hide splash screen after delay
-    const splashTimer = setTimeout(() => {
-      setShowSplash(false);
-    }, 2000);
-
-    return () => clearTimeout(splashTimer);
-  }, []);
-
   // Status Bar dinámica para nativo
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       StatusBar.setStyle({ style: Style.Dark });
       StatusBar.setBackgroundColor({ color: '#2D3E50' });
     }
+  }, []);
+
+  // Handle auth state changes
+  useEffect(() => {
+    if (isAuthLoading) return;
+    
+    if (isAuthenticated) {
+      setAuthState('authenticated');
+    } else {
+      setAuthState('login');
+    }
+  }, [isAuthenticated, isAuthLoading]);
+
+  // Hide splash screen
+  useEffect(() => {
+    const splashTimer = setTimeout(() => {
+      setShowSplash(false);
+    }, 1500);
+    return () => clearTimeout(splashTimer);
   }, []);
 
   // Online/Offline detection
@@ -181,12 +141,7 @@ function AppContent() {
 
   // Android back button handler
   useEffect(() => {
-    // Only add listener in Capacitor environment
-    const isCapacitor = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return !!(window as any).Capacitor;
-    };
-
+    const isCapacitor = () => !!(window as any).Capacitor;
     if (!isCapacitor()) return;
 
     const hasOpenModals = () => {
@@ -198,9 +153,7 @@ function AppContent() {
     let backButtonListener: Awaited<ReturnType<typeof CapacitorApp.addListener>> | null = null;
 
     CapacitorApp.addListener('backButton', ({ canGoBack }) => {
-      // If there are open modals, close them instead of exiting
       if (hasOpenModals()) {
-        // Close modals in reverse order of priority
         if (showEditScopeDialog) setShowEditScopeDialog(false);
         if (showDeleteConfirm) setShowDeleteConfirm(false);
         if (showAddProfile) setShowAddProfile(false);
@@ -219,17 +172,14 @@ function AppContent() {
         return;
       }
 
-      // If in Lists or Menu view, go back to month (Agenda)
       if (currentView === 'lists' || currentView === 'menu') {
         setCurrentView('month');
         return;
       }
 
-      // If can go back in history, let the browser handle it
       if (canGoBack) {
         window.history.back();
       }
-      // Otherwise, do nothing (don't exit app on first back press)
     }).then(listener => {
       backButtonListener = listener;
     });
@@ -240,7 +190,7 @@ function AppContent() {
   }, [
     showEventForm, showEventDetail, showUserSettings,
     showProfileSelector, showAddProfile, showDeleteConfirm,
-    showEditScopeDialog, currentView, setCurrentView
+    showEditScopeDialog, currentView
   ]);
 
   // Load events when authenticated
@@ -250,21 +200,18 @@ function AppContent() {
     }
   }, [isAuthenticated, loadEvents]);
 
-  // Debug: Log environment changes
-  // useEffect(() => {
-  //   if (environment) {
-  //     console.log('Environment loaded:', environment.name, 'Profiles:', environment.profiles.length, 'Active:', activeProfile?.name);
-  //   }
-  // }, [environment, activeProfile]);
-
   // Navigation handlers
   const handleViewChange = useCallback((view: CalendarView) => {
     setCurrentView(view);
   }, []);
 
-  // Vista toggle - Solo vista mensual (Dommuss Agenda)
   const handleViewToggle = useCallback(() => {
-    // No-op: Solo vista mensual disponible
+    // Cycle through month -> week -> day -> month
+    setCurrentView(prev => {
+      if (prev === 'month') return 'week';
+      if (prev === 'week') return 'day';
+      return 'month';
+    });
   }, []);
 
   const handleDayClick = useCallback((date: Date) => {
@@ -272,15 +219,56 @@ function AppContent() {
     setCurrentView('day');
   }, [setViewDate]);
 
+  const handlePrev = useCallback(() => {
+    if (currentView === 'month') {
+      const newDate = new Date(viewDate);
+      newDate.setMonth(newDate.getMonth() - 1);
+      setViewDate(newDate);
+    } else if (currentView === 'week') {
+      const newDate = new Date(viewDate);
+      newDate.setDate(newDate.getDate() - 7);
+      setViewDate(newDate);
+    } else {
+      const newDate = new Date(viewDate);
+      newDate.setDate(newDate.getDate() - 1);
+      setViewDate(newDate);
+    }
+  }, [currentView, viewDate, setViewDate]);
+
+  const handleNext = useCallback(() => {
+    if (currentView === 'month') {
+      const newDate = new Date(viewDate);
+      newDate.setMonth(newDate.getMonth() + 1);
+      setViewDate(newDate);
+    } else if (currentView === 'week') {
+      const newDate = new Date(viewDate);
+      newDate.setDate(newDate.getDate() + 7);
+      setViewDate(newDate);
+    } else {
+      const newDate = new Date(viewDate);
+      newDate.setDate(newDate.getDate() + 1);
+      setViewDate(newDate);
+    }
+  }, [currentView, viewDate, setViewDate]);
+
+  const handleToday = useCallback(() => {
+    setViewDate(new Date());
+  }, [setViewDate]);
+
+  // Touch gestures
+  const { onTouchStart, onTouchMove, onTouchEnd } = useTouchGestures({
+    onSwipeLeft: currentView === 'month' ? () => handleNext() : undefined,
+    onSwipeRight: currentView === 'month' ? () => handlePrev() : undefined,
+    threshold: 80,
+  });
+
   // Event handlers
   const handleEventClick = useCallback((event: ExpandedEvent) => {
     setSelectedEvent(event);
     setShowEventDetail(true);
   }, []);
 
-  // Turnos grid handlers
   const handleTurnoSlotClick = useCallback((time: string) => {
-    // Crear evento con la hora seleccionada
     const [hours, minutes] = time.split(':').map(Number);
     const newDate = new Date(viewDate);
     newDate.setHours(hours, minutes, 0, 0);
@@ -292,138 +280,138 @@ function AppContent() {
     setSelectedEvent(event);
     setShowEventDetail(true);
   }, []);
-  
-  const handleCreateEvent = useCallback(async (eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>) => {
-    await createEvent(eventData);
-  }, [createEvent]);
-  
+
+  // Check premium before allowing advanced features
+  const requirePremium = useCallback((_feature: string, callback: () => void) => {
+    if (!isPremium) {
+      setShowPaymentModal(true);
+    } else {
+      callback();
+    }
+  }, [isPremium]);
+
   const handleEditEvent = useCallback(() => {
     if (!selectedEvent) return;
-    
-    // Check if it's a recurring event
+
     const baseEvent = expandedEvents.find(e => e.baseEventId === selectedEvent.baseEventId);
     if (baseEvent?.isRecurring) {
-      setShowEditScopeDialog(true);
+      requirePremium('Edición de eventos recurrentes', () => {
+        setShowEditScopeDialog(true);
+      });
+      return;
+    }
+
+    setShowEventDetail(false);
+    setShowEventForm(true);
+  }, [selectedEvent, expandedEvents, requirePremium]);
+
+  const handleEditScopeSelect = (scope: 'single' | 'future' | 'all') => {
+    if (scope !== 'single') {
+      requirePremium('Edición de múltiples eventos', () => {
+        setEditScope(scope);
+        setShowEditScopeDialog(false);
+        setShowEventDetail(false);
+        setShowEventForm(true);
+      });
+    } else {
+      setEditScope(scope);
+      setShowEditScopeDialog(false);
+      setShowEventDetail(false);
+      setShowEventForm(true);
+    }
+  };
+
+  const handleCreateEvent = useCallback(async (eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>) => {
+    // Check for recurring events
+    if (eventData.rrule && !isPremium) {
+      setShowPaymentModal(true);
       return;
     }
     
-    setShowEventDetail(false);
-    setShowEventForm(true);
-  }, [selectedEvent, expandedEvents]);
-  
-  const handleEditScopeSelect = (scope: 'single' | 'future' | 'all') => {
-    setEditScope(scope);
-    setShowEditScopeDialog(false);
-    setShowEventDetail(false);
-    setShowEventForm(true);
-  };
-  
+    // Check for alarms
+    if (eventData.alarms && eventData.alarms.length > 0 && !isPremium) {
+      setShowPaymentModal(true);
+      return;
+    }
+
+    await createEvent(eventData);
+  }, [createEvent, isPremium]);
+
   const handleUpdateEvent = useCallback(async (eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!selectedEvent) return;
-    
+
     await createEvent({
       ...eventData,
       assignedProfileIds: eventData.assignedProfileIds.length > 0 ? eventData.assignedProfileIds : selectedEvent.assignedProfileIds,
     });
   }, [selectedEvent, createEvent]);
-  
+
   const handleDeleteClick = useCallback(() => {
     if (!selectedEvent) return;
-    
+
     if (selectedEvent.isRecurring) {
-      setShowDeleteConfirm(true);
+      requirePremium('Eliminación de eventos recurrentes', () => {
+        setShowDeleteConfirm(true);
+      });
     } else {
       setDeleteScope('single');
       setShowDeleteConfirm(true);
     }
-  }, [selectedEvent]);
-  
+  }, [selectedEvent, requirePremium]);
+
   const handleDeleteConfirm = useCallback(async () => {
     if (!selectedEvent) return;
-    
+
     await deleteEvent(selectedEvent.baseEventId, deleteScope);
     setShowDeleteConfirm(false);
     setShowEventDetail(false);
     setSelectedEvent(null);
   }, [selectedEvent, deleteScope, deleteEvent]);
-  
-  // Onboarding complete
+
+  // Auth handlers
+  const handleLoginSuccess = useCallback(() => {
+    setAuthState('authenticated');
+  }, []);
+
+  const handleRegisterSuccess = useCallback((token: string) => {
+    if (currentUser) {
+      setPendingToken(token);
+      setAuthState('verify-email');
+    }
+  }, [currentUser]);
+
+  const handleVerificationComplete = useCallback(() => {
+    setAuthState('authenticated');
+  }, []);
+
+  const handlePasswordResetSuccess = useCallback(() => {
+    setAuthState('login');
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    await logout();
+    setAuthState('login');
+  }, [logout]);
+
+  // Onboarding handlers
   const handleOnboardingComplete = useCallback(async (
     environmentName: string,
     pin: string | undefined,
     profileList: Array<{ name: string; permissions: 'admin' | 'readonly' }>
   ) => {
     try {
-      // If environment already exists, just add profiles to it
       if (environment && environment.profiles.length === 0 && profileList.length > 0) {
-        // Add profiles to existing environment
         for (const profileData of profileList) {
-          await addProfile(profileData.name, '', profileData.permissions);
+          await addProfile(profileData.name, currentUser?.email || '', profileData.permissions);
         }
       } else {
-        // Create new environment with profiles
         await createEnvironment(environmentName, pin, profileList);
       }
-      setShowOnboarding(false);
-      setShowLogin(false);
     } catch (error) {
       console.error('Error during onboarding:', error);
     }
-  }, [createEnvironment, addProfile, environment]);
-  
-  // Login handlers
-  const handleSelectEnvironment = useCallback(async (selectedEnv: { id: string; name: string; pin?: string }) => {
-    try {
-      // Load the environment first to check its profiles
-      const env = await getEnvironment(selectedEnv.id);
-      if (!env) {
-        console.error('Environment not found');
-        return;
-      }
-      
-      // Check if environment has profiles
-      if (env.profiles && env.profiles.length > 0) {
-        // Check for existing user session (auto-login with email)
-        const sessions = await getAllUserSessions();
-        const userWithEmail = Object.keys(sessions).find(email => sessions[email] === selectedEnv.id);
-        
-        if (userWithEmail) {
-          const profile = env.profiles.find(p => p.email.toLowerCase() === userWithEmail.toLowerCase());
-          if (profile) {
-            await loadEnvironment(selectedEnv.id);
-            await saveUserSession(userWithEmail, selectedEnv.id);
-            setShowLogin(false);
-            return;
-          }
-        }
-        
-        // No email session found - check if profiles have no email (legacy mode)
-        const hasProfilesWithEmail = env.profiles.some(p => p.email);
-        if (!hasProfilesWithEmail) {
-          // Legacy environment - load directly with first profile
-          await loadEnvironment(selectedEnv.id);
-          setShowLogin(false);
-          return;
-        }
-      }
-      
-      // Show user auth modal for email-based login/registration
-      setPendingEnvironmentId(selectedEnv.id);
-      setShowUserAuth(true);
-    } catch (error) {
-      console.error('Error selecting environment:', error);
-      // Fallback: try to load environment anyway
-      setPendingEnvironmentId(selectedEnv.id);
-      setShowUserAuth(true);
-    }
-  }, [loadEnvironment]);
-  
-  const handleCreateNewEnvironment = useCallback(() => {
-    setShowLogin(false);
-    setShowOnboarding(true);
-  }, []);
+  }, [createEnvironment, addProfile, environment, currentUser]);
 
-  // User auth complete handler
   const handleUserAuthComplete = useCallback(async (userData: {
     name: string;
     email: string;
@@ -434,109 +422,43 @@ function AppContent() {
   }) => {
     try {
       if (!pendingEnvironmentId) return;
-      
+
       const env = await getEnvironment(pendingEnvironmentId);
       if (!env) return;
-      
-      // Check if user already exists
+
       const existingProfile = env.profiles.find(p => p.email.toLowerCase() === userData.email.toLowerCase());
-      
+
       if (existingProfile) {
-        // Existing user - verify PIN
         if (existingProfile.pin === userData.pin) {
           await loadEnvironment(pendingEnvironmentId);
           await saveUserSession(userData.email, pendingEnvironmentId);
           setShowUserAuth(false);
-          setShowLogin(false);
           setPendingEnvironmentId('');
         } else {
           alert('PIN incorrecto');
           return;
         }
       } else {
-        // New user - add profile
         await addProfile(userData.name, userData.email, userData.permissions, userData.pin, userData.recoveryEmail, userData.avatarColor);
         await saveUserSession(userData.email, pendingEnvironmentId);
         setShowUserAuth(false);
-        setShowLogin(false);
         setPendingEnvironmentId('');
       }
     } catch (error) {
       console.error('Error in user auth:', error);
     }
   }, [pendingEnvironmentId, addProfile, loadEnvironment]);
-  
-  // Add profile handler
+
   const handleAddProfile = useCallback(async (name: string, permissions: 'admin' | 'readonly') => {
     await addProfile(name, '', permissions);
     setShowAddProfile(false);
   }, [addProfile]);
 
-  // Update profile handler (for user settings)
   const handleUpdateProfile = useCallback(async (profile: Profile) => {
     await updateProfile(profile);
   }, [updateProfile]);
-  
-  // Swipe gestures for navigation
-  useEffect(() => {
-    let touchStartX = 0;
-    let touchEndX = 0;
-    
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStartX = e.targetTouches[0].clientX;
-    };
-    
-    const handleTouchMove = (e: TouchEvent) => {
-      touchEndX = e.targetTouches[0].clientX;
-    };
-    
-    const handleTouchEnd = () => {
-      const swipeThreshold = 50;
-      const diff = touchStartX - touchEndX;
-      
-      if (Math.abs(diff) > swipeThreshold) {
-        if (diff > 0) {
-          handleNext();
-        } else {
-          handlePrev();
-        }
-      }
-    };
-    
-    document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchmove', handleTouchMove, { passive: true });
-    document.addEventListener('touchend', handleTouchEnd, { passive: true });
-    
-    return () => {
-      document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [handleNext, handlePrev]);
-  
-  // Keyboard navigation - Solo vista mensual
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (showEventForm || showEventDetail || showProfileSelector || showAddProfile) return;
 
-      if (e.key === 'ArrowLeft') {
-        handlePrev();
-      } else if (e.key === 'ArrowRight') {
-        handleNext();
-      } else if (e.key === 't') {
-        handleToday();
-      }
-      // Solo permite vista mensual (tecla 1)
-      if (e.key === '1') {
-        setCurrentView('month');
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handlePrev, handleNext, handleToday, showEventForm, showEventDetail, showProfileSelector, showAddProfile]);
-  
-  // Render views - Dommuss Agenda (principalmente vista mensual)
+  // Render views
   const renderView = () => {
     switch (currentView) {
       case 'month':
@@ -548,8 +470,16 @@ function AppContent() {
             filterProfileId={filterProfileId}
           />
         );
+      case 'week':
+        return (
+          <WeekView
+            currentDate={viewDate}
+            events={expandedEvents}
+            onEventClick={handleEventClick}
+            onDayClick={handleDayClick}
+          />
+        );
       case 'day':
-        // Vista diaria con grilla de turnos
         return (
           <>
             <DayView
@@ -572,7 +502,6 @@ function AppContent() {
       case 'menu':
         return <MenuView />;
       default:
-        // Por defecto, vista mensual
         return (
           <MonthView
             currentDate={viewDate}
@@ -589,45 +518,74 @@ function AppContent() {
     return <SplashScreen />;
   }
 
-  // Show onboarding
-  if (showOnboarding) {
-    return <Onboarding onComplete={handleOnboardingComplete} existingEnvName={environment?.name} />;
-  }
-  
-  // Show login screen
-  if (showLogin) {
+  // Show auth flow
+  if (authState === 'login') {
     return (
-      <LoginScreen
-        environments={environments}
-        onSelectEnvironment={handleSelectEnvironment}
-        onCreateNew={handleCreateNewEnvironment}
+      <Login
+        onSwitchToRegister={() => setAuthState('register')}
+        onSwitchToReset={() => setAuthState('password-reset')}
+        onLoginSuccess={handleLoginSuccess}
       />
     );
   }
-  
-  // Check if we have profiles
+
+  if (authState === 'register') {
+    return (
+      <Register
+        onSwitchToLogin={() => setAuthState('login')}
+        onRegisterSuccess={handleRegisterSuccess}
+      />
+    );
+  }
+
+  if (authState === 'verify-email' && currentUser) {
+    return (
+      <VerifyEmail
+        email={currentUser.email}
+        token={pendingToken}
+        onVerificationComplete={handleVerificationComplete}
+        onSkip={() => setAuthState('authenticated')}
+      />
+    );
+  }
+
+  if (authState === 'password-reset') {
+    return (
+      <PasswordReset
+        onSwitchToLogin={() => setAuthState('login')}
+        onSwitchToNewPassword={() => {
+          setAuthState('new-password');
+        }}
+      />
+    );
+  }
+
+  if (authState === 'new-password') {
+    return (
+      <NewPassword
+        onSuccess={handlePasswordResetSuccess}
+        onBack={() => setAuthState('password-reset')}
+      />
+    );
+  }
+
+  // Check if we have environment and profile
   if (!environment) {
-    console.log('No environment yet');
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
-  
+
   if (!activeProfile) {
-    console.log('No active profile, but environment exists:', environment.name, 'with', environment.profiles.length, 'profiles');
-    // If environment has profiles but no active profile is set, set the first one
     if (environment.profiles.length > 0) {
       setActiveProfile(environment.profiles[0].id);
-      return null; // Allow re-render
+      return null;
     }
-    // Environment exists but has no profiles - show onboarding to add profiles
-    console.log('Showing onboarding to add profiles to existing environment');
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
-  
+
   if (environment.profiles.length === 0) {
-    console.log('Environment has no profiles');
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
-  
+
   const isReadOnly = activeProfile.permissions === 'readonly';
 
   return (
@@ -653,6 +611,9 @@ function AppContent() {
         onFilterChange={setFilterProfileId}
       />
 
+      {/* Email Verification Banner */}
+      {!isEmailVerified && <EmailVerificationBanner />}
+
       {/* Offline Banner */}
       {!isOnline && (
         <div className="offline-banner">
@@ -664,7 +625,7 @@ function AppContent() {
       )}
 
       <main className="app-main">
-        {(currentView === 'month' || currentView === 'day') && (
+        {(currentView === 'month' || currentView === 'week' || currentView === 'day') && (
           <>
             <div className="app-calendar-nav">
               <button className="app-nav-btn" onClick={handlePrev} aria-label="Anterior">
@@ -688,7 +649,7 @@ function AppContent() {
           {renderView()}
         </div>
       </main>
-      
+
       {(currentView === 'month' || currentView === 'day') && !isReadOnly && (
         <Button
           className="btn-fab"
@@ -702,12 +663,12 @@ function AppContent() {
           <span className="fab-emoji">➕</span>
         </Button>
       )}
-      
+
       <BottomNav
         currentView={currentView}
         onViewChange={handleViewChange}
       />
-      
+
       {/* Event Form Modal */}
       <EventForm
         isOpen={showEventForm}
@@ -719,7 +680,7 @@ function AppContent() {
         profiles={environment.profiles}
         initialDate={viewDate}
       />
-      
+
       {/* Event Detail Modal */}
       <EventDetail
         isOpen={showEventDetail}
@@ -732,7 +693,7 @@ function AppContent() {
           setSelectedEvent(null);
         }}
       />
-      
+
       {/* Profile Selector Modal */}
       <ProfileSelector
         isOpen={showProfileSelector}
@@ -742,7 +703,7 @@ function AppContent() {
         onAddProfile={() => setShowAddProfile(true)}
         onClose={() => setShowProfileSelector(false)}
       />
-      
+
       {/* Add Profile Modal */}
       <AddProfileModal
         isOpen={showAddProfile}
@@ -767,11 +728,7 @@ function AppContent() {
         profile={activeProfile}
         onClose={() => setShowUserSettings(false)}
         onUpdateProfile={handleUpdateProfile}
-        onLogout={() => {
-          logout();
-          setShowUserSettings(false);
-          setShowLogin(true);
-        }}
+        onLogout={handleLogout}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -789,7 +746,7 @@ function AppContent() {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setShowDeleteConfirm(false)}
       />
-      
+
       {/* Edit Scope Dialog for Recurring Events */}
       <ConfirmDialog
         isOpen={showEditScopeDialog}
@@ -807,6 +764,17 @@ function AppContent() {
 
       {/* PWA Reload Prompt */}
       <ReloadPrompt />
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+        }}
+        onSuccess={() => {
+          setShowPaymentModal(false);
+        }}
+      />
     </div>
   );
 }

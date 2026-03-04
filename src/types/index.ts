@@ -2,6 +2,13 @@
 
 export type EventCategory = 'salud' | 'deporte' | 'comida' | 'cumple' | 'colegio' | 'otro';
 
+export interface EventAlarm {
+  id: string;
+  minutesBefore: number;
+  triggered: boolean;
+  triggeredAt?: Date;
+}
+
 export interface EventComment {
   profileId: string;
   profileName: string;
@@ -44,6 +51,7 @@ export interface Event {
   color: string;
   category?: EventCategory;
   rrule?: string;
+  alarms?: EventAlarm[];
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string;
@@ -67,6 +75,7 @@ export interface ExpandedEvent {
   category?: EventCategory;
   isRecurring: boolean;
   originalDate?: Date;
+  alarms?: EventAlarm[];
   createdBy?: string;
   lastModifiedBy?: string;
   attachments?: string[];

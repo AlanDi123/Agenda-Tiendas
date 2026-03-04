@@ -1,19 +1,49 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Environment, Profile } from '../types';
+import type { User } from '../types/auth';
 import {
   saveEnvironment,
   getEnvironment,
   getDarkMode,
   setDarkMode,
-  saveUserSession,
+  saveUserSession as saveEnvUserSession,
+  getUserSession,
 } from '../services/database';
+import {
+  createUser,
+  loginUser,
+  logoutUser,
+  getCurrentUser,
+  verifyEmail as verifyEmailService,
+  resendVerificationEmail,
+  requestPasswordReset as requestResetService,
+  resetPassword as resetPasswordService,
+  upgradeToPremium as upgradeService,
+} from '../services/authService';
 import { generateId, getInitials, generateAvatarColor } from '../utils/helpers';
 
 interface AuthContextType {
+  // User auth
+  currentUser: User | null;
+  isAuthenticated: boolean;
+  isEmailVerified: boolean;
+  isPremium: boolean;
+  isLoading: boolean;
+  
+  // Auth actions
+  register: (email: string, password: string) => Promise<User & { verificationToken: string }>;
+  login: (email: string, password: string) => Promise<User | null>;
+  logout: () => Promise<void>;
+  verifyEmail: (token: string) => Promise<boolean>;
+  resendVerificationEmail: (email: string) => Promise<boolean>;
+  requestPasswordReset: (email: string) => Promise<boolean>;
+  resetPassword: (token: string, newPassword: string) => Promise<boolean>;
+  upgradeToPremium: () => Promise<void>;
+  
+  // Environment (legacy support)
   environment: Environment | null;
   activeProfile: Profile | null;
-  isAuthenticated: boolean;
   createEnvironment: (
     name: string,
     pin?: string,
@@ -24,31 +54,129 @@ interface AuthContextType {
   updateProfile: (profile: Profile) => Promise<void>;
   deleteProfile: (id: string) => Promise<void>;
   setActiveProfile: (profileId: string) => void;
-  logout: () => void;
+  findProfileByEmail: (email: string) => Profile | undefined;
+  
+  // Settings
   darkMode: boolean;
   toggleDarkMode: () => Promise<void>;
-  findProfileByEmail: (email: string) => Profile | undefined;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Auth state
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Environment state (legacy)
   const [environment, setEnvironment] = useState<Environment | null>(null);
   const [activeProfileId, setActiveProfileId] = useState<string | undefined>();
   const [darkMode, setDarkModeState] = useState<boolean>(false);
 
-  // Cargar modo oscuro al iniciar
+  // Load current user on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+        
+        // Load environment for this user if exists
+        if (user) {
+          const envId = await getUserSession(user.email);
+          if (envId) {
+            const env = await getEnvironment(envId);
+            if (env) {
+              setEnvironment(env);
+              if (env.activeProfileId) {
+                setActiveProfileId(env.activeProfileId);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    initAuth();
+  }, []);
+
+  // Load dark mode
   useEffect(() => {
     getDarkMode().then(setDarkModeState);
   }, []);
 
-  // Aplicar modo oscuro al DOM
+  // Apply dark mode to DOM
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
   const activeProfile = environment?.profiles.find(p => p.id === activeProfileId) || null;
+  const isEmailVerified = currentUser?.emailVerified ?? false;
+  const isPremium = currentUser?.planStatus === 'PREMIUM';
 
+  // Auth actions
+  const register = useCallback(async (email: string, password: string) => {
+    const result = await createUser(email, password);
+    setCurrentUser(result);
+    return result;
+  }, []);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const user = await loginUser(email, password);
+    setCurrentUser(user);
+    
+    // Load user's environment
+    const envId = await getUserSession(email);
+    if (envId) {
+      const env = await getEnvironment(envId);
+      if (env) {
+        setEnvironment(env);
+        if (env.activeProfileId) {
+          setActiveProfileId(env.activeProfileId);
+        }
+      }
+    }
+    
+    return user;
+  }, []);
+
+  const logout = useCallback(async () => {
+    await logoutUser();
+    setCurrentUser(null);
+    setEnvironment(null);
+    setActiveProfileId(undefined);
+  }, []);
+
+  const verifyEmail = useCallback(async (token: string) => {
+    const success = await verifyEmailService(token);
+    if (success && currentUser) {
+      setCurrentUser({ ...currentUser, emailVerified: true });
+    }
+    return success;
+  }, [currentUser]);
+
+  const handleResendVerificationEmail = useCallback(async (email: string) => {
+    return resendVerificationEmail(email);
+  }, []);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    return requestResetService(email);
+  }, []);
+
+  const resetPassword = useCallback(async (token: string, newPassword: string) => {
+    return resetPasswordService(token, newPassword);
+  }, []);
+
+  const upgradeToPremium = useCallback(async () => {
+    if (!currentUser) throw new Error('No user logged in');
+    await upgradeService(currentUser.email);
+    setCurrentUser(prev => prev ? { ...prev, planStatus: 'PREMIUM' } : null);
+  }, [currentUser]);
+
+  // Environment actions (legacy support)
   const createEnvironment = useCallback(async (
     name: string,
     pin?: string,
@@ -56,14 +184,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ): Promise<Environment> => {
     const profiles: Profile[] = [];
     let activeProfileId: string | undefined;
-    
-    // Create initial profiles if provided
+
     if (initialProfiles && initialProfiles.length > 0) {
       for (const prof of initialProfiles) {
         const profile: Profile = {
           id: generateId(),
           name: prof.name,
-          email: '',
+          email: currentUser?.email || '',
           avatarColor: generateAvatarColor(),
           initials: getInitials(prof.name),
           permissions: prof.permissions,
@@ -73,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         activeProfileId = profile.id;
       }
     }
-    
+
     const env: Environment = {
       id: generateId(),
       name,
@@ -87,21 +214,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (activeProfileId) {
       setActiveProfileId(activeProfileId);
     }
+    
+    // Save environment for current user
+    if (currentUser) {
+      await saveEnvUserSession(currentUser.email, env.id);
+    }
+    
     return env;
-  }, []);
+  }, [currentUser]);
 
   const loadEnvironment = useCallback(async (id: string) => {
     const env = await getEnvironment(id);
     if (env) {
-      console.log('Loading environment:', env.name, 'profiles:', env.profiles?.length, 'activeProfileId:', env.activeProfileId);
       setEnvironment(env);
       if (env.activeProfileId && env.profiles?.find(p => p.id === env.activeProfileId)) {
         setActiveProfileId(env.activeProfileId);
       } else if (env.profiles && env.profiles.length > 0) {
         setActiveProfileId(env.profiles[0].id);
       }
+      
+      // Save environment for current user
+      if (currentUser) {
+        await saveEnvUserSession(currentUser.email, id);
+      }
     }
-  }, []);
+  }, [currentUser]);
 
   const addProfile = useCallback(async (
     name: string,
@@ -111,7 +248,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     recoveryEmail?: string,
     avatarColor?: string
   ): Promise<Profile> => {
-    // Wait for environment to be available
     let currentEnv = environment;
     let attempts = 0;
     while (!currentEnv && attempts < 10) {
@@ -119,7 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       currentEnv = environment;
       attempts++;
     }
-    
+
     if (!currentEnv) {
       throw new Error('No environment loaded');
     }
@@ -145,10 +281,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await saveEnvironment(updatedEnv);
     setEnvironment(updatedEnv);
     setActiveProfileId(profile.id);
-    
-    // Save user session for auto-login
+
     if (email) {
-      await saveUserSession(email.toLowerCase(), updatedEnv.id);
+      await saveEnvUserSession(email.toLowerCase(), updatedEnv.id);
     }
 
     return profile;
@@ -190,11 +325,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [environment]);
 
-  const logout = useCallback(() => {
-    setEnvironment(null);
-    setActiveProfileId(undefined);
-  }, []);
-
   const toggleDarkMode = useCallback(async () => {
     const newMode = !darkMode;
     setDarkModeState(newMode);
@@ -208,19 +338,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
+      // User auth
+      currentUser,
+      isAuthenticated: !!currentUser,
+      isEmailVerified,
+      isPremium,
+      isLoading,
+      
+      // Auth actions
+      register,
+      login,
+      logout,
+      verifyEmail,
+      resendVerificationEmail: handleResendVerificationEmail,
+      requestPasswordReset,
+      resetPassword,
+      upgradeToPremium,
+      
+      // Environment (legacy)
       environment,
       activeProfile,
-      isAuthenticated: !!environment && !!activeProfile,
       createEnvironment,
       loadEnvironment,
       addProfile,
       updateProfile,
       deleteProfile,
       setActiveProfile,
-      logout,
+      findProfileByEmail,
+      
+      // Settings
       darkMode,
       toggleDarkMode,
-      findProfileByEmail,
     }}>
       {children}
     </AuthContext.Provider>

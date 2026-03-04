@@ -1,5 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Environment, Event } from '../types';
+import type { User, EmailVerificationToken, PasswordResetToken, AuthSession } from '../types/auth';
+import type { Payment, PaymentSession } from '../types/payment';
 
 interface AgendaDB extends DBSchema {
   environments: {
@@ -15,14 +17,38 @@ interface AgendaDB extends DBSchema {
     key: string;
     value: { key: string; value: unknown };
   };
-  settingsMigration: {
+  // Auth stores
+  users: {
+    key: string; // email as key
+    value: User;
+  };
+  sessions: {
+    key: string; // email as key
+    value: AuthSession;
+  };
+  emailVerificationTokens: {
+    key: string; // email as key
+    value: EmailVerificationToken;
+  };
+  passwordResetTokens: {
+    key: string; // email as key
+    value: PasswordResetToken;
+  };
+  // Payment stores
+  payments: {
     key: string;
-    value: unknown;
+    value: Payment;
+    indexes: { 'by-user': string };
+  };
+  paymentSessions: {
+    key: string;
+    value: PaymentSession;
+    indexes: { 'by-user': string; 'by-status': string };
   };
 }
 
 const DB_NAME = 'agenda-tiendas-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbInstance: IDBPDatabase<AgendaDB> | null = null;
 
@@ -30,7 +56,7 @@ export async function getDB(): Promise<IDBPDatabase<AgendaDB>> {
   if (dbInstance) return dbInstance;
 
   dbInstance = await openDB<AgendaDB>(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
+    upgrade(db) {
       // Store environments
       if (!db.objectStoreNames.contains('environments')) {
         db.createObjectStore('environments', { keyPath: 'id' });
@@ -47,10 +73,34 @@ export async function getDB(): Promise<IDBPDatabase<AgendaDB>> {
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings', { keyPath: 'key' });
       }
-      
-      // Migration from v1 to v2: Add userSessions to settings
-      if (oldVersion < 2) {
-        // UserSessions will be initialized on first use
+
+      // Auth stores (v3)
+      if (!db.objectStoreNames.contains('users')) {
+        db.createObjectStore('users', { keyPath: 'email' });
+      }
+
+      if (!db.objectStoreNames.contains('sessions')) {
+        db.createObjectStore('sessions', { keyPath: 'email' });
+      }
+
+      if (!db.objectStoreNames.contains('emailVerificationTokens')) {
+        db.createObjectStore('emailVerificationTokens', { keyPath: 'email' });
+      }
+
+      if (!db.objectStoreNames.contains('passwordResetTokens')) {
+        db.createObjectStore('passwordResetTokens', { keyPath: 'email' });
+      }
+
+      // Payment stores (v3)
+      if (!db.objectStoreNames.contains('payments')) {
+        const paymentStore = db.createObjectStore('payments', { keyPath: 'id' });
+        paymentStore.createIndex('by-user', 'userId');
+      }
+
+      if (!db.objectStoreNames.contains('paymentSessions')) {
+        const sessionStore = db.createObjectStore('paymentSessions', { keyPath: 'id' });
+        sessionStore.createIndex('by-user', 'userId');
+        sessionStore.createIndex('by-status', 'status');
       }
     },
   });
