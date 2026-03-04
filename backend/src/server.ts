@@ -15,6 +15,7 @@ import { discountRoutes } from './routes/discounts';
 import { healthRoutes } from './routes/health';
 import { agendaRoutes } from './routes/agenda';
 import { authRoutes } from './routes/auth';
+import { appVersionRoutes } from './routes/appVersion';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 
@@ -100,6 +101,7 @@ app.use(`/api/${API_VERSION}/subscriptions`, apiLimiter, subscriptionRoutes);
 app.use(`/api/${API_VERSION}/auth`, authLimiter, authRoutes);
 app.use(`/api/${API_VERSION}/agenda`, apiLimiter, agendaRoutes);
 app.use(`/api/${API_VERSION}/discounts`, authLimiter, discountRoutes);
+app.use(`/api/${API_VERSION}/app`, apiLimiter, appVersionRoutes);
 
 // Webhooks (separate rate limiting, signature verified in route)
 app.use('/api/webhooks', webhookLimiter, webhookRoutes);

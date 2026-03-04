@@ -354,6 +354,29 @@ model ErrorLog {
 }
 
 // ============================================
+// APP VERSION MODEL (Mobile app releases)
+// ============================================
+model AppVersion {
+  id            String   @id @default(uuid())
+  latestVersion String
+  versionCode   Int
+  mandatory     Boolean  @default(false)
+  minVersion    String?
+  apkUrl        String
+  changelog     String
+  publishedAt   DateTime
+  buildNumber   Int?
+  commitSha     String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Indexes
+  @@index([active, createdAt])
+  @@index([latestVersion])
+}
+
+// ============================================
 // REFRESH TOKEN MODEL (Mobile sessions)
 // ============================================
 model RefreshToken {
