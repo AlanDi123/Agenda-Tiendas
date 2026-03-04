@@ -1,3 +1,8 @@
+/**
+ * TurnosGrid Styles
+ * Google Calendar-style time grid with horizontal event layout
+ */
+
 .turnos-grid-container {
   background-color: var(--color-surface);
   border-radius: var(--radius-lg);
@@ -22,6 +27,7 @@
   margin: 0;
 }
 
+/* Main grid container */
 .turnos-grid {
   position: relative;
   height: calc(var(--visible-hours, 17) * var(--hour-height, 64px));
@@ -29,56 +35,76 @@
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
+  display: flex;
 }
 
-/* Time slots */
-.turno-slot {
+/* Hour labels (left side) */
+.turnos-hour-labels {
+  width: 60px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-divider);
+  background-color: var(--color-surface);
+  position: sticky;
+  left: 0;
+  z-index: 20;
+}
+
+.turnos-hour-label {
   display: flex;
-  align-items: center;
-  padding: 0 var(--spacing-md);
-  min-height: calc(var(--hour-height, 64px) / 4);
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: var(--spacing-xs);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+/* Time slots background */
+.turnos-time-slots {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.turnos-time-slot {
+  height: calc(var(--hour-height, 64px) / 4); /* 15-minute slots */
   border-bottom: 1px solid var(--color-divider);
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
 
-.turno-slot:hover {
+.turnos-time-slot:hover {
   background-color: var(--color-surface-variant);
 }
 
-.turno-slot-current {
+.turnos-time-slot-current {
   background-color: rgba(255, 107, 53, 0.1);
 }
 
-.turno-slot-time {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  min-width: 50px;
+.turnos-slot-time {
+  display: none; /* Only show on hour boundaries */
 }
 
-.turno-slot-content {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* Events layer */
+.turnos-events-layer {
+  position: absolute;
+  top: 0;
+  left: 60px; /* Width of hour labels */
+  right: 0;
+  bottom: 0;
+  pointer-events: none; /* Allow clicks to pass through to time slots */
 }
 
-.turno-slot-available {
-  font-size: 0.75rem;
-  color: var(--color-text-disabled);
-  font-style: italic;
-}
-
-/* Event cards - positioned absolutely by time */
-.turno-event-card {
+/* Event cards */
+.turnos-event-card {
   position: absolute;
   left: var(--event-left);
   top: var(--event-top);
   width: var(--event-width);
   height: var(--event-height);
   background-color: var(--event-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   border: none;
   cursor: pointer;
   overflow: hidden;
@@ -89,19 +115,37 @@
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
   z-index: 5;
   text-align: left;
+  pointer-events: auto; /* Re-enable pointer events for events */
+  min-height: 24px;
 }
 
-.turno-event-card:hover {
+/* Hover and active states */
+.turnos-event-card:hover {
   transform: scale(1.02);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
   z-index: 10;
 }
 
-.turno-event-card:active {
+.turnos-event-card:active {
   transform: scale(0.98);
 }
 
-.turno-event-time {
+/* Overlap type styling */
+.turnos-event-single {
+  /* Single event, full width */
+}
+
+.turnos-event-partial {
+  /* Partial overlap, add subtle indicator */
+  border-left: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.turnos-event-full {
+  /* Full overlap */
+}
+
+/* Event content */
+.turnos-event-time {
   font-size: 0.6875rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.95);
@@ -111,7 +155,7 @@
   text-overflow: ellipsis;
 }
 
-.turno-event-content {
+.turnos-event-content {
   flex: 1;
   display: flex;
   align-items: center;
@@ -120,7 +164,7 @@
   min-width: 0;
 }
 
-.turno-event-title {
+.turnos-event-title {
   font-size: 0.75rem;
   font-weight: 500;
   color: white;
@@ -130,7 +174,7 @@
   flex: 1;
 }
 
-.turno-event-profile {
+.turnos-event-profile {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -147,7 +191,7 @@
 /* Current time line */
 .turnos-current-time-line {
   position: absolute;
-  left: 0;
+  left: 60px; /* Width of hour labels */
   right: 0;
   height: 2px;
   background-color: var(--color-accent);
@@ -169,7 +213,7 @@
 
 .current-time-label {
   position: absolute;
-  left: 55px;
+  left: 8px;
   top: 50%;
   transform: translateY(-50%);
   font-size: 0.6875rem;
@@ -179,6 +223,24 @@
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Scrollbar styles */
+.turnos-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.turnos-grid::-webkit-scrollbar-track {
+  background: var(--color-surface-variant);
+}
+
+.turnos-grid::-webkit-scrollbar-thumb {
+  background: var(--color-text-disabled);
+  border-radius: var(--radius-full);
+}
+
+.turnos-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
 }
 
 /* Empty state */
@@ -211,56 +273,59 @@
   margin: 0;
 }
 
-/* Scrollbar styles */
-.turnos-grid::-webkit-scrollbar {
-  width: 6px;
-}
-
-.turnos-grid::-webkit-scrollbar-track {
-  background: var(--color-surface-variant);
-}
-
-.turnos-grid::-webkit-scrollbar-thumb {
-  background: var(--color-text-disabled);
-  border-radius: var(--radius-full);
-}
-
-.turnos-grid::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-secondary);
-}
-
 /* Mobile optimization */
 @media (max-width: 480px) {
-  .turnos-grid {
-    --hour-height: 56px;
+  .turnos-hour-labels {
+    width: 50px;
   }
 
-  .turno-slot-time {
-    min-width: 45px;
+  .turnos-hour-label {
     font-size: 0.6875rem;
   }
 
-  .turno-event-title {
+  .turnos-time-slot {
+    height: calc(var(--hour-height, 56px) / 4);
+  }
+
+  .turnos-event-title {
     font-size: 0.6875rem;
   }
 
-  .turno-event-time {
+  .turnos-event-time {
     font-size: 0.625rem;
   }
 
   .current-time-label {
     font-size: 0.625rem;
-    left: 50px;
+    left: 54px;
+  }
+
+  .turnos-event-profile {
+    width: 18px;
+    height: 18px;
+    font-size: 0.5625rem;
   }
 }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .turno-event-card {
+  .turnos-event-card {
     transition: none;
   }
 
-  .turno-slot {
+  .turnos-time-slot {
     transition: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .turnos-grid {
+    overflow: visible;
+    height: auto;
+  }
+
+  .turnos-current-time-line {
+    display: none;
   }
 }

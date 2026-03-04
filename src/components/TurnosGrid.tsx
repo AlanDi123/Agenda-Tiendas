@@ -1,8 +1,28 @@
-// Enhanced TurnosGrid with Google Calendar-style time positioning and overlap handling
+/**
+ * TurnosGrid - Google Calendar-style Time Grid
+ * 
+ * Features:
+ * - Events positioned by actual time (top = minutes * pixelsPerMinute)
+ * - Overlapping events rendered side-by-side horizontally
+ * - Dynamic column width based on number of overlapping events
+ * - Current time indicator with smooth scroll
+ * - Click to create appointment
+ */
+
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { format, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { ExpandedEvent, Profile } from '../types';
+import {
+  positionEvents,
+  calculateEventLayout,
+  getOverlapType,
+  HOUR_HEIGHT,
+  START_HOUR,
+  END_HOUR,
+  GRID_HEIGHT,
+  MINUTE_HEIGHT,
+} from '../utils/agendaOverlap';
 import './TurnosGrid.css';
 
 interface TurnosGridProps {
@@ -11,113 +31,6 @@ interface TurnosGridProps {
   profiles: Profile[];
   onSlotClick?: (time: string) => void;
   onEventClick?: (event: ExpandedEvent) => void;
-}
-
-const HOUR_HEIGHT = 64; // pixels per hour
-const START_HOUR = 6; // 6:00 AM
-const END_HOUR = 23; // 11:00 PM
-const VISIBLE_HOURS = END_HOUR - START_HOUR;
-const MINUTES_PER_SLOT = 15;
-const SLOTS_PER_HOUR = 60 / MINUTES_PER_SLOT;
-
-// Calculate event position and dimensions
-function calculateEventPosition(event: ExpandedEvent) {
-  const startHour = event.startDate.getHours();
-  const startMinute = event.startDate.getMinutes();
-  const endHour = event.endDate.getHours();
-  const endMinute = event.endDate.getMinutes();
-
-  // Minutes from start of visible day (START_HOUR)
-  const startMinutesFromVisible = (startHour - START_HOUR) * 60 + startMinute;
-  const endMinutesFromVisible = (endHour - START_HOUR) * 60 + endMinute;
-
-  // Pixel position
-  const top = (startMinutesFromVisible / 60) * HOUR_HEIGHT;
-  const height = ((endMinutesFromVisible - startMinutesFromVisible) / 60) * HOUR_HEIGHT;
-
-  return {
-    top: Math.max(0, top),
-    height: Math.max(24, height), // Minimum height for visibility
-    startMinutes: startMinutesFromVisible,
-    endMinutes: endMinutesFromVisible,
-  };
-}
-
-// Check if two events overlap in time
-function eventsOverlap(e1: ExpandedEvent, e2: ExpandedEvent): boolean {
-  const e1Start = e1.startDate.getHours() * 60 + e1.startDate.getMinutes();
-  const e1End = e1.endDate.getHours() * 60 + e1.endDate.getMinutes();
-  const e2Start = e2.startDate.getHours() * 60 + e2.startDate.getMinutes();
-  const e2End = e2.endDate.getHours() * 60 + e2.endDate.getMinutes();
-
-  return e1Start < e2End && e2Start < e1End;
-}
-
-// Group overlapping events into collision groups
-function groupOverlappingEvents(events: ExpandedEvent[]): ExpandedEvent[][] {
-  const groups: ExpandedEvent[][] = [];
-  const processed = new Set<string>();
-
-  for (const event of events) {
-    if (processed.has(event.id)) continue;
-
-    const group: ExpandedEvent[] = [event];
-    processed.add(event.id);
-
-    for (const other of events) {
-      if (processed.has(other.id)) continue;
-      if (eventsOverlap(event, other)) {
-        group.push(other);
-        processed.add(other.id);
-      }
-    }
-
-    groups.push(group);
-  }
-
-  return groups;
-}
-
-// Calculate column positions for overlapping events
-function calculateEventColumns(group: ExpandedEvent[]): Map<string, { column: number; totalColumns: number }> {
-  const result = new Map<string, { column: number; totalColumns: number }>();
-  
-  // Sort by start time
-  const sorted = [...group].sort((a, b) => {
-    const aStart = a.startDate.getHours() * 60 + a.startDate.getMinutes();
-    const bStart = b.startDate.getHours() * 60 + b.startDate.getMinutes();
-    return aStart - bStart;
-  });
-
-  // Greedy algorithm to assign columns
-  const columns: ExpandedEvent[][] = [];
-
-  for (const event of sorted) {
-    const eventStart = event.startDate.getHours() * 60 + event.startDate.getMinutes();
-
-    let placed = false;
-
-    for (let colIndex = 0; colIndex < columns.length; colIndex++) {
-      const column = columns[colIndex];
-      const lastEvent = column[column.length - 1];
-      const lastEnd = lastEvent.endDate.getHours() * 60 + lastEvent.endDate.getMinutes();
-
-      // If no overlap with last event in this column
-      if (eventStart >= lastEnd) {
-        column.push(event);
-        result.set(event.id, { column: colIndex, totalColumns: columns.length });
-        placed = true;
-        break;
-      }
-    }
-
-    if (!placed) {
-      columns.push([event]);
-      result.set(event.id, { column: columns.length - 1, totalColumns: columns.length });
-    }
-  }
-
-  return result;
 }
 
 export function TurnosGrid({
@@ -162,26 +75,9 @@ export function TurnosGrid({
     });
   }, [events, currentDate]);
 
-  // Group overlapping events and calculate positions
+  // Position all events with overlap calculation
   const positionedEvents = useMemo(() => {
-    const groups = groupOverlappingEvents(daysEvents);
-    const positionMap = new Map<string, { event: ExpandedEvent; column: number; totalColumns: number }>();
-
-    for (const group of groups) {
-      const columns = calculateEventColumns(group);
-      columns.forEach((data, eventId) => {
-        const event = group.find(e => e.id === eventId);
-        if (event) {
-          positionMap.set(eventId, {
-            event,
-            column: data.column,
-            totalColumns: data.totalColumns,
-          });
-        }
-      });
-    }
-
-    return Array.from(positionMap.values());
+    return positionEvents(daysEvents);
   }, [daysEvents]);
 
   // Get profile for event
@@ -192,25 +88,43 @@ export function TurnosGrid({
     return profiles.find(p => p.id === event.assignedProfileIds[0]) || null;
   }, [profiles]);
 
-  // Render time slots
+  // Render hour labels
+  const hourLabels = useMemo(() => {
+    const labels = [];
+    for (let hour = START_HOUR; hour < END_HOUR; hour++) {
+      labels.push(
+        <div
+          key={hour}
+          className="turnos-hour-label"
+          style={{ height: `${HOUR_HEIGHT}px` }}
+        >
+          {format(new Date(2024, 0, 1, hour), 'HH:00')}
+        </div>
+      );
+    }
+    return labels;
+  }, []);
+
+  // Render time slots (clickable areas)
   const timeSlots = useMemo(() => {
     const slots = [];
     for (let hour = START_HOUR; hour < END_HOUR; hour++) {
-      for (let slot = 0; slot < SLOTS_PER_HOUR; slot++) {
-        const time = `${hour.toString().padStart(2, '0')}:${(slot * MINUTES_PER_SLOT).toString().padStart(2, '0')}`;
-        const isCurrentSlot = isToday(currentDate) && format(currentTime, 'HH:mm') === time;
+      for (let slot = 0; slot < 4; slot++) { // 15-minute slots
+        const minutes = slot * 15;
+        const time = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        const isCurrentSlot = isToday(currentDate) && 
+          format(currentTime, 'HH:mm') === time;
 
         slots.push(
           <div
             key={`${hour}-${slot}`}
-            className={`turno-slot ${isCurrentSlot ? 'turno-slot-current' : ''}`}
+            className={`turnos-time-slot ${isCurrentSlot ? 'turnos-time-slot-current' : ''}`}
             data-slot-time={time}
             onClick={() => onSlotClick?.(time)}
           >
-            <div className="turno-slot-time">{time}</div>
-            <div className="turno-slot-content">
-              <span className="turno-slot-available">Disponible</span>
-            </div>
+            {slot === 0 && (
+              <span className="turnos-slot-time">{time}</span>
+            )}
           </div>
         );
       }
@@ -227,65 +141,77 @@ export function TurnosGrid({
       </div>
 
       <div className="turnos-grid" ref={gridRef}>
+        {/* Hour labels */}
+        <div className="turnos-hour-labels">
+          {hourLabels}
+        </div>
+
         {/* Time slots background */}
-        {timeSlots}
+        <div className="turnos-time-slots">
+          {timeSlots}
+        </div>
 
         {/* Events positioned by time */}
-        {positionedEvents.map(({ event, column, totalColumns }) => {
-          const position = calculateEventPosition(event);
-          const profile = getEventProfile(event);
-          const eventColor = event.color || profile?.avatarColor || '#1E88E5';
-          const widthPercent = 100 / totalColumns;
-          const leftPercent = column * widthPercent;
+        <div className="turnos-events-layer">
+          {positionedEvents.map(({ event, column, totalColumns, position }) => {
+            const profile = getEventProfile(event);
+            const eventColor = event.color || profile?.avatarColor || '#1E88E5';
+            const { left, width } = calculateEventLayout(column, totalColumns);
+            const overlapType = getOverlapType(event, daysEvents);
 
-          // Skip events outside visible hours
-          if (position.startMinutes < 0 || position.startMinutes >= VISIBLE_HOURS * 60) {
-            return null;
-          }
+            // Skip events completely outside visible hours
+            if (position.top >= GRID_HEIGHT || position.top + position.height <= 0) {
+              return null;
+            }
 
-          return (
-            <button
-              key={event.id}
-              className="turno-event-card"
-              style={{
-                '--event-color': eventColor,
-                '--event-top': `${position.top}px`,
-                '--event-height': `${position.height}px`,
-                '--event-left': `calc(${leftPercent}%)`,
-                '--event-width': `calc(${widthPercent}% - 4px)`,
-              } as React.CSSProperties}
-              onClick={(e) => {
-                e.stopPropagation();
-                onEventClick?.(event);
-              }}
-            >
-              <div className="turno-event-time">
-                {format(event.startDate, 'HH:mm')} - {format(event.endDate, 'HH:mm')}
-              </div>
-              <div className="turno-event-content">
-                <span className="turno-event-title">{event.title}</span>
-                {profile && (
-                  <span
-                    className="turno-event-profile"
-                    style={{ backgroundColor: profile.avatarColor }}
-                  >
-                    {profile.initials}
-                  </span>
-                )}
-              </div>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={event.id}
+                className={`turnos-event-card turnos-event-${overlapType}`}
+                style={{
+                  '--event-color': eventColor,
+                  '--event-top': `${position.top}px`,
+                  '--event-height': `${position.height}px`,
+                  '--event-left': left,
+                  '--event-width': width,
+                } as React.CSSProperties}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEventClick?.(event);
+                }}
+                title={`${event.title}\n${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}`}
+              >
+                <div className="turnos-event-time">
+                  {format(event.startDate, 'HH:mm')} - {format(event.endDate, 'HH:mm')}
+                </div>
+                <div className="turnos-event-content">
+                  <span className="turnos-event-title">{event.title}</span>
+                  {profile && (
+                    <span
+                      className="turnos-event-profile"
+                      style={{ backgroundColor: profile.avatarColor }}
+                      title={profile.name}
+                    >
+                      {profile.initials}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
 
         {/* Current time line */}
         {isToday(currentDate) && (
           <div
             className="turnos-current-time-line"
             style={{
-              top: `${((currentTime.getHours() - START_HOUR) * 60 + currentTime.getMinutes()) / 60 * HOUR_HEIGHT}px`,
+              top: `${((currentTime.getHours() - START_HOUR) * 60 + currentTime.getMinutes()) * MINUTE_HEIGHT}px`,
             }}
           >
-            <span className="current-time-label">{format(currentTime, 'HH:mm')}</span>
+            <span className="current-time-label">
+              {format(currentTime, 'HH:mm')}
+            </span>
           </div>
         )}
       </div>
