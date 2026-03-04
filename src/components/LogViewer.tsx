@@ -12,13 +12,15 @@ interface LogViewerProps {
 const levelIcons = {
   error: '❌',
   warn: '⚠️',
-  info: 'ℹ️'
+  info: 'ℹ️',
+  debug: '🔍'
 };
 
 const levelColors = {
   error: '#E53935',
   warn: '#FB8C00',
-  info: '#1E88E5'
+  info: '#1E88E5',
+  debug: '#5C6BC0'
 };
 
 export function LogViewer({ isOpen, onClose }: LogViewerProps) {

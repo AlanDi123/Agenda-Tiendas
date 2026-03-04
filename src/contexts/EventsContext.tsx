@@ -9,6 +9,8 @@ import {
 } from '../services/database';
 import { expandRecurringEvents } from '../services/recurrence';
 import { generateId } from '../utils/helpers';
+import { AppLogger } from '../services/logger';
+import { useEventAlarms } from '../hooks/useEventAlarms';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -44,9 +46,17 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const [viewDate, setViewDate] = useState(new Date());
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  // Initialize alarm management
+  const { scheduleAlarm, cancelAlarms, rescheduleAlarms } = useEventAlarms(events);
+
   const addToast = useCallback((message: string, type: ToastType) => {
     const id = generateId();
     setToasts(prev => [...prev, { id, message, type }]);
+    
+    // Auto-remove toast after 5 seconds (silent save pattern)
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5000);
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -95,56 +105,82 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date(),
     };
 
-    await saveEvent(event);
-    setEvents(prev => [...prev, event]);
-    notifyFamily(event, 'create');
-    return event;
-  }, [notifyFamily]);
+    try {
+      await saveEvent(event);
+      setEvents(prev => [...prev, event]);
+      
+      // Schedule alarms if present
+      if (event.alarms && event.alarms.length > 0) {
+        for (const alarm of event.alarms) {
+          await scheduleAlarm(event, alarm);
+        }
+      }
+      
+      // Silent save with toast notification
+      addToast(`Evento "${event.title}" creado`, 'success');
+      AppLogger.logUserAction('create_event', { eventId: event.id, title: event.title });
+      
+      return event;
+    } catch (error) {
+      AppLogger.error('Error creating event', error, 'EventsContext');
+      addToast('Error al crear evento', 'error');
+      throw error;
+    }
+  }, [addToast, scheduleAlarm]);
 
   const updateEvent = useCallback(async (
     event: Event,
     scope: 'single' | 'future' | 'all'
   ) => {
-    const updatedEvent = {
-      ...event,
-      updatedAt: new Date(),
-    };
+    try {
+      const updatedEvent = {
+        ...event,
+        updatedAt: new Date(),
+      };
 
-    if (scope === 'all' || !event.rrule) {
-      // Actualizar toda la serie
       await saveEvent(updatedEvent);
       setEvents(prev => prev.map(e => e.id === event.id ? updatedEvent : e));
-    } else if (scope === 'future') {
-      // Para eventos futuros, necesitamos crear un nuevo evento recurrente
-      await saveEvent(updatedEvent);
-      setEvents(prev => prev.map(e => e.id === event.id ? updatedEvent : e));
-    } else {
-      // Solo este evento - crear una excepción
-      await saveEvent(updatedEvent);
-      setEvents(prev => prev.map(e => e.id === event.id ? updatedEvent : e));
+      
+      // Reschedule alarms for updated event
+      await rescheduleAlarms(updatedEvent);
+      
+      // Silent save with toast
+      addToast(`Evento "${event.title}" actualizado`, 'success');
+      AppLogger.logUserAction('update_event', { eventId: event.id, scope });
+      
+      notifyFamily(updatedEvent, 'update');
+    } catch (error) {
+      AppLogger.error('Error updating event', error, 'EventsContext');
+      addToast('Error al actualizar evento', 'error');
+      throw error;
     }
-    
-    notifyFamily(updatedEvent, 'update');
-  }, [notifyFamily]);
+  }, [addToast, rescheduleAlarms, notifyFamily]);
 
   const deleteEvent = useCallback(async (
     eventId: string,
     scope: 'single' | 'future' | 'all'
   ) => {
-    const event = events.find(e => e.id === eventId);
-    
-    if (scope === 'all') {
+    try {
+      const event = events.find(e => e.id === eventId);
+
+      // Cancel alarms first
+      if (event) {
+        await cancelAlarms(eventId);
+      }
+
       await deleteEventFromDB(eventId);
       setEvents(prev => prev.filter(e => e.id !== eventId));
-      if (event) notifyFamily(event, 'delete');
-    } else {
-      // Para 'single' o 'future', en una implementación completa
-      // manejaríamos las excepciones de recurrencia
-      await deleteEventFromDB(eventId);
-      setEvents(prev => prev.filter(e => e.id !== eventId));
-      if (event) notifyFamily(event, 'delete');
+      
+      if (event) {
+        notifyFamily(event, 'delete');
+        AppLogger.logUserAction('delete_event', { eventId, scope });
+      }
+    } catch (error) {
+      AppLogger.error('Error deleting event', error, 'EventsContext');
+      addToast('Error al eliminar evento', 'error');
+      throw error;
     }
-  }, [events, notifyFamily]);
+  }, [events, addToast, cancelAlarms, notifyFamily]);
 
   const getEventById = useCallback(async (id: string): Promise<Event | undefined> => {
     return getEvent(id);
