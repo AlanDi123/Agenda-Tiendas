@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Button';
 import { Modal } from '../Modal';
-import { SUBSCRIPTION_PLANS } from '../../services/paymentGateway';
+import { SUBSCRIPTION_PLANS } from '../../types/payment';
 import type { SubscriptionPlan } from '../../types/payment';
 import './Payment.css';
 
@@ -56,7 +56,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
         </div>
 
         <div className="payment-plans">
-          {SUBSCRIPTION_PLANS.map((plan) => (
+          {SUBSCRIPTION_PLANS.filter(p => p.id !== 'FREE').map((plan: SubscriptionPlan) => (
             <button
               key={plan.id}
               className={`payment-plan-card ${selectedPlan.id === plan.id ? 'selected' : ''}`}
@@ -71,7 +71,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
                 </div>
               </div>
               <ul className="payment-plan-features">
-                {plan.features.slice(0, 3).map((feature, index) => (
+                {plan.features.slice(0, 3).map((feature: string, index: number) => (
                   <li key={index} className="payment-plan-feature">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="20 6 9 17 4 12" />

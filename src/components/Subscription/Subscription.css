@@ -1,0 +1,197 @@
+.subscription-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.subscription-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-xl);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-divider);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.subscription-loading p {
+  margin-top: var(--spacing-md);
+  color: var(--color-text-secondary);
+}
+
+/* Header */
+.subscription-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.status-active {
+  background-color: rgba(67, 160, 71, 0.1);
+  color: var(--color-success);
+}
+
+.status-badge.status-free {
+  background-color: rgba(96, 125, 139, 0.1);
+  color: var(--color-text-secondary);
+}
+
+.subscription-header h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* Details */
+.subscription-details {
+  background-color: var(--color-surface-variant);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacing-sm) 0;
+  font-size: 0.9375rem;
+}
+
+.detail-row:not(:last-child) {
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.detail-label {
+  color: var(--color-text-secondary);
+}
+
+.detail-value {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.detail-warning {
+  color: var(--color-warning);
+}
+
+.detail-value.cancel-pending {
+  color: var(--color-warning);
+}
+
+.detail-lifetime {
+  background-color: rgba(255, 107, 53, 0.1);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  margin-top: var(--spacing-sm);
+}
+
+.detail-value.lifetime-badge {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Features */
+.subscription-features {
+  padding: var(--spacing-md) 0;
+}
+
+.subscription-features h4 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md);
+}
+
+.features-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.feature-item svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-success);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Actions */
+.subscription-actions {
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-divider);
+}
+
+/* Free plan */
+.subscription-free {
+  text-align: center;
+}
+
+.free-description {
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  margin: var(--spacing-md) 0;
+  line-height: 1.5;
+}
+
+/* Reactivate message */
+.subscription-reactivate {
+  padding: var(--spacing-md);
+  background-color: var(--color-warning);
+  color: white;
+  border-radius: var(--radius-md);
+}
+
+.reactivate-message {
+  font-size: 0.875rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Mobile optimization */
+@media (max-width: 480px) {
+  .subscription-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detail-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

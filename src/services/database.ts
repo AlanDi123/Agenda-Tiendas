@@ -1,7 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Environment, Event } from '../types';
 import type { User, EmailVerificationToken, PasswordResetToken, AuthSession } from '../types/auth';
-import type { Payment, PaymentSession } from '../types/payment';
+import type { Payment, PaymentSession, Subscription, DiscountCode, UserDiscountUsage } from '../types/payment';
 
 interface AgendaDB extends DBSchema {
   environments: {
@@ -34,21 +34,35 @@ interface AgendaDB extends DBSchema {
     key: string; // email as key
     value: PasswordResetToken;
   };
-  // Payment stores
+  // Payment & Subscription stores
   payments: {
     key: string;
     value: Payment;
-    indexes: { 'by-user': string };
+    indexes: { 'by-user': string; 'by-transaction': string };
   };
   paymentSessions: {
     key: string;
     value: PaymentSession;
     indexes: { 'by-user': string; 'by-status': string };
   };
+  subscriptions: {
+    key: string;
+    value: Subscription;
+    indexes: { 'by-user': string; 'by-status': string };
+  };
+  discountCodes: {
+    key: string; // code uppercase
+    value: DiscountCode;
+  };
+  userDiscountUsage: {
+    key: string;
+    value: UserDiscountUsage;
+    indexes: { 'by-user': string; 'by-code': string };
+  };
 }
 
 const DB_NAME = 'agenda-tiendas-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbInstance: IDBPDatabase<AgendaDB> | null = null;
 
@@ -95,12 +109,30 @@ export async function getDB(): Promise<IDBPDatabase<AgendaDB>> {
       if (!db.objectStoreNames.contains('payments')) {
         const paymentStore = db.createObjectStore('payments', { keyPath: 'id' });
         paymentStore.createIndex('by-user', 'userId');
+        paymentStore.createIndex('by-transaction', 'transactionId');
       }
 
       if (!db.objectStoreNames.contains('paymentSessions')) {
         const sessionStore = db.createObjectStore('paymentSessions', { keyPath: 'id' });
         sessionStore.createIndex('by-user', 'userId');
         sessionStore.createIndex('by-status', 'status');
+      }
+
+      // Subscription stores (v4)
+      if (!db.objectStoreNames.contains('subscriptions')) {
+        const subStore = db.createObjectStore('subscriptions', { keyPath: 'id' });
+        subStore.createIndex('by-user', 'userId');
+        subStore.createIndex('by-status', 'status');
+      }
+
+      if (!db.objectStoreNames.contains('discountCodes')) {
+        db.createObjectStore('discountCodes', { keyPath: 'code' });
+      }
+
+      if (!db.objectStoreNames.contains('userDiscountUsage')) {
+        const usageStore = db.createObjectStore('userDiscountUsage', { keyPath: 'id' });
+        usageStore.createIndex('by-user', 'userId');
+        usageStore.createIndex('by-code', 'discountCode');
       }
     },
   });

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Environment, Profile } from '../types';
 import type { User } from '../types/auth';
+import type { PlanType } from '../types/payment';
 import {
   saveEnvironment,
   getEnvironment,
@@ -21,6 +22,7 @@ import {
   resetPassword as resetPasswordService,
   upgradeToPremium as upgradeService,
 } from '../services/authService';
+import { hasPremiumAccess as _hasPremiumAccess, getUserPlan, getUserSubscription as _getUserSubscription, initializeDiscountCodes } from '../services/subscriptionService';
 import { generateId, getInitials, generateAvatarColor } from '../utils/helpers';
 
 interface AuthContextType {
@@ -29,8 +31,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isEmailVerified: boolean;
   isPremium: boolean;
+  userPlan: PlanType;
   isLoading: boolean;
-  
+
   // Auth actions
   register: (email: string, password: string) => Promise<User & { verificationToken: string }>;
   login: (email: string, password: string) => Promise<User | null>;
@@ -40,7 +43,8 @@ interface AuthContextType {
   requestPasswordReset: (email: string) => Promise<boolean>;
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
   upgradeToPremium: () => Promise<void>;
-  
+  refreshSubscription: () => Promise<void>;
+
   // Environment (legacy support)
   environment: Environment | null;
   activeProfile: Profile | null;
@@ -67,7 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Auth state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [userPlan, setUserPlan] = useState<PlanType>('FREE');
+
   // Environment state (legacy)
   const [environment, setEnvironment] = useState<Environment | null>(null);
   const [activeProfileId, setActiveProfileId] = useState<string | undefined>();
@@ -77,11 +82,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        // Initialize discount codes
+        await initializeDiscountCodes();
+
         const user = await getCurrentUser();
         setCurrentUser(user);
-        
-        // Load environment for this user if exists
+
+        // Load subscription status
         if (user) {
+          const plan = await getUserPlan(user.id);
+          setUserPlan(plan);
+
+          // Load environment for this user if exists
           const envId = await getUserSession(user.email);
           if (envId) {
             const env = await getEnvironment(envId);
@@ -99,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     };
-    
+
     initAuth();
   }, []);
 
@@ -115,7 +127,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const activeProfile = environment?.profiles.find(p => p.id === activeProfileId) || null;
   const isEmailVerified = currentUser?.emailVerified ?? false;
-  const isPremium = currentUser?.planStatus === 'PREMIUM';
+  const isPremium = userPlan !== 'FREE';
+
+  // Refresh subscription status
+  const refreshSubscription = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const plan = await getUserPlan(currentUser.id);
+      setUserPlan(plan);
+    } catch (error) {
+      console.error('Error refreshing subscription:', error);
+    }
+  }, [currentUser]);
 
   // Auth actions
   const register = useCallback(async (email: string, password: string) => {
@@ -127,7 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const user = await loginUser(email, password);
     setCurrentUser(user);
-    
+
+    // Load subscription status
+    if (user) {
+      const plan = await getUserPlan(user.id);
+      setUserPlan(plan);
+    }
+
     // Load user's environment
     const envId = await getUserSession(email);
     if (envId) {
@@ -139,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-    
+
     return user;
   }, []);
 
@@ -343,8 +372,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: !!currentUser,
       isEmailVerified,
       isPremium,
+      userPlan,
       isLoading,
-      
+
       // Auth actions
       register,
       login,
@@ -354,7 +384,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestPasswordReset,
       resetPassword,
       upgradeToPremium,
-      
+      refreshSubscription,
+
       // Environment (legacy)
       environment,
       activeProfile,
