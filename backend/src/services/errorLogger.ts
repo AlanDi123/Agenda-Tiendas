@@ -280,7 +280,7 @@ export async function getErrorStatistics(
   };
 
   // Count by error code
-  errors.forEach(error => {
+  errors.forEach((error: any) => {
     stats.byErrorCode[error.errorCode] = (stats.byErrorCode[error.errorCode] || 0) + 1;
     stats.byEndpoint[error.endpoint] = (stats.byEndpoint[error.endpoint] || 0) + 1;
   });

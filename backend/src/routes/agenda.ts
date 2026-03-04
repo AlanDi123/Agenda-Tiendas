@@ -8,7 +8,7 @@ import { z } from 'zod';
 import * as agendaService from '../services/agendaService';
 import { logApiError, logAgendaConflict } from '../services/errorLogger';
 import { createError } from '../middleware/errorHandler';
-import { authMiddleware, requireAuth } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
 
@@ -276,7 +276,7 @@ router.get('/appointments', async (req: Request, res: Response, next: NextFuncti
         staffId,
         new Date(startDate),
         new Date(endDate),
-        status
+        status as any
       );
     } else if (locationId) {
       appointments = await agendaService.getAppointmentsByLocation(
@@ -290,7 +290,7 @@ router.get('/appointments', async (req: Request, res: Response, next: NextFuncti
         user.id,
         new Date(startDate),
         new Date(endDate),
-        status
+        status as any
       );
     }
 

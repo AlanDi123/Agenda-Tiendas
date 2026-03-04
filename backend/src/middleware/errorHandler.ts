@@ -15,7 +15,7 @@ export function errorHandler(
   err: ApiError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) {
   // Log error for debugging (never expose to client)
   console.error('Error:', {

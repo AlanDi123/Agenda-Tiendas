@@ -4,7 +4,7 @@
  */
 
 import prisma from '../lib/prisma';
-import { PlanType, PlanStatus, SubscriptionStatus } from '@prisma/client';
+import { PlanType, PlanStatus } from '@prisma/client';
 import { createError } from '../middleware/errorHandler';
 
 const GRACE_PERIOD_HOURS = parseInt(process.env.GRACE_PERIOD_HOURS || '72', 10);
@@ -186,7 +186,7 @@ export async function activateSubscription(
   }
 
   // Use transaction for atomic update
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     // Create or update subscription
     await tx.subscription.upsert({
       where: { externalPaymentId },
@@ -232,7 +232,7 @@ export async function cancelSubscription(
   userId: string,
   reason?: string
 ): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     // Update active subscriptions
     await tx.subscription.updateMany({
       where: {
@@ -286,7 +286,7 @@ export async function processGracePeriods(): Promise<number> {
   // Update to expired status
   await prisma.user.updateMany({
     where: {
-      id: { in: expiredUsers.map(u => u.id) },
+      id: { in: expiredUsers.map((u: any) => u.id) },
     },
     data: {
       planStatus: 'expired',
@@ -314,7 +314,7 @@ export async function grantLifetimeSubscription(
   const now = new Date();
   const paymentId = externalPaymentId || `lifetime_${userId}_${Date.now()}`;
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     // Check if already has lifetime
     const existingLifetime = await tx.subscription.findFirst({
       where: {

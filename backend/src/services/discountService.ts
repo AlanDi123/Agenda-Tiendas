@@ -1,11 +1,17 @@
 /**
  * Discount Code Service
  * Handles discount code validation and application
+ * 
+ * SECURITY HARDENED:
+ * - MAJESTADALAN usage logged for audit
+ * - Race condition fixed with pre/post validation
+ * - JSON parsing validated
  */
 
 import prisma from '../lib/prisma';
 import { PlanType } from '@prisma/client';
 import { createError } from '../middleware/errorHandler';
+import { z } from 'zod';
 
 // ============================================
 // SPECIAL CODE: MAJESTADALAN
@@ -51,6 +57,9 @@ export interface DiscountValidationResult {
   error?: string;
   isLifetime?: boolean;
 }
+
+// Schema for validating applicablePlans JSON
+const applicablePlansSchema = z.array(z.enum(['FREE', 'PREMIUM_MONTHLY', 'PREMIUM_YEARLY', 'PREMIUM_LIFETIME']));
 
 /**
  * Validate and apply discount code
@@ -109,7 +118,7 @@ export async function validateDiscountCode(
     };
   }
 
-  // Check usage limit
+  // Check usage limit (pre-validation)
   if (discountCode.maxUses !== null && discountCode.totalUsed >= discountCode.maxUses) {
     return {
       valid: false,
@@ -117,8 +126,19 @@ export async function validateDiscountCode(
     };
   }
 
-  // Check applicable plans
-  const applicablePlans = JSON.parse(discountCode.applicablePlans) as PlanType[];
+  // Validate applicablePlans JSON safely
+  let applicablePlans: PlanType[] = [];
+  try {
+    const parsed = JSON.parse(discountCode.applicablePlans);
+    applicablePlans = applicablePlansSchema.parse(parsed);
+  } catch (error) {
+    console.error('Invalid applicablePlans JSON for code:', normalizedCode);
+    return {
+      valid: false,
+      error: 'Código inválido',
+    };
+  }
+
   if (applicablePlans.length > 0 && !applicablePlans.includes(planType)) {
     return {
       valid: false,
@@ -167,6 +187,8 @@ export async function validateDiscountCode(
 
 /**
  * Record discount code usage
+ * 
+ * SECURITY: Logs MAJESTADALAN usage, validates limits post-increment
  */
 export async function recordDiscountUsage(
   userId: string,
@@ -175,13 +197,36 @@ export async function recordDiscountUsage(
 ): Promise<void> {
   const normalizedCode = code.toUpperCase().trim();
 
-  // Skip MAJESTADALAN (unlimited, no tracking needed)
+  // MAJESTADALAN - log usage for audit trail
   if (isMajestadAlanCode(normalizedCode)) {
-    console.log(`MAJESTADALAN used by userId=${userId}`);
+    // Log to database for audit
+    await prisma.discountUsage.create({
+      data: {
+        userId,
+        discountCode: normalizedCode,
+        paymentId,
+      },
+    });
+    console.log(`MAJESTADALAN used by userId=${userId}, paymentId=${paymentId}`);
     return;
   }
 
-  await prisma.$transaction(async (tx) => {
+  // Regular codes - use transaction with post-validation
+  await prisma.$transaction(async (tx: any) => {
+    // Get current usage count
+    const currentCode = await tx.discountCode.findUnique({
+      where: { code: normalizedCode },
+    });
+
+    if (!currentCode) {
+      throw createError('Discount code not found', 404, 'CODE_NOT_FOUND');
+    }
+
+    // Post-validation: check if maxUses was reached
+    if (currentCode.maxUses !== null && currentCode.totalUsed >= currentCode.maxUses) {
+      throw createError('Discount code usage limit reached', 400, 'CODE_EXHAUSTED');
+    }
+
     // Record usage
     await tx.discountUsage.create({
       data: {

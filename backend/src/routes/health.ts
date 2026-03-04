@@ -12,7 +12,7 @@ const router = Router();
  * GET /api/health
  * Basic health check
  */
-router.get('/', (req, res) => {
+router.get('/', (_req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -24,11 +24,11 @@ router.get('/', (req, res) => {
  * GET /api/health/ready
  * Readiness check (includes database connection)
  */
-router.get('/ready', async (req, res) => {
+router.get('/ready', async (_req, res) => {
   try {
     // Check database connection
     await prisma.$queryRaw`SELECT 1`;
-    
+
     res.json({
       status: 'ready',
       database: 'connected',
@@ -48,7 +48,7 @@ router.get('/ready', async (req, res) => {
  * GET /api/health/live
  * Liveness check (just confirms server is running)
  */
-router.get('/live', (req, res) => {
+router.get('/live', (_req, res) => {
   res.json({
     status: 'alive',
     timestamp: new Date().toISOString(),

@@ -7,7 +7,6 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validateDiscountCode, isMajestadAlanCode } from '../services/discountService';
 import { grantLifetimeSubscription } from '../services/subscriptionService';
-import { createError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -70,7 +69,7 @@ router.post('/apply', async (req, res, next) => {
       await grantLifetimeSubscription(userId, 'discount_code', `discount_${code}_${Date.now()}`);
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         valid: result.valid,
@@ -85,6 +84,7 @@ router.post('/apply', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -122,7 +122,7 @@ router.post('/check', async (req, res, next) => {
     }
 
     // For regular codes, just check existence (admin would check full details)
-    res.json({
+    return res.json({
       success: true,
       data: {
         exists: true, // Would need DB check in production
@@ -131,6 +131,7 @@ router.post('/check', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 

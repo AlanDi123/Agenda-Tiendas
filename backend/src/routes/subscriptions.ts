@@ -6,7 +6,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { verifySubscription, PLAN_FEATURES } from '../services/subscriptionService';
-import { createError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -59,7 +58,7 @@ router.post('/verify', async (req, res, next) => {
  * GET /api/subscriptions/features
  * Get available features for each plan type
  */
-router.get('/features', async (req, res) => {
+router.get('/features', async (_req, res) => {
   res.json({
     success: true,
     data: {

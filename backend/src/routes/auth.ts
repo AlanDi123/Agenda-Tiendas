@@ -8,7 +8,7 @@ import { z } from 'zod';
 import * as authService from '../services/authService';
 import { logAuthFailure, logApiError } from '../services/errorLogger';
 import { createError } from '../middleware/errorHandler';
-import { authMiddleware, requireAuth } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
 
@@ -83,7 +83,7 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
       (error as any).code || 'REGISTRATION_ERROR',
       (error as any).message,
       {
-        email: req.body.email,
+        userEmail: req.body.email,
         device: req.headers['user-agent'],
         ipAddress: req.ip,
       }

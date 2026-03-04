@@ -3,8 +3,7 @@
  * Handles payment gateway webhooks with signature verification
  */
 
-import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
+import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { activateSubscription, grantLifetimeSubscription } from '../services/subscriptionService';
 import { isMajestadAlanCode } from '../services/discountService';
@@ -14,23 +13,8 @@ import { createError } from '../middleware/errorHandler';
 const router = Router();
 
 // ============================================
-// RAW BODY PARSER FOR WEBHOOKS
-// ============================================
-// Need raw body for signature verification
-import express from 'express';
-
-// ============================================
 // WEBHOOK HANDLER UTILITIES
 // ============================================
-
-interface WebhookPayload {
-  paymentId: string;
-  status: string;
-  amount: number;
-  currency: string;
-  userId?: string;
-  metadata?: Record<string, any>;
-}
 
 /**
  * Log webhook event for audit
@@ -95,7 +79,7 @@ async function processSuccessfulPayment(
   paymentId: string,
   userId: string,
   amount: number,
-  currency: string,
+  _currency: string,
   metadata?: Record<string, any>
 ) {
   // Extract plan type from metadata or determine from amount

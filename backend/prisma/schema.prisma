@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  engineType = "binary"
 }
 
 datasource db {
@@ -170,12 +171,17 @@ model Appointment {
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   rescheduleHistory AppointmentReschedule[]
 
-  // Indexes
+  // Indexes for fast lookups
   @@index([locationId, startTime])
   @@index([staffId, startTime])
   @@index([userId, startTime])
   @@index([status])
   @@index([startTime, endTime])
+  @@index([createdAt])
+  
+  // Unique constraint prevents exact duplicate bookings
+  // Note: Overlapping time ranges still need application-level checking
+  @@unique([locationId, staffId, startTime, endTime])
 }
 
 // ============================================

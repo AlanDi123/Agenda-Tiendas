@@ -1,6 +1,11 @@
 /**
  * Agenda Service
  * Core business logic for appointments, availability, and scheduling
+ * 
+ * SECURITY HARDENED:
+ * - Transaction-wrapped appointment creation
+ * - Database unique constraint handling
+ * - Proper conflict detection
  */
 
 import prisma from '../lib/prisma';
@@ -44,15 +49,19 @@ export interface AvailabilitySlot {
 
 /**
  * Check if time slot conflicts with existing appointments
+ * Optional transaction parameter for use within transactions
  */
 export async function hasTimeConflict(
   locationId: string,
   staffId: string,
   startTime: Date,
   endTime: Date,
-  excludeAppointmentId?: string
+  excludeAppointmentId?: string,
+  tx?: any // Optional Prisma transaction client
 ): Promise<boolean> {
-  const conflicts = await prisma.appointment.findMany({
+  const db = tx || prisma;
+  
+  const conflicts = await db.appointment.findMany({
     where: {
       locationId,
       staffId,
@@ -132,6 +141,8 @@ export async function isDateAvailable(
 
 /**
  * Create a new appointment
+ * 
+ * SECURITY: Wrapped in transaction with conflict handling
  */
 export async function createAppointment(
   data: CreateAppointmentData
@@ -152,69 +163,81 @@ export async function createAppointment(
   // Calculate end time if duration provided
   const calculatedEndTime = endTime || new Date(startTime.getTime() + (duration || 30) * 60000);
 
-  // Validate: Check for conflicts
-  const hasConflict = await hasTimeConflict(
-    locationId,
-    staffId,
-    startTime,
-    calculatedEndTime
-  );
+  // Use transaction for atomic creation with conflict handling
+  try {
+    const appointment = await prisma.$transaction(async (tx) => {
+      // Validate: Check for conflicts (application-level)
+      const hasConflict = await hasTimeConflict(
+        locationId,
+        staffId,
+        startTime,
+        calculatedEndTime,
+        undefined,
+        tx
+      );
 
-  if (hasConflict) {
-    throw createError('Time slot conflicts with existing appointment', 409, 'TIME_CONFLICT');
-  }
+      if (hasConflict) {
+        throw createError('Time slot conflicts with existing appointment', 409, 'TIME_CONFLICT');
+      }
 
-  // Validate: Check staff availability
-  const withinAvailability = await isWithinAvailability(staffId, startTime, calculatedEndTime);
-  if (!withinAvailability) {
-    throw createError('Requested time is outside staff availability', 400, 'OUTSIDE_AVAILABILITY');
-  }
+      // Validate: Check staff availability
+      const withinAvailability = await isWithinAvailability(staffId, startTime, calculatedEndTime);
+      if (!withinAvailability) {
+        throw createError('Requested time is outside staff availability', 400, 'OUTSIDE_AVAILABILITY');
+      }
 
-  // Validate: Check location unavailable dates
-  const dateAvailable = await isDateAvailable(locationId, startTime);
-  if (!dateAvailable) {
-    throw createError('Location is unavailable on this date', 400, 'LOCATION_UNAVAILABLE');
-  }
+      // Validate: Check location unavailable dates
+      const dateAvailable = await isDateAvailable(locationId, startTime);
+      if (!dateAvailable) {
+        throw createError('Location is unavailable on this date', 400, 'LOCATION_UNAVAILABLE');
+      }
 
-  // Create appointment
-  const appointment = await prisma.appointment.create({
-    data: {
-      locationId,
-      staffId,
-      userId,
-      startTime,
-      endTime: calculatedEndTime,
-      duration: duration || Math.round((calculatedEndTime.getTime() - startTime.getTime()) / 60000),
-      serviceType,
-      notes,
-      clientNotes,
-      color,
-      status: AppointmentStatus.pending,
-      rescheduleCount: 0,
-    },
-    include: {
-      location: true,
-      staff: {
+      // Create appointment (database unique constraint provides final protection)
+      return tx.appointment.create({
+        data: {
+          locationId,
+          staffId,
+          userId,
+          startTime,
+          endTime: calculatedEndTime,
+          duration: duration || Math.round((calculatedEndTime.getTime() - startTime.getTime()) / 60000),
+          serviceType,
+          notes,
+          clientNotes,
+          color,
+          status: AppointmentStatus.pending,
+          rescheduleCount: 0,
+        },
         include: {
+          location: true,
+          staff: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                },
+              },
+            },
+          },
           user: {
             select: {
               id: true,
               email: true,
-              name: true,
             },
           },
         },
-      },
-      user: {
-        select: {
-          id: true,
-          email: true,
-        },
-      },
-    },
-  });
+      });
+    });
 
-  return appointment;
+    return appointment;
+  } catch (error: any) {
+    // Handle unique constraint violation (database-level protection)
+    if (error.code === 'P2002') {
+      throw createError('Time slot is no longer available. Please select another time.', 409, 'TIME_CONFLICT');
+    }
+    throw error;
+  }
 }
 
 /**
@@ -309,52 +332,61 @@ export async function rescheduleAppointment(
 
   const calculatedEndTime = newEndTime || new Date(newStartTime.getTime() + (duration || appointment.duration) * 60000);
 
-  // Check for conflicts (excluding current appointment)
-  const hasConflict = await hasTimeConflict(
-    appointment.locationId,
-    appointment.staffId,
-    newStartTime,
-    calculatedEndTime,
-    appointmentId
-  );
-
-  if (hasConflict) {
-    throw createError('New time slot conflicts with existing appointment', 409, 'TIME_CONFLICT');
-  }
-
-  // Use transaction for atomic update
-  return prisma.$transaction(async (tx) => {
-    // Create reschedule history
-    await tx.appointmentReschedule.create({
-      data: {
-        appointmentId,
-        previousStartTime: appointment.startTime,
-        previousEndTime: appointment.endTime,
+  // Use transaction for atomic reschedule
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Check for conflicts (excluding current appointment)
+      const hasConflict = await hasTimeConflict(
+        appointment.locationId,
+        appointment.staffId,
         newStartTime,
-        newEndTime: calculatedEndTime,
-        reason,
-        rescheduledBy,
-      },
-    });
+        calculatedEndTime,
+        appointmentId,
+        tx
+      );
 
-    // Update appointment
-    return tx.appointment.update({
-      where: { id: appointmentId },
-      data: {
-        startTime: newStartTime,
-        endTime: calculatedEndTime,
-        rescheduleCount: { increment: 1 },
-        previousStartTime: appointment.startTime,
-        previousEndTime: appointment.endTime,
-      },
-      include: {
-        rescheduleHistory: {
-          orderBy: { createdAt: 'desc' },
-          take: 5,
+      if (hasConflict) {
+        throw createError('New time slot conflicts with existing appointment', 409, 'TIME_CONFLICT');
+      }
+
+      // Create reschedule history
+      await tx.appointmentReschedule.create({
+        data: {
+          appointmentId,
+          previousStartTime: appointment.startTime,
+          previousEndTime: appointment.endTime,
+          newStartTime,
+          newEndTime: calculatedEndTime,
+          reason,
+          rescheduledBy,
         },
-      },
+      });
+
+      // Update appointment
+      return tx.appointment.update({
+        where: { id: appointmentId },
+        data: {
+          startTime: newStartTime,
+          endTime: calculatedEndTime,
+          rescheduleCount: { increment: 1 },
+          previousStartTime: appointment.startTime,
+          previousEndTime: appointment.endTime,
+        },
+        include: {
+          rescheduleHistory: {
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          },
+        },
+      });
     });
-  });
+  } catch (error: any) {
+    // Handle unique constraint violation
+    if (error.code === 'P2002') {
+      throw createError('New time slot is no longer available', 409, 'TIME_CONFLICT');
+    }
+    throw error;
+  }
 }
 
 // ============================================
@@ -363,6 +395,8 @@ export async function rescheduleAppointment(
 
 /**
  * Get available slots for a date range
+ * 
+ * OPTIMIZED: Pre-fetches appointments and uses interval merging
  */
 export async function getAvailableSlots(
   staffId: string,
@@ -372,8 +406,7 @@ export async function getAvailableSlots(
   slotDuration: number = 30
 ): Promise<AvailabilitySlot[]> {
   const slots: AvailabilitySlot[] = [];
-  const current = new Date(startDate);
-
+  
   // Get location business hours
   const location = await prisma.location.findUnique({
     where: { id: locationId },
@@ -381,6 +414,7 @@ export async function getAvailableSlots(
       businessStart: true,
       businessEnd: true,
       slotDuration: true,
+      timezone: true,
     },
   });
 
@@ -392,49 +426,79 @@ export async function getAvailableSlots(
   const businessEndMinutes = location.businessEnd * 60;
   const duration = slotDuration || location.slotDuration;
 
+  // Pre-fetch all appointments for the date range (single query)
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      staffId,
+      startTime: { gte: startDate },
+      endTime: { lte: endDate },
+      status: {
+        notIn: [AppointmentStatus.cancelled, AppointmentStatus.no_show],
+      },
+    },
+    select: {
+      startTime: true,
+      endTime: true,
+    },
+  });
+
+  // Create a map of appointments by date for O(1) lookup
+  const appointmentsByDate = new Map<string, Array<{ start: number; end: number }>>();
+  for (const apt of appointments) {
+    const dateKey = apt.startTime.toISOString().split('T')[0];
+    const startMinutes = apt.startTime.getHours() * 60 + apt.startTime.getMinutes();
+    const endMinutes = apt.endTime.getHours() * 60 + apt.endTime.getMinutes();
+    
+    if (!appointmentsByDate.has(dateKey)) {
+      appointmentsByDate.set(dateKey, []);
+    }
+    appointmentsByDate.get(dateKey)!.push({ start: startMinutes, end: endMinutes });
+  }
+
+  // Generate slots for each day
+  const current = new Date(startDate);
   while (current <= endDate) {
-    const dateStr = current.toISOString().split('T')[0];
-    const dayStart = new Date(current);
-    dayStart.setHours(Math.floor(businessStartMinutes / 60), businessStartMinutes % 60, 0, 0);
-
-    // Get all appointments for this day
-    const dayEnd = new Date(dayStart);
-    dayEnd.setHours(Math.floor(businessEndMinutes / 60), businessEndMinutes % 60, 0, 0);
-
-    const appointments = await prisma.appointment.findMany({
-      where: {
-        staffId,
-        startTime: { gte: dayStart },
-        endTime: { lte: dayEnd },
-        status: {
-          notIn: [AppointmentStatus.cancelled, AppointmentStatus.no_show],
-        },
-      },
-      select: {
-        startTime: true,
-        endTime: true,
-      },
-    });
+    const dateKey = current.toISOString().split('T')[0];
+    const dayAppointments = appointmentsByDate.get(dateKey) || [];
+    
+    // Sort appointments by start time for efficient merging
+    dayAppointments.sort((a, b) => a.start - b.start);
+    
+    // Merge overlapping appointments
+    const mergedAppointments: Array<{ start: number; end: number }> = [];
+    for (const apt of dayAppointments) {
+      if (mergedAppointments.length === 0 || apt.start > mergedAppointments[mergedAppointments.length - 1].end) {
+        mergedAppointments.push(apt);
+      } else {
+        mergedAppointments[mergedAppointments.length - 1].end = Math.max(
+          mergedAppointments[mergedAppointments.length - 1].end,
+          apt.end
+        );
+      }
+    }
 
     // Generate slots
-    let slotStart = new Date(dayStart);
-    while (slotStart < dayEnd) {
-      const slotEnd = new Date(slotStart.getTime() + duration * 60000);
-
-      if (slotEnd > dayEnd) break;
-
-      // Check if slot conflicts with any appointment
-      const hasConflict = appointments.some(apt =>
-        slotStart < apt.endTime && slotEnd > apt.startTime
+    let slotStart = businessStartMinutes;
+    while (slotStart + duration <= businessEndMinutes) {
+      const slotEnd = slotStart + duration;
+      
+      // Check if slot conflicts with any merged appointment
+      const hasConflict = mergedAppointments.some(apt =>
+        slotStart < apt.end && slotEnd > apt.start
       );
 
+      const slotDate = new Date(current);
+      slotDate.setHours(Math.floor(slotStart / 60), slotStart % 60, 0, 0);
+      const slotEndDate = new Date(slotDate);
+      slotEndDate.setMinutes(slotEndDate.getMinutes() + duration);
+
       slots.push({
-        startTime: slotStart,
-        endTime: slotEnd,
+        startTime: slotDate,
+        endTime: slotEndDate,
         available: !hasConflict,
       });
 
-      slotStart = slotEnd;
+      slotStart += duration;
     }
 
     // Move to next day
@@ -547,11 +611,11 @@ export async function getStaffStatistics(
 
   const stats = {
     total: appointments.length,
-    confirmed: appointments.filter(a => a.status === 'confirmed').length,
-    cancelled: appointments.filter(a => a.status === 'cancelled').length,
-    noShow: appointments.filter(a => a.status === 'no_show').length,
-    completed: appointments.filter(a => a.status === 'completed').length,
-    totalDuration: appointments.reduce((sum, a) => sum + a.duration, 0),
+    confirmed: appointments.filter((a: any) => a.status === 'confirmed').length,
+    cancelled: appointments.filter((a: any) => a.status === 'cancelled').length,
+    noShow: appointments.filter((a: any) => a.status === 'no_show').length,
+    completed: appointments.filter((a: any) => a.status === 'completed').length,
+    totalDuration: appointments.reduce((sum: number, a: any) => sum + a.duration, 0),
   };
 
   return stats;

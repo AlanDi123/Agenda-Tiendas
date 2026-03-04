@@ -38,7 +38,7 @@ export function verifySignature(
  * Middleware factory for signature verification
  */
 export function signatureVerification(config: SignatureConfig) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     const signature = req.headers[config.headerName.toLowerCase()] as string;
     
     if (!signature) {
