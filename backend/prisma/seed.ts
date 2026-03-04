@@ -1,6 +1,6 @@
 /**
  * Database Seed Script
- * Creates initial discount codes including MAJESTADALAN
+ * Creates initial discount codes and default data
  */
 
 import prisma from '../lib/prisma';
@@ -93,6 +93,34 @@ async function seed() {
   });
 
   console.log('✅ DESCUENTO20 code created');
+
+  // ============================================
+  // DEFAULT ADMIN USER (development only)
+  // ============================================
+  if (process.env.NODE_ENV === 'development') {
+    const crypto = require('crypto');
+    
+    const adminPasswordHash = crypto
+      .createHash('sha256')
+      .update('admin123' + (process.env.PASSWORD_SALT || 'default-salt'))
+      .digest('hex');
+
+    await prisma.user.upsert({
+      where: { email: 'admin@dommuss.com' },
+      update: {},
+      create: {
+        email: 'admin@dommuss.com',
+        passwordHash: adminPasswordHash,
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        role: 'ADMIN',
+        planType: 'PREMIUM_LIFETIME',
+        planStatus: 'active',
+      },
+    });
+
+    console.log('✅ Admin user created (admin@dommuss.com / admin123)');
+  }
 
   console.log('🎉 Seeding completed!');
   process.exit(0);

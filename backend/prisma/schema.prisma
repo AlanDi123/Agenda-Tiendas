@@ -16,20 +16,188 @@ datasource db {
 model User {
   id              String       @id @default(uuid())
   email           String       @unique
+  passwordHash    String
+  emailVerified   Boolean      @default(false)
+  emailVerifiedAt DateTime?
+  verificationToken String?    @unique
+  verificationTokenExpires DateTime?
+  resetToken      String?      @unique
+  resetTokenExpires DateTime?
+  role            UserRole     @default(USER)
   planType        PlanType     @default(FREE)
   planStatus      PlanStatus   @default(active)
   currentPeriodEnd DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+  lastLoginAt     DateTime?
+  lastLoginIp     String?
 
   // Relations
+  ownedLocations  Location[]
+  staffAssignments StaffAssignment[]
+  appointments    Appointment[]
   subscriptions   Subscription[]
   paymentLogs     PaymentLog[]
   discountUsages  DiscountUsage[]
+  errorLogs       ErrorLog[]
+  refreshTokens   RefreshToken[]
 
   // Indexes for performance
   @@index([email])
   @@index([planType, planStatus])
+  @@index([role])
+}
+
+// ============================================
+// LOCATION MODEL (Multi-location support)
+// ============================================
+model Location {
+  id              String       @id @default(uuid())
+  ownerId         String
+  name            String
+  address         String?
+  city            String?
+  timezone        String       @default("America/Argentina/Buenos_Aires")
+  slotDuration    Int          @default(30) // minutes
+  businessStart   Int          @default(9)  // 9:00 AM
+  businessEnd     Int          @default(20) // 8:00 PM
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  owner           User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  staff           StaffAssignment[]
+  appointments    Appointment[]
+  unavailableDates UnavailableDate[]
+
+  // Indexes
+  @@index([ownerId])
+  @@index([active])
+}
+
+// ============================================
+// STAFF ASSIGNMENT (Multi-professional)
+// ============================================
+model StaffAssignment {
+  id              String       @id @default(uuid())
+  userId          String
+  locationId      String
+  role            StaffRole    @default(STAFF)
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location        Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  availability    Availability[]
+  appointments    Appointment[]
+
+  // Indexes
+  @@index([userId, locationId])
+  @@unique([userId, locationId]) // One assignment per location
+}
+
+// ============================================
+// AVAILABILITY (Working hours)
+// ============================================
+model Availability {
+  id              String       @id @default(uuid())
+  staffId         String
+  dayOfWeek       Int          // 0=Sunday, 1=Monday, etc.
+  startTime       Int          // minutes from midnight
+  endTime         Int          // minutes from midnight
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  staff           StaffAssignment @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([staffId, dayOfWeek])
+  @@index([staffId, active])
+}
+
+// ============================================
+// UNAVAILABLE DATES (Holidays, time off)
+// ============================================
+model UnavailableDate {
+  id              String       @id @default(uuid())
+  locationId      String
+  date            DateTime     @db.Date
+  reason          String?
+  allDay          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+
+  // Relations
+  location        Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([locationId, date])
+  @@unique([locationId, date])
+}
+
+// ============================================
+// APPOINTMENT MODEL (Turnos)
+// ============================================
+model Appointment {
+  id              String           @id @default(uuid())
+  locationId      String
+  staffId         String
+  userId          String           // Client who made the appointment
+  startTime       DateTime
+  endTime         DateTime
+  duration        Int              // minutes
+  serviceType     String
+  status          AppointmentStatus @default(pending)
+  notes           String?          // Internal notes
+  clientNotes     String?          // Notes from client
+  color           String?          // Color coding
+  cancelledAt     DateTime?
+  cancelledBy     String?          // userId who cancelled
+  cancelReason    String?
+  rescheduleCount Int              @default(0)
+  previousStartTime DateTime?      // For reschedule history
+  previousEndTime DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  location        Location         @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  staff           StaffAssignment  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rescheduleHistory AppointmentReschedule[]
+
+  // Indexes
+  @@index([locationId, startTime])
+  @@index([staffId, startTime])
+  @@index([userId, startTime])
+  @@index([status])
+  @@index([startTime, endTime])
+}
+
+// ============================================
+// APPOINTMENT RESCHEDULE HISTORY
+// ============================================
+model AppointmentReschedule {
+  id              String       @id @default(uuid())
+  appointmentId   String
+  previousStartTime DateTime
+  previousEndTime DateTime
+  newStartTime    DateTime
+  newEndTime      DateTime
+  reason          String?
+  rescheduledBy   String       // userId
+  createdAt       DateTime     @default(now())
+
+  // Relations
+  appointment     Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([appointmentId])
+  @@index([createdAt])
 }
 
 // ============================================
@@ -150,8 +318,71 @@ model WebhookEvent {
 }
 
 // ============================================
+// ERROR LOG MODEL (Centralized logging)
+// ============================================
+model ErrorLog {
+  id            String   @id @default(uuid())
+  userId        String?
+  userEmail     String?
+  endpoint      String
+  method        String
+  errorCode     String
+  errorMessage  String
+  errorStack    String?
+  device        String?  // Mobile device info
+  appVersion    String?
+  ipAddress     String?
+  metadata      String?  // JSON additional context
+  severity      ErrorSeverity @default(error)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Indexes
+  @@index([userId])
+  @@index([endpoint])
+  @@index([errorCode])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+// ============================================
+// REFRESH TOKEN MODEL (Mobile sessions)
+// ============================================
+model RefreshToken {
+  id            String   @id @default(uuid())
+  userId        String
+  token         String   @unique
+  device        String?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// ============================================
 // ENUMS
 // ============================================
+enum UserRole {
+  USER
+  OWNER
+  STAFF
+  ADMIN
+}
+
+enum StaffRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
 enum PlanType {
   FREE
   PREMIUM_MONTHLY
@@ -177,4 +408,20 @@ enum SubscriptionStatus {
 enum DiscountType {
   percentage
   fixed
+}
+
+enum AppointmentStatus {
+  pending
+  confirmed
+  cancelled
+  no_show
+  completed
+}
+
+enum ErrorSeverity {
+  debug
+  info
+  warning
+  error
+  critical
 }
