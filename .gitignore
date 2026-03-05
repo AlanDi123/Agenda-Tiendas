@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 agenda-keystore.txt
+
+# Android
+android/.gradle/
+android/.idea/
+android/**/build/
+android/app/keystore.jks
+android/app/keystore.properties
+

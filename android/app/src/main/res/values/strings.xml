@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Dommuss</string>
-    <string name="title_activity_main">Dommuss</string>
+    <string name="app_name">Dommuss Agenda</string>
+    <string name="title_activity_main">Dommuss Agenda</string>
     <string name="package_name">com.importmania.agenda</string>
     <string name="custom_url_scheme">com.importmania.agenda</string>
 </resources>

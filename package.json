@@ -10,14 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@capacitor/android": "^8.1.0",
-    "@capacitor/app": "^8.0.1",
-    "@capacitor/browser": "^8.0.1",
-    "@capacitor/core": "^8.1.0",
-    "@capacitor/device": "^8.0.1",
-    "@capacitor/local-notifications": "^8.0.1",
-    "@capacitor/preferences": "^8.0.1",
-    "@capacitor/status-bar": "^8.0.1",
+    "@capacitor/android": "5.7.0",
+    "@capacitor/app": "5.0.8",
+    "@capacitor/browser": "5.2.1",
+    "@capacitor/core": "5.7.0",
+    "@capacitor/device": "5.0.8",
+    "@capacitor/local-notifications": "5.0.8",
+    "@capacitor/preferences": "5.0.8",
+    "@capacitor/status-bar": "5.0.8",
     "date-fns": "^4.1.0",
     "idb": "^8.0.3",
     "react": "^19.2.0",
@@ -26,7 +26,7 @@
     "vite-plugin-pwa": "^0.19.8"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.1.0",
+    "@capacitor/cli": "5.7.0",
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
