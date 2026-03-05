@@ -90,5 +90,8 @@ configurations.all {
                 details.useVersion '1.8.22'
             }
         }
+        // Fix para incompatibilidad androidx.browser con AGP 8.1.4
+        // La versión 1.9.0 requiere AGP 8.2+ y compileSdk 35
+        force 'androidx.browser:browser:1.8.0'
     }
 }
