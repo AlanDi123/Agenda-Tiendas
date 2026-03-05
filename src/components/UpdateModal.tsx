@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from './Button';
 import { Modal } from './Modal';
 import { downloadAndInstall, dismissUpdate } from '../services/updateService';
-import type { UpdateCheckResult } from '../services/updateService';
+import type { UpdateCheckResult } from '../types/update';
 import './UpdateModal.css';
 
 interface UpdateModalProps {
@@ -24,13 +24,13 @@ export function UpdateModal({ isOpen, update, onClose, onDismiss }: UpdateModalP
 
     try {
       await downloadAndInstall(update.apkUrl);
-      
+
       // Dismiss this update so we don't prompt again immediately
       await dismissUpdate(update.latestVersion);
-      
+
       // Close modal
       onClose();
-      
+
       // Call onDismiss if provided
       onDismiss?.();
     } catch (err) {
@@ -115,7 +115,7 @@ export function UpdateModal({ isOpen, update, onClose, onDismiss }: UpdateModalP
               Recordarme después
             </Button>
           )}
-          
+
           <Button
             variant="primary"
             onClick={handleUpdateNow}

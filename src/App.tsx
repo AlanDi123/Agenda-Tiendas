@@ -28,7 +28,9 @@ import { PasswordReset } from './components/Auth/PasswordReset';
 import { NewPassword } from './components/Auth/NewPassword';
 import { PaymentModal } from './components/Payment/PaymentModal';
 import { EmailVerificationBanner } from './components/EmailVerificationBanner';
+import { UpdateModal } from './components/UpdateModal';
 import { useTouchGestures } from './hooks/useTouchGestures';
+import { useAppUpdates } from './hooks/useAppUpdates';
 import { App as CapacitorApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
@@ -70,6 +72,14 @@ function AppContent() {
     toasts,
     removeToast,
   } = useEvents();
+
+  // App updates hook
+  const {
+    updateInfo,
+    hasUpdate,
+    isMandatory,
+    dismissUpdate,
+  } = useAppUpdates();
 
   // Auth flow state
   const [authState, setAuthState] = useState<AuthState>('loading');
@@ -764,6 +774,20 @@ function AppContent() {
 
       {/* PWA Reload Prompt */}
       <ReloadPrompt />
+
+      {/* App Update Modal */}
+      <UpdateModal
+        isOpen={hasUpdate}
+        update={updateInfo}
+        onClose={() => {
+          if (!isMandatory) {
+            dismissUpdate();
+          }
+        }}
+        onDismiss={() => {
+          dismissUpdate();
+        }}
+      />
 
       {/* Payment Modal */}
       <PaymentModal
