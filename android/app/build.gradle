@@ -16,12 +16,37 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    // ============================================
+    // SIGNING CONFIGURATION
+    // ============================================
+    signingConfigs {
+        release {
+            // Try to load keystore.properties if it exists
+            def keystorePropertiesFile = file('keystore.properties')
+            if (keystorePropertiesFile.exists()) {
+                Properties keystoreProperties = new Properties()
+                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+                storePassword keystoreProperties['storePassword']
+                keyPassword keystoreProperties['keyPassword']
+                keyAlias keystoreProperties['keyAlias']
+                storeFile file(keystoreProperties['storeFile'])
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Use signing config if keystore.properties exists
+            def keystorePropertiesFile = file('keystore.properties')
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17

@@ -1,103 +1,121 @@
 #!/bin/bash
-# Version Bumping Script
-# Updates version in package.json, Android build.gradle, and creates git tag
-#
-# Usage:
-#   ./scripts/bump-version.sh [major|minor|patch|version]
-#
-# Examples:
-#   ./scripts/bump-version.sh major    # 1.4.2 -> 2.0.0
-#   ./scripts/bump-version.sh minor    # 1.4.2 -> 1.5.0
-#   ./scripts/bump-version.sh patch    # 1.4.2 -> 1.4.3
-#   ./scripts/bump-version.sh 2.1.0    # Set specific version
+
+# ============================================
+# bump-version.sh
+# 
+# Script para actualizar versiones automáticamente
+# - Actualiza package.json
+# - Actualiza android/app/build.gradle
+# - Crea commit
+# - Crea tag vX.X.X
+# ============================================
 
 set -e
 
-# Colors for output
+# Colores para output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Get current version from package.json
-CURRENT_VERSION=$(node -p "require('./package.json').version")
-echo -e "${YELLOW}Current version: ${CURRENT_VERSION}${NC}"
-
-# Determine new version
-if [ -z "$1" ]; then
-    echo -e "${RED}Error: Please specify version bump type (major|minor|patch) or specific version${NC}"
+# Función para mostrar uso
+usage() {
+    echo "Uso: $0 [major|minor|patch|<version>]"
+    echo ""
+    echo "Ejemplos:"
+    echo "  $0 patch    # Incrementa 1.0.0 -> 1.0.1"
+    echo "  $0 minor    # Incrementa 1.0.0 -> 1.1.0"
+    echo "  $0 major    # Incrementa 1.0.0 -> 2.0.0"
+    echo "  $0 1.2.3    # Establece versión específica"
     exit 1
+}
+
+# Verificar que estamos en el directorio correcto
+if [ ! -f "package.json" ]; then
+    echo -e "${RED}Error: package.json no encontrado${NC}"
+    echo "Ejecuta este script desde la raíz del proyecto"
+    exit 1
+fi
+
+# Obtener versión actual
+CURRENT_VERSION=$(grep -o '"version": "[^"]*"' package.json | cut -d'"' -f4)
+echo -e "${YELLOW}Versión actual: ${CURRENT_VERSION}${NC}"
+
+# Determinar nueva versión
+if [ -z "$1" ]; then
+    usage
 fi
 
 case "$1" in
     major)
-        NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{printf "%d.0.0", $1+1}')
+        NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{print ($1+1)".0.0"}')
         ;;
     minor)
-        NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{printf "%d.%d.0", $1, $2+1}')
+        NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{print $1".(" $2+1)".0"}')
         ;;
     patch)
-        NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{printf "%d.%d.%d", $1, $2, $3+1}')
+        NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{print $1"."$2".("$3+1)}')
         ;;
     *)
-        # Validate semver format
-        if [[ ! "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo -e "${RED}Error: Invalid version format. Use semantic versioning (e.g., 1.4.2)${NC}"
+        # Validar formato de versión
+        if ! [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo -e "${RED}Error: Formato de versión inválido${NC}"
+            echo "Usa formato X.Y.Z (ej: 1.2.3)"
             exit 1
         fi
         NEW_VERSION="$1"
         ;;
 esac
 
-# Calculate version code (e.g., 1.4.2 -> 10402)
-VERSION_CODE=$(echo "$NEW_VERSION" | awk -F. '{ printf "%d%02d%02d", $1, $2, $3 }')
+echo -e "${GREEN}Nueva versión: ${NEW_VERSION}${NC}"
 
-echo -e "${YELLOW}New version: ${NEW_VERSION} (${VERSION_CODE})${NC}"
-read -p "Continue? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${RED}Aborted${NC}"
-    exit 1
-fi
+# Convertir versión a versionCode (ej: 1.2.3 -> 10203)
+VERSION_CODE=$(echo "$NEW_VERSION" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
 
-# Update package.json
-echo -e "${GREEN}Updating package.json...${NC}"
-npm version "$NEW_VERSION" --no-git-tag-version
-
-# Update Android build.gradle
-echo -e "${GREEN}Updating Android build.gradle...${NC}"
-if [ -f "android/app/build.gradle" ]; then
-    # Update versionName
-    sed -i.bak "s/versionName \"[^\"]*\"/versionName \"$NEW_VERSION\"/" android/app/build.gradle
-    # Update versionCode
-    sed -i.bak "s/versionCode [0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
-    # Remove backup file
-    rm -f android/app/build.gradle.bak
-    echo -e "${GREEN}Android build.gradle updated${NC}"
+# Actualizar package.json
+echo -e "${YELLOW}Actualizando package.json...${NC}"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" package.json
 else
-    echo -e "${YELLOW}Warning: android/app/build.gradle not found${NC}"
+    # Linux
+    sed -i "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" package.json
 fi
 
-# Update capacitor.config.ts if exists
-if [ -f "capacitor.config.ts" ]; then
-    echo -e "${GREEN}capacitor.config.ts found (no version update needed)${NC}"
+# Actualizar android/app/build.gradle
+if [ -f "android/app/build.gradle" ]; then
+    echo -e "${YELLOW}Actualizando android/app/build.gradle...${NC}"
+    
+    # Actualizar versionName
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s/versionName \"[^\"]*\"/versionName \"$NEW_VERSION\"/" android/app/build.gradle
+        sed -i '' "s/versionCode [0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
+    else
+        sed -i "s/versionName \"[^\"]*\"/versionName \"$NEW_VERSION\"/" android/app/build.gradle
+        sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
+    fi
+    
+    echo -e "${GREEN}✓ build.gradle actualizado (versionName: $NEW_VERSION, versionCode: $VERSION_CODE)${NC}"
+else
+    echo -e "${YELLOW}⚠ android/app/build.gradle no encontrado, saltando...${NC}"
 fi
 
-# Create git commit
-echo -e "${GREEN}Creating git commit...${NC}"
-git add package.json package-lock.json android/app/build.gradle
-git commit -m "chore: bump version to $NEW_VERSION ($VERSION_CODE)" || echo "No changes to commit"
+# Commit
+echo -e "${YELLOW}Creando commit...${NC}"
+git add package.json android/app/build.gradle 2>/dev/null || true
+git commit -m "chore: bump version to $NEW_VERSION" || echo -e "${YELLOW}⚠ No hay cambios para commitear${NC}"
 
-# Create git tag
-echo -e "${GREEN}Creating git tag v${NEW_VERSION}...${NC}"
-git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+# Tag
+echo -e "${YELLOW}Creando tag v$NEW_VERSION...${NC}"
+git tag "v$NEW_VERSION"
 
-echo -e "${GREEN}✓ Version bumped successfully!${NC}"
+echo -e "${GREEN}============================================${NC}"
+echo -e "${GREEN}✓ Versión actualizada exitosamente${NC}"
+echo -e "${GREEN}============================================${NC}"
+echo -e "${YELLOW}Versión: ${NEW_VERSION} (${VERSION_CODE})${NC}"
 echo ""
-echo -e "${YELLOW}Next steps:${NC}"
-echo "  1. Push changes: git push origin main"
-echo "  2. Push tag: git push origin v$NEW_VERSION"
-echo "  3. GitHub Actions will automatically build and release APK"
-echo ""
-echo -e "${YELLOW}Or to push everything:${NC}"
+echo -e "${YELLOW}Para push, ejecuta:${NC}"
 echo "  git push origin main && git push origin v$NEW_VERSION"
+echo ""
+echo -e "${YELLOW}O usa el atajo:${NC}"
+echo "  git push origin main --tags"
