@@ -47,6 +47,11 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
 
+      - name: Install Android SDK 35
+        run: |
+          echo y | sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          echo "Android SDK 35 installed successfully"
+
       - name: Determine version
         id: version
         run: |

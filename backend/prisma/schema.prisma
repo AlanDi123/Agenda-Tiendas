@@ -12,6 +12,59 @@ datasource db {
 }
 
 // ============================================
+// EMAIL VERIFICATION TOKEN MODEL
+// ============================================
+model EmailVerificationToken {
+  id            String   @id @default(uuid())
+  userId        String
+  email         String
+  codeHash      String
+  expiresAt     DateTime
+  used          Boolean  @default(false)
+  usedAt        DateTime?
+  createdAt     DateTime @default(now())
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([userId, used])
+  @@index([email, expiresAt])
+}
+
+// ============================================
+// PAYMENT MODEL
+// ============================================
+model Payment {
+  id                String       @id @default(uuid())
+  userId            String
+  amount            Float
+  currency          String       @default("USD")
+  amountARS         Float?       // Amount in ARS if converted
+  status            PaymentStatus @default(pending)
+  gateway           String       @default("mercadopago")
+  externalPaymentId String?      @unique
+  preferenceId      String?
+  planType          PlanType?
+  isLifetime        Boolean      @default(false)
+  discountCode      String?
+  discountAmount    Float        @default(0)
+  metadata          String?      // JSON additional data
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  // Relations
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([userId])
+  @@index([externalPaymentId])
+  @@index([status])
+  @@index([gateway])
+  @@index([createdAt])
+}
+
+// ============================================
 // USER MODEL
 // ============================================
 model User {
@@ -42,6 +95,8 @@ model User {
   discountUsages  DiscountUsage[]
   errorLogs       ErrorLog[]
   refreshTokens   RefreshToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  payments        Payment[]
 
   // Indexes for performance
   @@index([email])
@@ -432,6 +487,15 @@ enum SubscriptionStatus {
   failed
   refunded
   cancelled
+}
+
+enum PaymentStatus {
+  pending
+  approved
+  rejected
+  refunded
+  cancelled
+  in_process
 }
 
 enum DiscountType {

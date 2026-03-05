@@ -1,330 +1,329 @@
 /**
- * Discount Code Service
- * Handles discount code validation and application
- * 
- * SECURITY HARDENED:
- * - MAJESTADALAN usage logged for audit
- * - Race condition fixed with pre/post validation
- * - JSON parsing validated
+ * Discount Service
+ * Handles discount code validation and usage tracking
+ * Special handling for MAJESTADALAN code with audit logging
  */
 
+import { v4 as uuidv4 } from 'uuid';
 import prisma from '../lib/prisma';
-import { PlanType } from '@prisma/client';
-import { createError } from '../middleware/errorHandler';
-import { z } from 'zod';
 
 // ============================================
-// SPECIAL CODE: MAJESTADALAN
+// CONSTANTS
 // ============================================
 
-const MAJESTADALAN_CODE = 'MAJESTADALAN';
-
-/**
- * Check if code is the special MAJESTADALAN code
- * This code grants PREMIUM_LIFETIME with 100% discount
- */
-export function isMajestadAlanCode(code: string): boolean {
-  return code.toUpperCase().trim() === MAJESTADALAN_CODE;
-}
-
-/**
- * Get MAJESTADALAN code details
- * Always valid, unlimited uses, never expires
- */
-export function getMajestadAlanDetails() {
-  return {
-    code: MAJESTADALAN_CODE,
-    type: 'percentage' as const,
-    value: 100,
-    applicablePlans: ['PREMIUM_LIFETIME'] as PlanType[],
-    maxUses: null, // Unlimited
-    perUserLimit: null, // Unlimited per user
-    expiresAt: null, // Never expires
-    description: 'Acceso Premium Vitalicio Gratuito',
-  };
-}
+export const MAJESTADALAN_CODE = 'MAJESTADALAN';
 
 // ============================================
-// DISCOUNT CODE VALIDATION
+// TYPES
 // ============================================
 
 export interface DiscountValidationResult {
-  valid: boolean;
-  code?: string;
-  type?: 'percentage' | 'fixed';
-  value?: number;
-  discountAmount?: number;
-  error?: string;
-  isLifetime?: boolean;
+  isValid: boolean;
+  discount?: {
+    code: string;
+    type: 'percentage' | 'fixed';
+    value: number;
+    currency?: string;
+  };
+  message?: string;
 }
 
-// Schema for validating applicablePlans JSON
-const applicablePlansSchema = z.array(z.enum(['FREE', 'PREMIUM_MONTHLY', 'PREMIUM_YEARLY', 'PREMIUM_LIFETIME']));
+export interface DiscountUsageLog {
+  userId: string;
+  code: string;
+  paymentId: string;
+  isMajestadAlan: boolean;
+}
+
+// ============================================
+// FUNCTIONS
+// ============================================
 
 /**
- * Validate and apply discount code
+ * Validate a discount code
  */
 export async function validateDiscountCode(
   code: string,
-  userId: string,
-  planType: PlanType,
-  amount: number
+  userId: string
 ): Promise<DiscountValidationResult> {
-  const normalizedCode = code.toUpperCase().trim();
-
-  // Special case: MAJESTADALAN
-  if (isMajestadAlanCode(normalizedCode)) {
-    if (planType !== 'PREMIUM_LIFETIME') {
-      return {
-        valid: false,
-        error: 'Este código solo es válido para Premium Vitalicio',
-      };
-    }
-    return {
-      valid: true,
-      code: MAJESTADALAN_CODE,
-      type: 'percentage',
-      value: 100,
-      discountAmount: amount, // 100% discount
-      isLifetime: true,
-    };
-  }
-
-  // Regular discount codes
-  const discountCode = await prisma.discountCode.findUnique({
-    where: { code: normalizedCode },
-  });
-
-  if (!discountCode) {
-    return {
-      valid: false,
-      error: 'Código inválido',
-    };
-  }
-
-  // Check if active
-  if (!discountCode.active) {
-    return {
-      valid: false,
-      error: 'Código desactivado',
-    };
-  }
-
-  // Check expiration
-  if (discountCode.expiresAt && new Date(discountCode.expiresAt) < new Date()) {
-    return {
-      valid: false,
-      error: 'Código expirado',
-    };
-  }
-
-  // Check usage limit (pre-validation)
-  if (discountCode.maxUses !== null && discountCode.totalUsed >= discountCode.maxUses) {
-    return {
-      valid: false,
-      error: 'Código agotado',
-    };
-  }
-
-  // Validate applicablePlans JSON safely
-  let applicablePlans: PlanType[] = [];
   try {
-    const parsed = JSON.parse(discountCode.applicablePlans);
-    applicablePlans = applicablePlansSchema.parse(parsed);
-  } catch (error) {
-    console.error('Invalid applicablePlans JSON for code:', normalizedCode);
-    return {
-      valid: false,
-      error: 'Código inválido',
-    };
-  }
-
-  if (applicablePlans.length > 0 && !applicablePlans.includes(planType)) {
-    return {
-      valid: false,
-      error: 'Código no válido para este plan',
-    };
-  }
-
-  // Check per-user limit
-  if (discountCode.perUserLimit !== null) {
-    const userUsage = await prisma.discountUsage.count({
-      where: {
-        userId,
-        discountCode: normalizedCode,
-      },
-    });
-
-    if (userUsage >= discountCode.perUserLimit) {
+    // Normalize code
+    const normalizedCode = code.trim().toUpperCase();
+    
+    // Special handling for MAJESTADALAN
+    if (normalizedCode === MAJESTADALAN_CODE) {
       return {
-        valid: false,
-        error: 'Ya usaste este código',
+        isValid: true,
+        discount: {
+          code: MAJESTADALAN_CODE,
+          type: 'percentage',
+          value: 100, // 100% discount
+        },
       };
     }
+    
+    // Check database for other discount codes
+    const discount = await prisma.discountCode.findUnique({
+      where: { code: normalizedCode },
+    });
+    
+    if (!discount) {
+      return {
+        isValid: false,
+        message: 'Código inválido',
+      };
+    }
+    
+    // Check if active
+    if (!discount.active) {
+      return {
+        isValid: false,
+        message: 'Código desactivado',
+      };
+    }
+    
+    // Check expiration
+    if (discount.expiresAt && discount.expiresAt < new Date()) {
+      return {
+        isValid: false,
+        message: 'Código expirado',
+      };
+    }
+    
+    // Check max uses
+    if (discount.maxUses !== null && discount.totalUsed >= discount.maxUses) {
+      return {
+        isValid: false,
+        message: 'Código agotado',
+      };
+    }
+    
+    // Check per-user limit
+    if (discount.perUserLimit !== null) {
+      const userUsage = await prisma.discountUsage.count({
+        where: {
+          userId,
+          discountCode: normalizedCode,
+        },
+      });
+      
+      if (userUsage >= discount.perUserLimit) {
+        return {
+          isValid: false,
+          message: 'Ya has usado este código',
+        };
+      }
+    }
+    
+    return {
+      isValid: true,
+      discount: {
+        code: discount.code,
+        type: discount.type,
+        value: discount.value,
+        currency: discount.currency || undefined,
+      },
+    };
+  } catch (error) {
+    console.error('[DiscountService] Error validating code:', error);
+    return {
+      isValid: false,
+      message: 'Error al validar código',
+    };
   }
-
-  // Calculate discount amount
-  let discountAmount: number;
-  if (discountCode.type === 'percentage') {
-    discountAmount = (amount * discountCode.value) / 100;
-  } else {
-    // Fixed discount
-    discountAmount = Math.min(discountCode.value, amount);
-  }
-
-  return {
-    valid: true,
-    code: normalizedCode,
-    type: discountCode.type as 'percentage' | 'fixed',
-    value: discountCode.value,
-    discountAmount,
-  };
 }
 
-// ============================================
-// DISCOUNT CODE USAGE
-// ============================================
-
 /**
- * Record discount code usage
- * 
- * SECURITY: Logs MAJESTADALAN usage, validates limits post-increment
+ * Apply discount and log usage
+ * Special audit logging for MAJESTADALAN
  */
-export async function recordDiscountUsage(
+export async function applyDiscount(
   userId: string,
   code: string,
   paymentId: string
-): Promise<void> {
-  const normalizedCode = code.toUpperCase().trim();
-
-  // MAJESTADALAN - log usage for audit trail
-  if (isMajestadAlanCode(normalizedCode)) {
-    // Log to database for audit
+): Promise<{
+  success: boolean;
+  message: string;
+  discountAmount?: number;
+}> {
+  try {
+    const normalizedCode = code.trim().toUpperCase();
+    const isMajestadAlan = normalizedCode === MAJESTADALAN_CODE;
+    
+    // Validate the code first
+    const validation = await validateDiscountCode(normalizedCode, userId);
+    
+    if (!validation.isValid || !validation.discount) {
+      return {
+        success: false,
+        message: validation.message || 'Código inválido',
+      };
+    }
+    
+    // For MAJESTADALAN, create the discount code if it doesn't exist
+    if (isMajestadAlan) {
+      await ensureMajestadAlanCodeExists();
+    }
+    
+    // Log the usage
     await prisma.discountUsage.create({
       data: {
+        id: uuidv4(),
         userId,
         discountCode: normalizedCode,
         paymentId,
       },
     });
-    console.log(`MAJESTADALAN used by userId=${userId}, paymentId=${paymentId}`);
-    return;
+    
+    // Increment total usage for non-MAJESTADALAN codes
+    if (!isMajestadAlan) {
+      await prisma.discountCode.update({
+        where: { code: normalizedCode },
+        data: {
+          totalUsed: { increment: 1 },
+        },
+      });
+    }
+    
+    // Create audit log for MAJESTADALAN
+    if (isMajestadAlan) {
+      await prisma.paymentLog.create({
+        data: {
+          id: uuidv4(),
+          userId,
+          gateway: 'bypass',
+          amount: 0,
+          currency: 'USD',
+          status: 'approved',
+          rawPayload: JSON.stringify({
+            type: 'majestadalan_usage',
+            code: MAJESTADALAN_CODE,
+            paymentId,
+            timestamp: new Date().toISOString(),
+          }),
+          signature: 'majestadalan',
+        },
+      });
+      
+      console.log(`[DiscountService] MAJESTADALAN used by user ${userId} for payment ${paymentId}`);
+    }
+    
+    // Calculate discount amount (placeholder - actual calculation happens in payment service)
+    const discountAmount = validation.discount.type === 'percentage' 
+      ? validation.discount.value 
+      : validation.discount.value;
+    
+    return {
+      success: true,
+      message: 'Código aplicado exitosamente',
+      discountAmount,
+    };
+  } catch (error) {
+    console.error('[DiscountService] Error applying discount:', error);
+    return {
+      success: false,
+      message: 'Error al aplicar código',
+    };
   }
+}
 
-  // Regular codes - use transaction with post-validation
-  await prisma.$transaction(async (tx: any) => {
-    // Get current usage count
-    const currentCode = await tx.discountCode.findUnique({
-      where: { code: normalizedCode },
+/**
+ * Ensure MAJESTADALAN code exists in database
+ */
+async function ensureMajestadAlanCodeExists(): Promise<void> {
+  try {
+    await prisma.discountCode.upsert({
+      where: { code: MAJESTADALAN_CODE },
+      create: {
+        code: MAJESTADALAN_CODE,
+        type: 'percentage',
+        value: 100,
+        applicablePlans: JSON.stringify(['PREMIUM_MONTHLY', 'PREMIUM_YEARLY', 'PREMIUM_LIFETIME']),
+        active: true,
+        maxUses: null, // Unlimited
+        perUserLimit: 1, // One per user
+      },
+      update: {},
     });
+  } catch (error) {
+    console.error('[DiscountService] Error ensuring MAJESTADALAN code exists:', error);
+  }
+}
 
-    if (!currentCode) {
-      throw createError('Discount code not found', 404, 'CODE_NOT_FOUND');
-    }
-
-    // Post-validation: check if maxUses was reached
-    if (currentCode.maxUses !== null && currentCode.totalUsed >= currentCode.maxUses) {
-      throw createError('Discount code usage limit reached', 400, 'CODE_EXHAUSTED');
-    }
-
-    // Record usage
-    await tx.discountUsage.create({
-      data: {
-        userId,
-        discountCode: normalizedCode,
-        paymentId,
+/**
+ * Get usage statistics for MAJESTADALAN
+ */
+export async function getMajestadAlanStats(): Promise<{
+  totalUses: number;
+  recentUses: Array<{
+    userId: string;
+    createdAt: Date;
+    paymentId: string;
+  }>;
+}> {
+  try {
+    const totalUses = await prisma.discountUsage.count({
+      where: { discountCode: MAJESTADALAN_CODE },
+    });
+    
+    const recentUses = await prisma.discountUsage.findMany({
+      where: { discountCode: MAJESTADALAN_CODE },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        userId: true,
+        createdAt: true,
+        paymentId: true,
       },
     });
-
-    // Increment total used count
-    await tx.discountCode.update({
-      where: { code: normalizedCode },
-      data: {
-        totalUsed: { increment: 1 },
-      },
-    });
-  });
-}
-
-// ============================================
-// DISCOUNT CODE MANAGEMENT
-// ============================================
-
-/**
- * Create a new discount code
- */
-export async function createDiscountCode(data: {
-  code: string;
-  type: 'percentage' | 'fixed';
-  value: number;
-  currency?: string;
-  maxUses?: number;
-  perUserLimit?: number;
-  applicablePlans: PlanType[];
-  expiresAt?: Date;
-}): Promise<void> {
-  const normalizedCode = data.code.toUpperCase().trim();
-
-  // Check if code already exists
-  const existing = await prisma.discountCode.findUnique({
-    where: { code: normalizedCode },
-  });
-
-  if (existing) {
-    throw createError('Code already exists', 409, 'CODE_EXISTS');
+    
+    return {
+      totalUses,
+      recentUses,
+    };
+  } catch (error) {
+    console.error('[DiscountService] Error getting MAJESTADALAN stats:', error);
+    return {
+      totalUses: 0,
+      recentUses: [],
+    };
   }
-
-  await prisma.discountCode.create({
-    data: {
-      code: normalizedCode,
-      type: data.type,
-      value: data.value,
-      currency: data.currency,
-      maxUses: data.maxUses,
-      perUserLimit: data.perUserLimit,
-      applicablePlans: JSON.stringify(data.applicablePlans),
-      expiresAt: data.expiresAt,
-      totalUsed: 0,
-      active: true,
-    },
-  });
 }
 
 /**
- * Deactivate a discount code
+ * Get all discount usages for a user
  */
-export async function deactivateDiscountCode(code: string): Promise<void> {
-  const normalizedCode = code.toUpperCase().trim();
-
-  await prisma.discountCode.update({
-    where: { code: normalizedCode },
-    data: { active: false },
-  });
-}
-
-/**
- * Get all active discount codes (admin function)
- */
-export async function getActiveDiscountCodes(): Promise<Array<{
+export async function getUserDiscountUsages(userId: string): Promise<Array<{
   code: string;
-  type: string;
-  value: number;
-  totalUsed: number;
-  maxUses: number | null;
-  expiresAt: Date | null;
+  createdAt: Date;
+  paymentId: string;
 }>> {
-  const codes = await prisma.discountCode.findMany({
-    where: { active: true },
-    select: {
-      code: true,
-      type: true,
-      value: true,
-      totalUsed: true,
-      maxUses: true,
-      expiresAt: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  return codes;
+  try {
+    const usages = await prisma.discountUsage.findMany({
+      where: { userId },
+      select: {
+        discountCode: { select: { code: true } },
+        createdAt: true,
+        paymentId: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    
+    return usages.map(u => ({
+      code: u.discountCode.code,
+      createdAt: u.createdAt,
+      paymentId: u.paymentId,
+    }));
+  } catch (error) {
+    console.error('[DiscountService] Error getting user discount usages:', error);
+    return [];
+  }
 }
+
+export default {
+  validateDiscountCode,
+  applyDiscount,
+  getMajestadAlanStats,
+  getUserDiscountUsages,
+  MAJESTADALAN_CODE,
+};

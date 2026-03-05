@@ -1,0 +1,122 @@
+.email-verification-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Info Section */
+.verification-info {
+  text-align: center;
+}
+
+.verification-info p {
+  margin: 8px 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.verification-email {
+  font-weight: 600;
+  color: var(--color-primary);
+  font-size: 16px;
+  word-break: break-all;
+}
+
+.verification-hint {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+/* Code Inputs */
+.verification-code-inputs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.verification-code-input {
+  width: 48px;
+  height: 56px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  border: 2px solid var(--color-divider);
+  border-radius: 8px;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  transition: all 0.2s ease;
+}
+
+.verification-code-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.verification-code-input:disabled {
+  background: var(--color-surface);
+  cursor: not-allowed;
+}
+
+/* Error */
+.verification-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--color-error-light);
+  border-radius: 8px;
+  color: var(--color-error);
+  font-size: 14px;
+}
+
+.verification-error-icon {
+  font-size: 18px;
+}
+
+/* Resend */
+.verification-resend {
+  text-align: center;
+}
+
+.verification-resend p {
+  margin: 0 0 8px 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+/* Actions */
+.verification-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Success */
+.email-verification-success {
+  text-align: center;
+  padding: 20px;
+}
+
+.email-verification-success p {
+  margin: 8px 0;
+  color: var(--color-text-primary);
+  font-size: 16px;
+}
+
+.success-subtitle {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .verification-code-input {
+    width: 40px;
+    height: 48px;
+    font-size: 20px;
+  }
+}

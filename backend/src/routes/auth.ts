@@ -48,6 +48,14 @@ const refreshTokenSchema = z.object({
   refreshToken: z.string(),
 });
 
+const sendVerificationCodeSchema = z.object({
+  email: z.string().email().optional(), // Optional if authenticated
+});
+
+const verifyCodeSchema = z.object({
+  code: z.string().length(6),
+});
+
 // ============================================
 // REGISTRATION
 // ============================================
@@ -141,6 +149,75 @@ router.post('/resend-verification', async (req: Request, res: Response, next: Ne
       // verificationToken: result.verificationToken, // Remove in production
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// EMAIL VERIFICATION BY CODE (NEW)
+// ============================================
+
+/**
+ * POST /api/v1/auth/send-verification
+ * Send verification code to user's email
+ */
+router.post('/send-verification', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).userId;
+    const userEmail = (req as any).user?.email;
+    
+    if (!userId || !userEmail) {
+      throw createError('Usuario no autenticado', 401, 'UNAUTHORIZED');
+    }
+
+    const { sendVerificationCode } = await import('../services/emailService');
+    const result = await sendVerificationCode(userId, userEmail);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/v1/auth/verify-code
+ * Verify email with 6-digit code
+ */
+router.post('/verify-code', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).userId;
+    const { code } = verifyCodeSchema.parse(req.body);
+
+    if (!userId) {
+      throw createError('Usuario no autenticado', 401, 'UNAUTHORIZED');
+    }
+
+    const { verifyCode } = await import('../services/emailService');
+    const result = await verifyCode(userId, code);
+
+    if (result.success && result.email) {
+      // Update user's emailVerified status
+      const prisma = (await import('../lib/prisma')).default;
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return next(createError('Código inválido', 400, 'VALIDATION_ERROR'));
+    }
     next(error);
   }
 });

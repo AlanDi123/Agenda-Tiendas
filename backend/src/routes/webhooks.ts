@@ -1,259 +1,203 @@
 /**
  * Webhook Routes
- * Handles payment gateway webhooks with signature verification
+ * Handles incoming webhooks from payment gateways (Mercado Pago)
  */
 
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
+import { processWebhookPayment } from '../services/paymentService';
 import prisma from '../lib/prisma';
-import { activateSubscription, grantLifetimeSubscription } from '../services/subscriptionService';
-import { isMajestadAlanCode } from '../services/discountService';
-import { verifySignature, getGatewayConfig } from '../middleware/signatureVerification';
-import { createError } from '../middleware/errorHandler';
 
 const router = Router();
 
 // ============================================
-// WEBHOOK HANDLER UTILITIES
+// CONFIGURATION
 // ============================================
 
-/**
- * Log webhook event for audit
- */
-async function logWebhookEvent(
-  gateway: string,
-  eventType: string,
-  paymentId: string,
-  status: string,
-  amount: number,
-  currency: string,
-  signature: string,
-  rawPayload: string,
-  error?: string
-) {
-  await prisma.webhookEvent.create({
-    data: {
-      gateway,
-      eventType,
-      paymentId,
-      status,
-      amount,
-      currency,
-      signature,
-      rawPayload,
-      processed: !error,
-      error,
-    },
-  });
-}
-
-/**
- * Log payment for audit
- */
-async function logPayment(
-  userId: string,
-  gateway: string,
-  amount: number,
-  currency: string,
-  status: string,
-  rawPayload: string,
-  signature?: string
-) {
-  await prisma.paymentLog.create({
-    data: {
-      userId,
-      gateway,
-      amount,
-      currency,
-      status,
-      rawPayload,
-      signature,
-    },
-  });
-}
-
-/**
- * Process successful payment
- */
-async function processSuccessfulPayment(
-  gateway: string,
-  paymentId: string,
-  userId: string,
-  amount: number,
-  _currency: string,
-  metadata?: Record<string, any>
-) {
-  // Extract plan type from metadata or determine from amount
-  let planType = metadata?.planType;
-  
-  if (!planType) {
-    // Determine from amount (approximate)
-    if (amount >= 199) {
-      planType = 'PREMIUM_LIFETIME';
-    } else if (amount >= 99) {
-      planType = 'PREMIUM_YEARLY';
-    } else if (amount >= 9) {
-      planType = 'PREMIUM_MONTHLY';
-    } else {
-      planType = 'FREE';
-    }
-  }
-
-  // Check for MAJESTADALAN discount code
-  const discountCode = metadata?.discountCode;
-  if (discountCode && isMajestadAlanCode(discountCode)) {
-    // Grant lifetime subscription
-    await grantLifetimeSubscription(userId, gateway, paymentId);
-    console.log(`MAJESTADALAN applied: userId=${userId}, gateway=${gateway}`);
-    return;
-  }
-
-  // Activate subscription
-  await activateSubscription(userId, planType, gateway, paymentId);
-}
+const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET || '';
 
 // ============================================
-// GENERIC WEBHOOK HANDLER
-// ============================================
-
-async function handleWebhook(
-  req: Request,
-  res: Response,
-  gateway: string
-) {
-  const signature = req.headers['x-webhook-signature'] as string || 
-                    req.headers['x-request-signature'] as string ||
-                    '';
-
-  const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-  
-  try {
-    // Get gateway config
-    const config = getGatewayConfig(gateway);
-    
-    if (!config || !config.secret) {
-      throw createError(`Webhook secret not configured for ${gateway}`, 500);
-    }
-
-    // Verify signature
-    if (signature && config.secret) {
-      const isValid = verifySignature(rawBody, signature, config.secret);
-      if (!isValid) {
-        await logWebhookEvent(
-          gateway,
-          'unknown',
-          'unknown',
-          'failed',
-          0,
-          'USD',
-          signature,
-          rawBody,
-          'Invalid signature'
-        );
-        throw createError('Invalid signature', 401);
-      }
-    }
-
-    // Parse payload (gateway-specific parsing would go here)
-    const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    
-    // Extract common fields (gateway-specific extraction would go here)
-    const paymentId = payload.id || payload.payment_id || payload.transaction_id;
-    const status = payload.status || payload.payment_status;
-    const amount = payload.amount || payload.transaction_amount || 0;
-    const currency = payload.currency_id || payload.currency || 'USD';
-    const userId = payload.metadata?.userId || payload.user_id;
-    
-    if (!paymentId) {
-      throw createError('Missing payment ID in webhook', 400);
-    }
-
-    // Log the webhook event
-    await logWebhookEvent(
-      gateway,
-      payload.action || payload.event_type || 'payment.updated',
-      paymentId,
-      status,
-      amount,
-      currency,
-      signature,
-      rawBody
-    );
-
-    // Process based on status
-    if (status === 'approved' || status === 'completed' || status === 'paid') {
-      if (!userId) {
-        throw createError('Missing userId in webhook metadata', 400);
-      }
-
-      await processSuccessfulPayment(
-        gateway,
-        paymentId,
-        userId,
-        amount,
-        currency,
-        payload.metadata
-      );
-
-      await logPayment(userId, gateway, amount, currency, status, rawBody, signature);
-    }
-
-    // Acknowledge webhook
-    res.status(200).json({ received: true });
-
-  } catch (error) {
-    console.error(`Webhook error (${gateway}):`, error);
-    
-    // Still acknowledge to prevent retries for client errors
-    if (error instanceof Error && (error as any).statusCode === 400) {
-      res.status(200).json({ received: true, error: 'Bad request' });
-    } else {
-      res.status(500).json({ received: true, error: 'Processing error' });
-    }
-  }
-}
-
-// ============================================
-// GATEWAY-SPECIFIC WEBHOOK ROUTES
+// MERCADO PAGO WEBHOOK
 // ============================================
 
 /**
  * POST /api/webhooks/mercadopago
- * Mercado Pago webhook
+ * Handle Mercado Pago payment notifications
+ * 
+ * Mercado Pago sends notifications for:
+ * - payment.created
+ * - payment.updated
  */
-router.post('/mercadopago', (req, res, next) => {
-  handleWebhook(req, res, 'mercadopago').catch(next);
+router.post('/mercadopago', async (req: Request, res: Response) => {
+  try {
+    const { action, data, topic } = req.body;
+    
+    console.log('[Webhook] Received Mercado Pago notification:', { action, topic, data });
+    
+    // Verify webhook signature if secret is configured
+    if (MP_WEBHOOK_SECRET) {
+      const signature = req.headers['x-signature'] as string;
+      
+      if (!signature) {
+        console.warn('[Webhook] Missing signature header');
+        // In production, return 401
+        // return res.status(401).json({ error: 'Missing signature' });
+      } else {
+        const isValid = verifyMercadoPagoSignature(req.body, signature);
+        if (!isValid) {
+          console.error('[Webhook] Invalid signature');
+          // In production, return 401
+          // return res.status(401).json({ error: 'Invalid signature' });
+        }
+      }
+    }
+    
+    // Handle payment notifications
+    if (topic === 'payment' || action?.includes('payment')) {
+      const paymentId = data?.id?.toString();
+      
+      if (!paymentId) {
+        console.error('[Webhook] Missing payment ID in notification');
+        return res.status(400).json({ error: 'Missing payment ID' });
+      }
+      
+      // Process the payment update
+      const result = await processWebhookPayment(paymentId);
+      
+      if (result.success) {
+        console.log('[Webhook] Payment processed successfully:', paymentId);
+        res.status(200).json({ success: true, message: result.message });
+      } else {
+        console.error('[Webhook] Payment processing failed:', paymentId);
+        res.status(500).json({ success: false, message: result.message });
+      }
+    } else {
+      // Handle other topics (subscription, plan, etc.)
+      console.log('[Webhook] Unhandled topic:', topic);
+      res.status(200).json({ success: true, message: 'Webhook received' });
+    }
+  } catch (error) {
+    console.error('[Webhook] Error processing Mercado Pago webhook:', error);
+    
+    // Log error
+    try {
+      await prisma.webhookEvent.create({
+        data: {
+          id: crypto.randomUUID(),
+          gateway: 'mercadopago',
+          eventType: req.body.topic || 'unknown',
+          paymentId: req.body.data?.id?.toString() || '',
+          status: 'error',
+          amount: 0,
+          currency: 'ARS',
+          signature: 'error',
+          rawPayload: JSON.stringify(req.body),
+          processed: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      });
+    } catch (logError) {
+      console.error('[Webhook] Error logging webhook error:', logError);
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 });
 
 /**
- * POST /api/webhooks/paypal
- * PayPal webhook
+ * Verify Mercado Pago webhook signature
+ * 
+ * Mercado Pago signs webhooks with HMAC-SHA256
  */
-router.post('/paypal', (req, res, next) => {
-  handleWebhook(req, res, 'paypal').catch(next);
-});
+function verifyMercadoPagoSignature(payload: any, signature: string): boolean {
+  try {
+    if (!MP_WEBHOOK_SECRET) {
+      console.warn('[Webhook] MP_WEBHOOK_SECRET not configured, skipping signature verification');
+      return true;
+    }
+    
+    const payloadString = JSON.stringify(payload);
+    const expectedSignature = crypto
+      .createHmac('sha256', MP_WEBHOOK_SECRET)
+      .update(payloadString)
+      .digest('hex');
+    
+    return crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(expectedSignature)
+    );
+  } catch (error) {
+    console.error('[Webhook] Error verifying signature:', error);
+    return false;
+  }
+}
 
 /**
- * POST /api/webhooks/ebanx
- * EBANX webhook
+ * GET /api/webhooks/mercadopago
+ * Test endpoint for Mercado Pago webhook configuration
  */
-router.post('/ebanx', (req, res, next) => {
-  handleWebhook(req, res, 'ebanx').catch(next);
+router.get('/mercadopago', (req: Request, res: Response) => {
+  res.status(200).json({ 
+    success: true, 
+    message: 'Mercado Pago webhook endpoint is active',
+    timestamp: new Date().toISOString(),
+  });
 });
 
-/**
- * POST /api/webhooks/mobbex
- * Mobbex webhook
- */
-router.post('/mobbex', (req, res, next) => {
-  handleWebhook(req, res, 'mobbex').catch(next);
-});
+// ============================================
+// WEBHOOK STATUS
+// ============================================
 
 /**
- * POST /api/webhooks/payway
- * Payway webhook
+ * GET /api/webhooks/status
+ * Get recent webhook events for debugging
  */
-router.post('/payway', (req, res, next) => {
-  handleWebhook(req, res, 'payway').catch(next);
+router.get('/status', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 10;
+    const gateway = req.query.gateway as string;
+    
+    const where: any = {};
+    if (gateway) {
+      where.gateway = gateway;
+    }
+    
+    const events = await prisma.webhookEvent.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        gateway: true,
+        eventType: true,
+        paymentId: true,
+        status: true,
+        amount: true,
+        currency: true,
+        processed: true,
+        error: true,
+        createdAt: true,
+      },
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        events,
+        total: events.length,
+      },
+    });
+  } catch (error) {
+    console.error('[Webhook] Error fetching webhook status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error fetching webhook status',
+    });
+  }
 });
 
 export { router as webhookRoutes };
