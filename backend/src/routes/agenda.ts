@@ -1,192 +1,80 @@
 /**
- * Agenda Routes (v1)
- * Handles appointments, availability, and scheduling
+ * Agenda Routes (v1) - Stub Implementation
+ * Simplified version without database dependency
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
-import * as agendaService from '../services/agendaService';
-import { logApiError, logAgendaConflict } from '../services/errorLogger';
-import { createError } from '../middleware/errorHandler';
 import { authMiddleware } from '../middleware/auth';
+import { createError } from '../middleware/errorHandler';
 
 const router = Router();
 
 // ============================================
-// SCHEMAS
-// ============================================
-
-const createAppointmentSchema = z.object({
-  locationId: z.string().uuid(),
-  staffId: z.string().uuid(),
-  startTime: z.string().datetime(),
-  endTime: z.string().datetime().optional(),
-  duration: z.number().int().positive().optional(),
-  serviceType: z.string().min(1),
-  notes: z.string().optional(),
-  clientNotes: z.string().optional(),
-  color: z.string().optional(),
-});
-
-const rescheduleAppointmentSchema = z.object({
-  newStartTime: z.string().datetime(),
-  newEndTime: z.string().datetime().optional(),
-  duration: z.number().int().positive().optional(),
-  reason: z.string().optional(),
-});
-
-const cancelAppointmentSchema = z.object({
-  reason: z.string().optional(),
-});
-
-const availabilitySchema = z.object({
-  staffId: z.string().uuid(),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
-  slotDuration: z.number().int().positive().optional(),
-});
-
-// ============================================
-// MIDDLEWARE
-// ============================================
-
-// All agenda routes require authentication
-router.use(authMiddleware);
-
-// ============================================
-// APPOINTMENTS
+// APPOINTMENTS (Stub)
 // ============================================
 
 /**
- * POST /api/v1/agenda/appointments
- * Create new appointment
+ * GET /api/v1/agenda/appointments
+ * Get user appointments - STUB
  */
-router.post('/appointments', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/appointments', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
-    const data = createAppointmentSchema.parse(req.body);
-
-    const appointment = await agendaService.createAppointment({
-      ...data,
-      userId: user.id,
-      startTime: new Date(data.startTime),
-      endTime: data.endTime ? new Date(data.endTime) : undefined,
-    });
-
-    res.status(201).json({
+    // Stub - returns empty array
+    res.json({
       success: true,
-      data: appointment,
+      data: {
+        appointments: [],
+        message: 'Appointment service requires database configuration',
+      },
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return next(createError('Invalid request data', 400, 'VALIDATION_ERROR'));
-    }
-
-    if ((error as any).code === 'TIME_CONFLICT') {
-      await logAgendaConflict(
-        '/api/v1/agenda/appointments',
-        'POST',
-        'Time slot conflict',
-        {
-          userId: (req as any).user?.id,
-          startTime: new Date(req.body.startTime),
-          device: req.headers['user-agent'],
-        }
-      );
-    } else {
-      await logApiError(
-        '/api/v1/agenda/appointments',
-        'POST',
-        (error as any).code || 'CREATE_APPOINTMENT_ERROR',
-        (error as any).message,
-        {
-          userId: (req as any).user?.id,
-          device: req.headers['user-agent'],
-          requestBody: req.body,
-        }
-      );
-    }
     next(error);
   }
 });
 
 /**
  * GET /api/v1/agenda/appointments/:id
- * Get appointment by ID
+ * Get appointment by ID - STUB
  */
 router.get('/appointments/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
-    const appointment = await agendaService.getAppointment(id);
-
-    if (!appointment) {
-      throw createError('Appointment not found', 404, 'NOT_FOUND');
-    }
-
-    res.json({
-      success: true,
-      data: appointment,
-    });
+    throw createError('Appointment service requires database configuration', 501, 'NOT_IMPLEMENTED');
   } catch (error) {
     next(error);
   }
 });
 
 /**
- * PUT /api/v1/agenda/appointments/:id/reschedule
- * Reschedule appointment
+ * POST /api/v1/agenda/appointments
+ * Create appointment - STUB
  */
-router.post('/appointments/:id/reschedule', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/appointments', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
-    const { id } = req.params;
-    const data = rescheduleAppointmentSchema.parse(req.body);
-
-    const appointment = await agendaService.rescheduleAppointment(id, {
-      ...data,
-      newStartTime: new Date(data.newStartTime),
-      newEndTime: data.newEndTime ? new Date(data.newEndTime) : undefined,
-      rescheduledBy: user.id,
-    });
-
-    res.json({
-      success: true,
-      data: appointment,
-    });
+    throw createError('Appointment creation requires database configuration', 501, 'NOT_IMPLEMENTED');
   } catch (error) {
-    if ((error as any).code === 'TIME_CONFLICT') {
-      await logAgendaConflict(
-        `/api/v1/agenda/appointments/${req.params.id}/reschedule`,
-        'POST',
-        'Reschedule conflict',
-        {
-          userId: (req as any).user?.id,
-          appointmentId: req.params.id,
-          startTime: new Date(req.body.newStartTime),
-          device: req.headers['user-agent'],
-        }
-      );
-    }
+    next(error);
+  }
+});
+
+/**
+ * POST /api/v1/agenda/appointments/:id/reschedule
+ * Reschedule appointment - STUB
+ */
+router.post('/appointments/:id/reschedule', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    throw createError('Appointment rescheduling requires database configuration', 501, 'NOT_IMPLEMENTED');
+  } catch (error) {
     next(error);
   }
 });
 
 /**
  * POST /api/v1/agenda/appointments/:id/cancel
- * Cancel appointment
+ * Cancel appointment - STUB
  */
-router.post('/appointments/:id/cancel', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/appointments/:id/cancel', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
-    const { id } = req.params;
-    const { reason } = cancelAppointmentSchema.parse(req.body);
-
-    const appointment = await agendaService.cancelAppointment(id, user.id, reason);
-
-    res.json({
-      success: true,
-      data: appointment,
-    });
+    throw createError('Appointment cancellation requires database configuration', 501, 'NOT_IMPLEMENTED');
   } catch (error) {
     next(error);
   }
@@ -194,144 +82,92 @@ router.post('/appointments/:id/cancel', async (req: Request, res: Response, next
 
 /**
  * PUT /api/v1/agenda/appointments/:id/status
- * Update appointment status
+ * Update appointment status - STUB
  */
-router.put('/appointments/:id/status', async (req: Request, res: Response, next: NextFunction) => {
+router.put('/appointments/:id/status', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!['pending', 'confirmed', 'cancelled', 'no_show', 'completed'].includes(status)) {
-      throw createError('Invalid status', 400, 'INVALID_STATUS');
-    }
-
-    const appointment = await agendaService.updateAppointmentStatus(id, status);
-
-    res.json({
-      success: true,
-      data: appointment,
-    });
+    throw createError('Appointment status update requires database configuration', 501, 'NOT_IMPLEMENTED');
   } catch (error) {
     next(error);
   }
 });
 
 // ============================================
-// AVAILABILITY
+// AVAILABILITY (Stub)
 // ============================================
 
 /**
  * GET /api/v1/agenda/availability
- * Get available slots for date range
+ * Get available slots - STUB
  */
-router.get('/availability', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/availability', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
-    const { staffId, startDate, endDate, slotDuration } = availabilitySchema.parse(req.query);
-
-    // Get staff's default location or use first active location
-    const slots = await agendaService.getAvailableSlots(
-      staffId,
-      user.locationId, // Would need to be passed or determined
-      new Date(startDate),
-      new Date(endDate),
-      slotDuration
-    );
-
     res.json({
       success: true,
-      data: slots,
+      data: {
+        slots: [],
+        message: 'Availability service requires database configuration',
+      },
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return next(createError('Invalid query parameters', 400, 'VALIDATION_ERROR'));
-    }
     next(error);
   }
 });
 
 // ============================================
-// APPOINTMENT LISTS
+// LOCATIONS (Stub)
 // ============================================
 
 /**
- * GET /api/v1/agenda/appointments
- * Get appointments by date range
+ * GET /api/v1/agenda/locations
+ * Get user locations - STUB
  */
-router.get('/appointments', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/locations', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
-    const { startDate, endDate, staffId, locationId, status } = z.object({
-      startDate: z.string().datetime(),
-      endDate: z.string().datetime(),
-      staffId: z.string().uuid().optional(),
-      locationId: z.string().uuid().optional(),
-      status: z.string().optional().transform(s => s ? s.split(',') : undefined),
-    }).parse(req.query);
-
-    let appointments;
-
-    if (staffId) {
-      appointments = await agendaService.getAppointmentsByRange(
-        staffId,
-        new Date(startDate),
-        new Date(endDate),
-        status as any
-      );
-    } else if (locationId) {
-      appointments = await agendaService.getAppointmentsByLocation(
-        locationId,
-        new Date(startDate),
-        new Date(endDate)
-      );
-    } else {
-      // Get user's own appointments
-      appointments = await agendaService.getAppointmentsByRange(
-        user.id,
-        new Date(startDate),
-        new Date(endDate),
-        status as any
-      );
-    }
-
     res.json({
       success: true,
-      data: appointments,
+      data: {
+        locations: [],
+        message: 'Location service requires database configuration',
+      },
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return next(createError('Invalid query parameters', 400, 'VALIDATION_ERROR'));
-    }
     next(error);
   }
 });
 
 /**
- * GET /api/v1/agenda/staff/:staffId/statistics
- * Get staff appointment statistics
+ * POST /api/v1/agenda/locations
+ * Create location - STUB
  */
-router.get('/staff/:staffId/statistics', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/locations', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { staffId } = req.params;
-    const { startDate, endDate } = z.object({
-      startDate: z.string().datetime(),
-      endDate: z.string().datetime(),
-    }).parse(req.query);
+    throw createError('Location creation requires database configuration', 501, 'NOT_IMPLEMENTED');
+  } catch (error) {
+    next(error);
+  }
+});
 
-    const stats = await agendaService.getStaffStatistics(
-      staffId,
-      new Date(startDate),
-      new Date(endDate)
-    );
+// ============================================
+// STATISTICS (Stub)
+// ============================================
 
+/**
+ * GET /api/v1/agenda/statistics
+ * Get agenda statistics - STUB
+ */
+router.get('/statistics', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
     res.json({
       success: true,
-      data: stats,
+      data: {
+        totalAppointments: 0,
+        upcomingAppointments: 0,
+        cancelledAppointments: 0,
+        message: 'Statistics service requires database configuration',
+      },
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return next(createError('Invalid query parameters', 400, 'VALIDATION_ERROR'));
-    }
     next(error);
   }
 });

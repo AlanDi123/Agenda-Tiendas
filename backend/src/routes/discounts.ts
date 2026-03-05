@@ -1,137 +1,100 @@
 /**
- * Discount Code Routes
+ * Discount Routes
  * Handles discount code validation and application
+ * Uses Drizzle ORM
  */
 
-import { Router } from 'express';
-import { z } from 'zod';
-import { validateDiscountCode, isMajestadAlanCode } from '../services/discountService';
-import { grantLifetimeSubscription } from '../services/subscriptionService';
+import { Router, Request, Response, NextFunction } from 'express';
+import { authMiddleware } from '../middleware/auth';
+import { validateDiscountCode, applyDiscount, getMajestadAlanStats } from '../services/discountService';
+import { createError } from '../middleware/errorHandler';
+import type { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 // ============================================
-// APPLY DISCOUNT CODE
+// VALIDATE DISCOUNT CODE
 // ============================================
 
-const applySchema = z.object({
-  userId: z.string().uuid(),
-  code: z.string().min(1).max(50),
-  planType: z.enum(['FREE', 'PREMIUM_MONTHLY', 'PREMIUM_YEARLY', 'PREMIUM_LIFETIME']),
-  amount: z.number().positive(),
-});
-
 /**
- * POST /api/discounts/apply
- * Validate and apply discount code
- * 
- * Request:
- * {
- *   "userId": "uuid",
- *   "code": "MAJESTADALAN",
- *   "planType": "PREMIUM_LIFETIME",
- *   "amount": 199.99
- * }
- * 
- * Response (success):
- * {
- *   "success": true,
- *   "data": {
- *     "valid": true,
- *     "code": "MAJESTADALAN",
- *     "type": "percentage",
- *     "value": 100,
- *     "discountAmount": 199.99,
- *     "finalAmount": 0,
- *     "isLifetime": true,
- *     "requiresPayment": false
- *   }
- * }
+ * POST /api/v1/discounts/validate
+ * Validate a discount code
  */
-router.post('/apply', async (req, res, next) => {
+router.post('/validate', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { userId, code, planType, amount } = applySchema.parse(req.body);
+    const userId = (req as AuthRequest).userId;
+    const { code } = req.body;
 
-    const result = await validateDiscountCode(code, userId, planType, amount);
-
-    if (!result.valid) {
-      return res.json({
-        success: false,
-        error: result.error,
-      });
+    if (!userId) {
+      throw createError('Usuario no autenticado', 401, 'UNAUTHORIZED');
     }
 
-    const finalAmount = Math.max(0, amount - (result.discountAmount || 0));
-    const requiresPayment = finalAmount > 0;
-
-    // Special handling for MAJESTADALAN - grant lifetime immediately
-    if (result.isLifetime && !requiresPayment) {
-      await grantLifetimeSubscription(userId, 'discount_code', `discount_${code}_${Date.now()}`);
+    if (!code) {
+      throw createError('Código requerido', 400, 'VALIDATION_ERROR');
     }
 
-    return res.json({
+    const result = await validateDiscountCode(code, userId);
+
+    res.json({
       success: true,
-      data: {
-        valid: result.valid,
-        code: result.code,
-        type: result.type,
-        value: result.value,
-        discountAmount: result.discountAmount,
-        finalAmount,
-        isLifetime: result.isLifetime || false,
-        requiresPayment,
-      },
+      ...result,
     });
   } catch (error) {
     next(error);
-    return;
   }
 });
 
 // ============================================
-// CHECK CODE (without applying)
+// APPLY DISCOUNT
 // ============================================
 
-const checkSchema = z.object({
-  code: z.string().min(1).max(50),
-});
-
 /**
- * POST /api/discounts/check
- * Check if a code exists and is valid (without user context)
+ * POST /api/v1/discounts/apply
+ * Apply discount to a payment
  */
-router.post('/check', async (req, res, next) => {
+router.post('/apply', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { code } = checkSchema.parse(req.body);
-    const normalizedCode = code.toUpperCase().trim();
+    const userId = (req as AuthRequest).userId;
+    const { code, paymentId } = req.body;
 
-    // Special case: MAJESTADALAN
-    if (isMajestadAlanCode(normalizedCode)) {
-      return res.json({
-        success: true,
-        data: {
-          exists: true,
-          code: 'MAJESTADALAN',
-          description: 'Acceso Premium Vitalicio Gratuito',
-          type: 'percentage',
-          value: 100,
-          applicablePlans: ['PREMIUM_LIFETIME'],
-          unlimited: true,
-        },
-      });
+    if (!userId) {
+      throw createError('Usuario no autenticado', 401, 'UNAUTHORIZED');
     }
 
-    // For regular codes, just check existence (admin would check full details)
-    return res.json({
-      success: true,
-      data: {
-        exists: true, // Would need DB check in production
-        message: 'Code exists, apply to see details',
-      },
+    if (!code || !paymentId) {
+      throw createError('Código y paymentId requeridos', 400, 'VALIDATION_ERROR');
+    }
+
+    const result = await applyDiscount(userId, code, paymentId);
+
+    res.json({
+      success: result.success,
+      message: result.message,
+      discountAmount: result.discountAmount,
     });
   } catch (error) {
     next(error);
-    return;
+  }
+});
+
+// ============================================
+// ADMIN: MAJESTADALAN STATS
+// ============================================
+
+/**
+ * GET /api/v1/discounts/majestadalan/stats
+ * Get MAJESTADALAN usage statistics (admin only)
+ */
+router.get('/majestadalan/stats', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stats = await getMajestadAlanStats();
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    next(error);
   }
 });
 

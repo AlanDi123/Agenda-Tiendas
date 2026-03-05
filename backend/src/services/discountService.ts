@@ -2,10 +2,13 @@
  * Discount Service
  * Handles discount code validation and usage tracking
  * Special handling for MAJESTADALAN code with audit logging
+ * Uses Drizzle ORM with Neon PostgreSQL
  */
 
+import { eq, and, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-import prisma from '../lib/prisma';
+import db from '../db';
+import { discountCodes, discountUsages, paymentLogs } from '../db/schema';
 
 // ============================================
 // CONSTANTS
@@ -28,13 +31,6 @@ export interface DiscountValidationResult {
   message?: string;
 }
 
-export interface DiscountUsageLog {
-  userId: string;
-  code: string;
-  paymentId: string;
-  isMajestadAlan: boolean;
-}
-
 // ============================================
 // FUNCTIONS
 // ============================================
@@ -47,9 +43,8 @@ export async function validateDiscountCode(
   userId: string
 ): Promise<DiscountValidationResult> {
   try {
-    // Normalize code
     const normalizedCode = code.trim().toUpperCase();
-    
+
     // Special handling for MAJESTADALAN
     if (normalizedCode === MAJESTADALAN_CODE) {
       return {
@@ -57,23 +52,37 @@ export async function validateDiscountCode(
         discount: {
           code: MAJESTADALAN_CODE,
           type: 'percentage',
-          value: 100, // 100% discount
+          value: 100,
         },
       };
     }
-    
+
     // Check database for other discount codes
-    const discount = await prisma.discountCode.findUnique({
-      where: { code: normalizedCode },
-    });
-    
-    if (!discount) {
+    const foundCodes = await db.select({
+      code: discountCodes.code,
+      type: discountCodes.type,
+      value: discountCodes.value,
+      currency: discountCodes.currency,
+      maxUses: discountCodes.maxUses,
+      perUserLimit: discountCodes.perUserLimit,
+      totalUsed: discountCodes.totalUsed,
+      active: discountCodes.active,
+      expiresAt: discountCodes.expiresAt,
+      applicablePlans: discountCodes.applicablePlans,
+    })
+      .from(discountCodes)
+      .where(eq(discountCodes.code, normalizedCode))
+      .limit(1);
+
+    if (foundCodes.length === 0) {
       return {
         isValid: false,
         message: 'Código inválido',
       };
     }
-    
+
+    const discount = foundCodes[0];
+
     // Check if active
     if (!discount.active) {
       return {
@@ -81,7 +90,7 @@ export async function validateDiscountCode(
         message: 'Código desactivado',
       };
     }
-    
+
     // Check expiration
     if (discount.expiresAt && discount.expiresAt < new Date()) {
       return {
@@ -89,7 +98,7 @@ export async function validateDiscountCode(
         message: 'Código expirado',
       };
     }
-    
+
     // Check max uses
     if (discount.maxUses !== null && discount.totalUsed >= discount.maxUses) {
       return {
@@ -97,30 +106,33 @@ export async function validateDiscountCode(
         message: 'Código agotado',
       };
     }
-    
+
     // Check per-user limit
     if (discount.perUserLimit !== null) {
-      const userUsage = await prisma.discountUsage.count({
-        where: {
-          userId,
-          discountCode: normalizedCode,
-        },
-      });
-      
-      if (userUsage >= discount.perUserLimit) {
+      const userUsage = await db.select({ id: discountUsages.id })
+        .from(discountUsages)
+        .where(
+          and(
+            eq(discountUsages.userId, userId),
+            eq(discountUsages.discountCode, normalizedCode)
+          )
+        )
+        .limit(1);
+
+      if (userUsage.length > 0) {
         return {
           isValid: false,
           message: 'Ya has usado este código',
         };
       }
     }
-    
+
     return {
       isValid: true,
       discount: {
         code: discount.code,
-        type: discount.type,
-        value: discount.value,
+        type: discount.type as 'percentage' | 'fixed',
+        value: parseFloat(discount.value),
         currency: discount.currency || undefined,
       },
     };
@@ -135,7 +147,6 @@ export async function validateDiscountCode(
 
 /**
  * Apply discount and log usage
- * Special audit logging for MAJESTADALAN
  */
 export async function applyDiscount(
   userId: string,
@@ -149,70 +160,60 @@ export async function applyDiscount(
   try {
     const normalizedCode = code.trim().toUpperCase();
     const isMajestadAlan = normalizedCode === MAJESTADALAN_CODE;
-    
+
     // Validate the code first
     const validation = await validateDiscountCode(normalizedCode, userId);
-    
+
     if (!validation.isValid || !validation.discount) {
       return {
         success: false,
         message: validation.message || 'Código inválido',
       };
     }
-    
-    // For MAJESTADALAN, create the discount code if it doesn't exist
-    if (isMajestadAlan) {
-      await ensureMajestadAlanCodeExists();
-    }
-    
+
     // Log the usage
-    await prisma.discountUsage.create({
-      data: {
-        id: uuidv4(),
-        userId,
-        discountCode: normalizedCode,
-        paymentId,
-      },
+    await db.insert(discountUsages).values({
+      id: uuidv4(),
+      userId,
+      discountCode: normalizedCode,
+      paymentId,
     });
-    
+
     // Increment total usage for non-MAJESTADALAN codes
     if (!isMajestadAlan) {
-      await prisma.discountCode.update({
-        where: { code: normalizedCode },
-        data: {
-          totalUsed: { increment: 1 },
-        },
-      });
+      await db.update(discountCodes)
+        .set({
+          totalUsed: sql`${discountCodes.totalUsed} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(discountCodes.code, normalizedCode));
     }
-    
+
     // Create audit log for MAJESTADALAN
     if (isMajestadAlan) {
-      await prisma.paymentLog.create({
-        data: {
-          id: uuidv4(),
-          userId,
-          gateway: 'bypass',
-          amount: 0,
-          currency: 'USD',
-          status: 'approved',
-          rawPayload: JSON.stringify({
-            type: 'majestadalan_usage',
-            code: MAJESTADALAN_CODE,
-            paymentId,
-            timestamp: new Date().toISOString(),
-          }),
-          signature: 'majestadalan',
-        },
+      await db.insert(paymentLogs).values({
+        id: uuidv4(),
+        userId,
+        gateway: 'bypass',
+        amount: '0',
+        currency: 'USD',
+        status: 'approved',
+        rawPayload: JSON.stringify({
+          type: 'majestadalan_usage',
+          code: MAJESTADALAN_CODE,
+          paymentId,
+          timestamp: new Date().toISOString(),
+        }),
+        signature: 'majestadalan',
       });
-      
+
       console.log(`[DiscountService] MAJESTADALAN used by user ${userId} for payment ${paymentId}`);
     }
-    
-    // Calculate discount amount (placeholder - actual calculation happens in payment service)
-    const discountAmount = validation.discount.type === 'percentage' 
-      ? validation.discount.value 
+
+    const discountAmount = validation.discount.type === 'percentage'
+      ? validation.discount.value
       : validation.discount.value;
-    
+
     return {
       success: true,
       message: 'Código aplicado exitosamente',
@@ -228,29 +229,6 @@ export async function applyDiscount(
 }
 
 /**
- * Ensure MAJESTADALAN code exists in database
- */
-async function ensureMajestadAlanCodeExists(): Promise<void> {
-  try {
-    await prisma.discountCode.upsert({
-      where: { code: MAJESTADALAN_CODE },
-      create: {
-        code: MAJESTADALAN_CODE,
-        type: 'percentage',
-        value: 100,
-        applicablePlans: JSON.stringify(['PREMIUM_MONTHLY', 'PREMIUM_YEARLY', 'PREMIUM_LIFETIME']),
-        active: true,
-        maxUses: null, // Unlimited
-        perUserLimit: 1, // One per user
-      },
-      update: {},
-    });
-  } catch (error) {
-    console.error('[DiscountService] Error ensuring MAJESTADALAN code exists:', error);
-  }
-}
-
-/**
  * Get usage statistics for MAJESTADALAN
  */
 export async function getMajestadAlanStats(): Promise<{
@@ -262,21 +240,22 @@ export async function getMajestadAlanStats(): Promise<{
   }>;
 }> {
   try {
-    const totalUses = await prisma.discountUsage.count({
-      where: { discountCode: MAJESTADALAN_CODE },
-    });
-    
-    const recentUses = await prisma.discountUsage.findMany({
-      where: { discountCode: MAJESTADALAN_CODE },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-      select: {
-        userId: true,
-        createdAt: true,
-        paymentId: true,
-      },
-    });
-    
+    const totalUsesResult = await db.select({ count: sql<number>`count(*)` })
+      .from(discountUsages)
+      .where(eq(discountUsages.discountCode, MAJESTADALAN_CODE));
+
+    const totalUses = totalUsesResult[0]?.count || 0;
+
+    const recentUses = await db.select({
+      userId: discountUsages.userId,
+      createdAt: discountUsages.createdAt,
+      paymentId: discountUsages.paymentId,
+    })
+      .from(discountUsages)
+      .where(eq(discountUsages.discountCode, MAJESTADALAN_CODE))
+      .orderBy(sql`${discountUsages.createdAt} DESC`)
+      .limit(10);
+
     return {
       totalUses,
       recentUses,
@@ -299,18 +278,18 @@ export async function getUserDiscountUsages(userId: string): Promise<Array<{
   paymentId: string;
 }>> {
   try {
-    const usages = await prisma.discountUsage.findMany({
-      where: { userId },
-      select: {
-        discountCode: { select: { code: true } },
-        createdAt: true,
-        paymentId: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    
-    return usages.map(u => ({
-      code: u.discountCode.code,
+    const usages = await db.select({
+      code: discountCodes.code,
+      createdAt: discountUsages.createdAt,
+      paymentId: discountUsages.paymentId,
+    })
+      .from(discountUsages)
+      .innerJoin(discountCodes, eq(discountUsages.discountCode, discountCodes.code))
+      .where(eq(discountUsages.userId, userId))
+      .orderBy(sql`${discountUsages.createdAt} DESC`);
+
+    return usages.map((u) => ({
+      code: u.code,
       createdAt: u.createdAt,
       paymentId: u.paymentId,
     }));

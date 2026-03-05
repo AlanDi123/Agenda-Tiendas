@@ -1,366 +1,243 @@
 /**
  * Subscription Service
- * Core business logic for subscription management
+ * Handles subscription verification and management
+ * Uses Drizzle ORM with Neon PostgreSQL
  */
 
-import prisma from '../lib/prisma';
-import { PlanType, PlanStatus } from '@prisma/client';
-import { createError } from '../middleware/errorHandler';
-
-const GRACE_PERIOD_HOURS = parseInt(process.env.GRACE_PERIOD_HOURS || '72', 10);
+import { eq, and, desc } from 'drizzle-orm';
+import db from '../db';
+import { subscriptions, users, plans } from '../db/schema';
 
 // ============================================
-// FEATURE FLAGS BY PLAN
+// TYPES
 // ============================================
 
-export const PLAN_FEATURES: Record<PlanType, Record<string, boolean>> = {
-  FREE: {
-    recurringEvents: false,
-    alarms: false,
-    dragAndDrop: false,
-    editScope: false,
-    export: false,
-    unlimitedEvents: false,
-    prioritySupport: false,
-    advancedAnalytics: false,
-  },
-  PREMIUM_MONTHLY: {
-    recurringEvents: true,
-    alarms: true,
-    dragAndDrop: true,
-    editScope: true,
-    export: true,
-    unlimitedEvents: true,
-    prioritySupport: false,
-    advancedAnalytics: false,
-  },
-  PREMIUM_YEARLY: {
-    recurringEvents: true,
-    alarms: true,
-    dragAndDrop: true,
-    editScope: true,
-    export: true,
-    unlimitedEvents: true,
-    prioritySupport: true,
-    advancedAnalytics: true,
-  },
-  PREMIUM_LIFETIME: {
-    recurringEvents: true,
-    alarms: true,
-    dragAndDrop: true,
-    editScope: true,
-    export: true,
-    unlimitedEvents: true,
-    prioritySupport: true,
-    advancedAnalytics: true,
-  },
-};
+export interface SubscriptionStatus {
+  isActive: boolean;
+  planType: string;
+  expiresAt?: Date;
+  isLifetime: boolean;
+}
 
 // ============================================
-// SUBSCRIPTION VERIFICATION
+// FUNCTIONS
 // ============================================
 
 /**
- * Verify user's subscription status
- * This is the SINGLE SOURCE OF TRUTH for frontend
+ * Get subscription status for a user
  */
-export async function verifySubscription(userId: string): Promise<{
-  planType: PlanType;
-  planStatus: PlanStatus;
-  expiresAt: Date | null;
-  isLifetime: boolean;
-  features: Record<string, boolean>;
-}> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      subscriptions: {
-        where: { status: 'active' },
-        orderBy: { startDate: 'desc' },
-        take: 1,
-      },
-    },
-  });
+export async function getSubscriptionStatus(userId: string): Promise<SubscriptionStatus> {
+  try {
+    // Find active subscription
+    const foundSubscriptions = await db.select({
+      id: subscriptions.id,
+      planType: subscriptions.planType,
+      endDate: subscriptions.endDate,
+      isLifetime: subscriptions.isLifetime,
+    })
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.userId, userId),
+          eq(subscriptions.status, 'active')
+        )
+      )
+      .orderBy(desc(subscriptions.endDate))
+      .limit(1);
 
-  if (!user) {
-    throw createError('User not found', 404, 'USER_NOT_FOUND');
-  }
+    if (foundSubscriptions.length === 0) {
+      // Check user's direct plan
+      const foundUsers = await db.select({
+        planType: users.planType,
+        planStatus: users.planStatus,
+        currentPeriodEnd: users.currentPeriodEnd,
+      })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
 
-  // Check for lifetime subscription first (bypasses all date checks)
-  const lifetimeSub = await prisma.subscription.findFirst({
-    where: {
-      userId,
-      isLifetime: true,
-      status: 'active',
-    },
-  });
+      const user = foundUsers[0];
+      if (user && user.planType !== 'FREE' && user.planStatus === 'active') {
+        return {
+          isActive: true,
+          planType: user.planType,
+          expiresAt: user.currentPeriodEnd || undefined,
+          isLifetime: user.planType === 'PREMIUM_LIFETIME',
+        };
+      }
 
-  if (lifetimeSub) {
-    return {
-      planType: 'PREMIUM_LIFETIME',
-      planStatus: 'active',
-      expiresAt: null,
-      isLifetime: true,
-      features: PLAN_FEATURES['PREMIUM_LIFETIME'],
-    };
-  }
-
-  // Check current subscription
-  const activeSubscription = user.subscriptions[0];
-
-  if (!activeSubscription || !user.currentPeriodEnd) {
-    // No active subscription - return FREE
-    return {
-      planType: 'FREE',
-      planStatus: 'active',
-      expiresAt: null,
-      isLifetime: false,
-      features: PLAN_FEATURES['FREE'],
-    };
-  }
-
-  const now = new Date();
-  const periodEnd = user.currentPeriodEnd;
-  const gracePeriodEnd = new Date(periodEnd.getTime() + GRACE_PERIOD_HOURS * 60 * 60 * 1000);
-
-  // Determine status based on dates
-  let planStatus: PlanStatus = user.planStatus;
-
-  if (now > gracePeriodEnd) {
-    planStatus = 'expired';
-    // Update user status
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        planStatus: 'expired',
+      return {
+        isActive: false,
         planType: 'FREE',
-      },
-    });
-  } else if (now > periodEnd) {
-    planStatus = 'grace_period';
+        isLifetime: false,
+      };
+    }
+
+    const subscription = foundSubscriptions[0];
+
+    // Check if expired
+    if (subscription.endDate && subscription.endDate < new Date() && !subscription.isLifetime) {
+      await db.update(subscriptions)
+        .set({ status: 'cancelled' })
+        .where(eq(subscriptions.id, subscription.id));
+
+      return {
+        isActive: false,
+        planType: 'FREE',
+        isLifetime: false,
+      };
+    }
+
+    return {
+      isActive: true,
+      planType: subscription.planType || 'FREE',
+      expiresAt: subscription.endDate || undefined,
+      isLifetime: subscription.isLifetime,
+    };
+  } catch (error) {
+    console.error('[SubscriptionService] Error getting subscription status:', error);
+    return {
+      isActive: false,
+      planType: 'FREE',
+      isLifetime: false,
+    };
+  }
+}
+
+/**
+ * Check if user has active subscription for a specific feature
+ */
+export async function verifySubscription(
+  userId: string,
+  feature?: string
+): Promise<{
+  isActive: boolean;
+  planType: string;
+  message?: string;
+}> {
+  const status = await getSubscriptionStatus(userId);
+
+  if (!status.isActive) {
+    return {
+      isActive: false,
+      planType: 'FREE',
+      message: 'Se requiere una suscripción activa',
+    };
+  }
+
+  // Check feature-specific requirements
+  if (feature) {
+    const premiumFeatures = ['recurring_events', 'custom_alarms', 'unlimited_profiles'];
+    
+    if (premiumFeatures.includes(feature) && status.planType === 'FREE') {
+      return {
+        isActive: false,
+        planType: 'FREE',
+        message: `La función "${feature}" requiere una suscripción Premium`,
+      };
+    }
   }
 
   return {
-    planType: user.planType,
-    planStatus,
-    expiresAt: periodEnd,
-    isLifetime: false,
-    features: PLAN_FEATURES[user.planType] || PLAN_FEATURES['FREE'],
+    isActive: true,
+    planType: status.planType,
   };
 }
 
-// ============================================
-// SUBSCRIPTION ACTIVATION
-// ============================================
-
 /**
- * Activate subscription after successful payment
+ * Get available plans
  */
-export async function activateSubscription(
-  userId: string,
-  planType: PlanType,
-  paymentGateway: string,
-  externalPaymentId: string,
-  startDate?: Date,
-  endDate?: Date
-): Promise<void> {
-  const now = startDate || new Date();
+export async function getAvailablePlans(): Promise<Array<{
+  id: string;
+  name: string;
+  type: string;
+  priceUsd: string;
+  priceArs: string | null;
+  features: string[];
+  interval: string;
+}>> {
+  try {
+    const foundPlans = await db.select({
+      id: plans.id,
+      name: plans.name,
+      type: plans.type,
+      priceUsd: plans.priceUsd,
+      priceArs: plans.priceArs,
+      features: plans.features,
+      interval: plans.interval,
+    })
+      .from(plans)
+      .where(eq(plans.active, true))
+      .orderBy(plans.priceUsd);
 
-  // Calculate end date based on plan type
-  let calculatedEndDate: Date | null = null;
-  let isLifetime = false;
-
-  if (planType === 'PREMIUM_LIFETIME') {
-    isLifetime = true;
-    calculatedEndDate = null; // Lifetime has no expiration
-  } else if (endDate) {
-    calculatedEndDate = endDate;
-  } else {
-    // Default periods
-    calculatedEndDate = new Date(now);
-    if (planType === 'PREMIUM_MONTHLY') {
-      calculatedEndDate.setMonth(calculatedEndDate.getMonth() + 1);
-    } else if (planType === 'PREMIUM_YEARLY') {
-      calculatedEndDate.setFullYear(calculatedEndDate.getFullYear() + 1);
-    }
+    return foundPlans.map((plan) => ({
+      ...plan,
+      features: JSON.parse(plan.features),
+    }));
+  } catch (error) {
+    console.error('[SubscriptionService] Error getting plans:', error);
+    return [];
   }
-
-  // Use transaction for atomic update
-  await prisma.$transaction(async (tx: any) => {
-    // Create or update subscription
-    await tx.subscription.upsert({
-      where: { externalPaymentId },
-      update: {
-        status: 'active',
-        endDate: calculatedEndDate,
-        updatedAt: now,
-      },
-      create: {
-        userId,
-        planType,
-        paymentGateway,
-        externalPaymentId,
-        status: 'active',
-        startDate: now,
-        endDate: calculatedEndDate,
-        isLifetime,
-      },
-    });
-
-    // Update user
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        planType,
-        planStatus: 'active',
-        currentPeriodEnd: calculatedEndDate,
-      },
-    });
-  });
-
-  console.log(`Subscription activated: userId=${userId}, planType=${planType}`);
 }
 
-// ============================================
-// SUBSCRIPTION CANCELLATION
-// ============================================
-
 /**
- * Cancel subscription (at period end, not immediate)
+ * Cancel user subscription
  */
-export async function cancelSubscription(
-  userId: string,
-  reason?: string
-): Promise<void> {
-  await prisma.$transaction(async (tx: any) => {
-    // Update active subscriptions
-    await tx.subscription.updateMany({
-      where: {
-        userId,
-        status: 'active',
-        isLifetime: false, // Can't cancel lifetime
-      },
-      data: {
+export async function cancelSubscription(userId: string): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  try {
+    // Find active subscription
+    const foundSubscriptions = await db.select({ id: subscriptions.id })
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.userId, userId),
+          eq(subscriptions.status, 'active')
+        )
+      )
+      .limit(1);
+
+    if (foundSubscriptions.length === 0) {
+      return {
+        success: false,
+        message: 'No hay suscripción activa para cancelar',
+      };
+    }
+
+    // Update subscription status
+    await db.update(subscriptions)
+      .set({
         status: 'cancelled',
-      },
-    });
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, foundSubscriptions[0].id));
 
-    // Update user to grace period
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        planStatus: 'grace_period',
-      },
-    });
-  });
+    // Update user plan
+    await db.update(users)
+      .set({
+        planStatus: 'cancelled',
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
 
-  console.log(`Subscription cancelled: userId=${userId}, reason=${reason || 'user_request'}`);
-}
-
-// ============================================
-// GRACE PERIOD CHECK
-// ============================================
-
-/**
- * Check and update grace period statuses
- * Should be run periodically (e.g., every hour)
- */
-export async function processGracePeriods(): Promise<number> {
-  const now = new Date();
-  const graceThreshold = new Date(now.getTime() - GRACE_PERIOD_HOURS * 60 * 60 * 1000);
-
-  // Find users in grace period whose grace has expired
-  const expiredUsers = await prisma.user.findMany({
-    where: {
-      planStatus: 'grace_period',
-      currentPeriodEnd: {
-        lt: graceThreshold,
-      },
-    },
-  });
-
-  if (expiredUsers.length === 0) {
-    return 0;
+    return {
+      success: true,
+      message: 'Suscripción cancelada exitosamente',
+    };
+  } catch (error) {
+    console.error('[SubscriptionService] Error canceling subscription:', error);
+    return {
+      success: false,
+      message: 'Error al cancelar suscripción',
+    };
   }
-
-  // Update to expired status
-  await prisma.user.updateMany({
-    where: {
-      id: { in: expiredUsers.map((u: any) => u.id) },
-    },
-    data: {
-      planStatus: 'expired',
-      planType: 'FREE',
-      currentPeriodEnd: null,
-    },
-  });
-
-  console.log(`Processed ${expiredUsers.length} expired subscriptions`);
-  return expiredUsers.length;
 }
 
-// ============================================
-// LIFETIME SUBSCRIPTION
-// ============================================
-
-/**
- * Grant lifetime subscription (for special codes like MAJESTADALAN)
- */
-export async function grantLifetimeSubscription(
-  userId: string,
-  paymentGateway: string = 'discount_code',
-  externalPaymentId?: string
-): Promise<void> {
-  const now = new Date();
-  const paymentId = externalPaymentId || `lifetime_${userId}_${Date.now()}`;
-
-  await prisma.$transaction(async (tx: any) => {
-    // Check if already has lifetime
-    const existingLifetime = await tx.subscription.findFirst({
-      where: {
-        userId,
-        isLifetime: true,
-        status: 'active',
-      },
-    });
-
-    if (existingLifetime) {
-      // Already has lifetime, just ensure user is updated
-      await tx.user.update({
-        where: { id: userId },
-        data: {
-          planType: 'PREMIUM_LIFETIME',
-          planStatus: 'active',
-          currentPeriodEnd: null,
-        },
-      });
-      return;
-    }
-
-    // Create lifetime subscription
-    await tx.subscription.create({
-      data: {
-        userId,
-        planType: 'PREMIUM_LIFETIME',
-        paymentGateway,
-        externalPaymentId: paymentId,
-        status: 'active',
-        startDate: now,
-        endDate: null,
-        isLifetime: true,
-      },
-    });
-
-    // Update user
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        planType: 'PREMIUM_LIFETIME',
-        planStatus: 'active',
-        currentPeriodEnd: null,
-      },
-    });
-  });
-
-  console.log(`Lifetime subscription granted: userId=${userId}`);
-}
+export default {
+  getSubscriptionStatus,
+  verifySubscription,
+  getAvailablePlans,
+  cancelSubscription,
+};

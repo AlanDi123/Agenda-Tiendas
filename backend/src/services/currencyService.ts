@@ -1,6 +1,7 @@
 /**
  * Currency Service
  * Handles USD to ARS conversion using exchangerate.host API
+ * Uses Math.ceil for rounding up as specified
  */
 
 // ============================================
@@ -34,13 +35,13 @@ export interface ExchangeRateResponse {
  */
 export async function getUsdToArsRate(): Promise<number> {
   const now = Date.now();
-  
+
   // Return cached rate if still valid
   if (cachedRate !== null && (now - cacheTimestamp) < CACHE_DURATION_MS) {
     console.log('[CurrencyService] Using cached exchange rate:', cachedRate);
     return cachedRate;
   }
-  
+
   try {
     const response = await fetch(
       `${EXCHANGE_RATE_API_URL}?from=USD&to=ARS&amount=1`,
@@ -51,45 +52,44 @@ export async function getUsdToArsRate(): Promise<number> {
         },
       }
     );
-    
+
     if (!response.ok) {
       throw new Error(`Exchange rate API returned ${response.status}`);
     }
-    
-    const data = await response.json();
-    
+
+    const data = await response.json() as { success?: boolean; result?: number };
+
     if (!data.success && data.result === undefined) {
       throw new Error('Invalid response from exchange rate API');
     }
-    
+
     // Use Math.ceil for rounding up as specified
-    const rate = Math.ceil(data.result * 100) / 100;
-    
+    const rate = Math.ceil((data.result || 0) * 100) / 100;
+
     // Cache the rate
     cachedRate = rate;
     cacheTimestamp = now;
-    
+
     console.log('[CurrencyService] Fetched new exchange rate:', rate);
-    
+
     return rate;
   } catch (error) {
     console.error('[CurrencyService] Error fetching exchange rate:', error);
-    
+
     // Fallback to a reasonable default rate if API fails
-    // This ensures the app can still function during API outages
-    const fallbackRate = 1000; // Conservative fallback rate
+    const fallbackRate = 1000;
     console.log('[CurrencyService] Using fallback rate:', fallbackRate);
-    
+
     return fallbackRate;
   }
 }
 
 /**
  * Convert USD amount to ARS
+ * Uses Math.ceil for rounding up
  */
 export async function convertUsdToArs(usdAmount: number): Promise<number> {
   const rate = await getUsdToArsRate();
-  // Use Math.ceil for rounding up as specified
   return Math.ceil(usdAmount * rate);
 }
 
@@ -98,13 +98,11 @@ export async function convertUsdToArs(usdAmount: number): Promise<number> {
  */
 export async function convertArsToUsd(arsAmount: number): Promise<number> {
   const rate = await getUsdToArsRate();
-  // Use Math.ceil for rounding up as specified
   return Math.ceil((arsAmount / rate) * 100) / 100;
 }
 
 /**
  * Clear the cached exchange rate
- * Useful for testing or forcing a refresh
  */
 export function clearCache(): void {
   cachedRate = null;

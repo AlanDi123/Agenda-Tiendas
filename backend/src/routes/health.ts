@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import prisma from '../lib/prisma';
+import { checkDatabaseConnection } from '../db';
 
 const router = Router();
 
@@ -26,14 +26,21 @@ router.get('/', (_req, res) => {
  */
 router.get('/ready', async (_req, res) => {
   try {
-    // Check database connection
-    await prisma.$queryRaw`SELECT 1`;
+    const connected = await checkDatabaseConnection();
 
-    res.json({
-      status: 'ready',
-      database: 'connected',
-      timestamp: new Date().toISOString(),
-    });
+    if (connected) {
+      res.json({
+        status: 'ready',
+        database: 'connected',
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      res.status(503).json({
+        status: 'not_ready',
+        database: 'disconnected',
+        timestamp: new Date().toISOString(),
+      });
+    }
   } catch (error) {
     res.status(503).json({
       status: 'not_ready',

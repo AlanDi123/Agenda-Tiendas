@@ -1,12 +1,15 @@
 /**
  * Payment Service
  * Handles Mercado Pago checkout and subscription management
+ * Uses Drizzle ORM with Neon PostgreSQL
  */
 
 import MercadoPagoConfig, { Preference, Payment } from 'mercadopago';
 import { v4 as uuidv4 } from 'uuid';
-import prisma from '../lib/prisma';
-import { convertUsdToArs } from './currencyService';
+import { eq, and, desc } from 'drizzle-orm';
+import db from '../db';
+import { payments, subscriptions, users, plans, discountCodes, webhookEvents, paymentLogs } from '../db/schema';
+import { getUsdToArsRate } from './currencyService';
 
 // ============================================
 // CONFIGURATION
@@ -41,14 +44,6 @@ export interface CheckoutResult {
   message?: string;
 }
 
-export interface WebhookPaymentData {
-  paymentId: string;
-  status: string;
-  amount: number;
-  currency: string;
-  externalReference?: string;
-}
-
 // ============================================
 // PLAN PRICING
 // ============================================
@@ -58,6 +53,15 @@ const PLAN_PRICES: Record<string, { usd: number; interval: 'monthly' | 'yearly' 
   PREMIUM_YEARLY: { usd: 99.99, interval: 'yearly' },
   PREMIUM_LIFETIME: { usd: 199.99, interval: 'lifetime' },
 };
+
+function getPlanDescription(planType: string): string {
+  const descriptions: Record<string, string> = {
+    PREMIUM_MONTHLY: 'Suscripción Mensual Premium',
+    PREMIUM_YEARLY: 'Suscripción Anual Premium (2 meses gratis)',
+    PREMIUM_LIFETIME: 'Acceso de por vida',
+  };
+  return descriptions[planType] || 'Suscripción Premium';
+}
 
 // ============================================
 // FUNCTIONS
@@ -69,9 +73,10 @@ const PLAN_PRICES: Record<string, { usd: number; interval: 'monthly' | 'yearly' 
 export async function getPlanPricing(planType: string): Promise<PlanPricing | null> {
   const plan = PLAN_PRICES[planType];
   if (!plan) return null;
-  
-  const priceArs = await convertUsdToArs(plan.usd);
-  
+
+  const rate = await getUsdToArsRate();
+  const priceArs = Math.ceil(plan.usd * rate);
+
   return {
     planType,
     priceUsd: plan.usd,
@@ -79,18 +84,6 @@ export async function getPlanPricing(planType: string): Promise<PlanPricing | nu
     interval: plan.interval,
     description: getPlanDescription(planType),
   };
-}
-
-/**
- * Get human-readable plan description
- */
-function getPlanDescription(planType: string): string {
-  const descriptions: Record<string, string> = {
-    PREMIUM_MONTHLY: 'Suscripción Mensual Premium',
-    PREMIUM_YEARLY: 'Suscripción Anual Premium (2 meses gratis)',
-    PREMIUM_LIFETIME: 'Acceso de por vida',
-  };
-  return descriptions[planType] || 'Suscripción Premium';
 }
 
 /**
@@ -103,17 +96,23 @@ export async function createCheckoutPreference(
 ): Promise<CheckoutResult> {
   try {
     // Get user info
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-    
-    if (!user) {
+    const foundUsers = await db.select({
+      id: users.id,
+      email: users.email,
+    })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (foundUsers.length === 0) {
       return {
         success: false,
         message: 'Usuario no encontrado',
       };
     }
-    
+
+    const user = foundUsers[0];
+
     // Get plan pricing
     const pricing = await getPlanPricing(planType);
     if (!pricing) {
@@ -122,32 +121,49 @@ export async function createCheckoutPreference(
         message: 'Plan no válido',
       };
     }
-    
+
     // Apply discount if provided
     let finalPriceUsd = pricing.priceUsd;
     let discountAmount = 0;
-    
+
     if (discountCode) {
-      const discount = await prisma.discountCode.findUnique({
-        where: { code: discountCode },
-      });
-      
-      if (discount && discount.active && (!discount.expiresAt || discount.expiresAt > new Date())) {
-        if (discount.type === 'percentage') {
-          discountAmount = finalPriceUsd * (discount.value / 100);
-        } else if (discount.type === 'fixed') {
-          discountAmount = discount.value;
+      const foundCodes = await db.select({
+        code: discountCodes.code,
+        type: discountCodes.type,
+        value: discountCodes.value,
+        active: discountCodes.active,
+        expiresAt: discountCodes.expiresAt,
+        applicablePlans: discountCodes.applicablePlans,
+      })
+        .from(discountCodes)
+        .where(eq(discountCodes.code, discountCode.toUpperCase()))
+        .limit(1);
+
+      if (foundCodes.length > 0) {
+        const discount = foundCodes[0];
+        const applicablePlans = JSON.parse(discount.applicablePlans) as string[];
+
+        if (discount.active &&
+          (!discount.expiresAt || discount.expiresAt > new Date()) &&
+          applicablePlans.includes(planType)) {
+
+          if (discount.type === 'percentage') {
+            discountAmount = finalPriceUsd * (parseFloat(discount.value) / 100);
+          } else if (discount.type === 'fixed') {
+            discountAmount = parseFloat(discount.value);
+          }
+          finalPriceUsd = Math.max(0, finalPriceUsd - discountAmount);
         }
-        finalPriceUsd = Math.max(0, finalPriceUsd - discountAmount);
       }
     }
-    
-    // Convert to ARS for Mercado Pago (Argentina)
-    const finalPriceArs = await convertUsdToArs(finalPriceUsd);
-    
+
+    // Convert to ARS for Mercado Pago
+    const rate = await getUsdToArsRate();
+    const finalPriceArs = Math.ceil(finalPriceUsd * rate);
+
     // Create preference
     const preference = new Preference(client);
-    
+
     const preferenceData = {
       items: [
         {
@@ -181,30 +197,27 @@ export async function createCheckoutPreference(
       },
       notification_url: `${BACKEND_BASE_URL}/api/webhooks/mercadopago`,
     };
-    
+
     const result = await preference.create({ body: preferenceData });
-    
+
     // Store payment record
-    await prisma.payment.create({
-      data: {
-        id: uuidv4(),
-        userId,
-        amount: finalPriceUsd,
-        currency: 'USD',
-        amountARS: finalPriceArs,
-        status: 'pending',
-        gateway: 'mercadopago',
-        preferenceId: result.id,
-        planType: planType as any,
-        isLifetime: planType === 'PREMIUM_LIFETIME',
-        discountCode: discountCode || null,
-        discountAmount,
-        metadata: JSON.stringify(preferenceData.metadata),
-      },
+    await db.insert(payments).values({
+      id: uuidv4(),
+      userId,
+      amountArs: finalPriceArs.toString(),
+      amountUsd: finalPriceUsd.toString(),
+      currency: 'ARS',
+      status: 'pending',
+      gateway: 'mercadopago',
+      preferenceId: result.id,
+      planId: null,
+      discountCode: discountCode || null,
+      discountAmount: discountAmount.toString(),
+      metadata: JSON.stringify(preferenceData.metadata),
     });
-    
+
     console.log(`[PaymentService] Created preference ${result.id} for user ${userId}`);
-    
+
     return {
       success: true,
       preferenceId: result.id,
@@ -229,111 +242,135 @@ export async function processWebhookPayment(paymentId: string): Promise<{
   try {
     const payment = new Payment(client);
     const paymentData = await payment.get({ id: paymentId });
-    
+
     if (!paymentData) {
       return {
         success: false,
         message: 'Payment not found',
       };
     }
-    
+
     const status = paymentData.status || 'unknown';
     const externalReference = paymentData.external_reference;
     const amount = paymentData.transaction_amount || 0;
     const currency = paymentData.currency_id || 'ARS';
-    
-    // Find the payment record by preference_id
-    const paymentRecord = await prisma.payment.findFirst({
-      where: {
-        preferenceId: paymentId,
-      },
-    });
-    
+
+    // Find payment record by preference_id
+    const foundPayments = await db.select({
+      id: payments.id,
+      userId: payments.userId,
+      planId: payments.planId,
+    })
+      .from(payments)
+      .where(eq(payments.preferenceId, paymentId))
+      .limit(1);
+
+    let paymentRecord = foundPayments[0];
+
+    // If not found by preference_id, try external_payment_id
     if (!paymentRecord) {
-      // Create new payment record if not found
-      console.log('[PaymentService] Payment record not found, creating new one');
+      const foundByExternal = await db.select({
+        id: payments.id,
+        userId: payments.userId,
+        planId: payments.planId,
+      })
+        .from(payments)
+        .where(eq(payments.externalPaymentId, paymentId))
+        .limit(1);
+      paymentRecord = foundByExternal[0];
     }
-    
-    // Update or create payment record
-    const updatedPayment = await prisma.payment.upsert({
-      where: {
-        id: paymentRecord?.id || uuidv4(),
-      },
-      create: {
-        id: uuidv4(),
+
+    if (!paymentRecord) {
+      // Create new payment record
+      const newPaymentId = uuidv4();
+      await db.insert(payments).values({
+        id: newPaymentId,
         userId: externalReference || '',
-        amount: currency === 'USD' ? amount : amount / 1000, // Approximate conversion
-        currency: currency === 'USD' ? 'USD' : 'ARS',
-        amountARS: currency === 'ARS' ? amount : undefined,
+        amountArs: amount.toString(),
+        currency,
         status: status as any,
         gateway: 'mercadopago',
         externalPaymentId: paymentId,
-        planType: paymentRecord?.planType,
-        isLifetime: paymentRecord?.isLifetime || false,
-      },
-      update: {
+      });
+      paymentRecord = { id: newPaymentId, userId: externalReference || '', planId: null };
+    }
+
+    // Update payment status
+    await db.update(payments)
+      .set({
         status: status as any,
         externalPaymentId: paymentId,
         updatedAt: new Date(),
-      },
-    });
-    
+      })
+      .where(eq(payments.id, paymentRecord.id));
+
     // If payment is approved, activate subscription
-    if (status === 'approved' && updatedPayment.userId && updatedPayment.planType) {
-      await activateSubscription(
-        updatedPayment.userId,
-        updatedPayment.planType as any,
-        updatedPayment.isLifetime,
-        paymentId
-      );
+    if (status === 'approved' && paymentRecord.userId) {
+      // Get payment details to find plan type
+      const paymentDetails = await db.select({
+        metadata: payments.metadata,
+      })
+        .from(payments)
+        .where(eq(payments.id, paymentRecord.id))
+        .limit(1);
+
+      if (paymentDetails[0]?.metadata) {
+        const metadata = JSON.parse(paymentDetails[0].metadata);
+        const planType = metadata.planType;
+
+        if (planType) {
+          await activateSubscription(
+            paymentRecord.userId,
+            planType,
+            planType === 'PREMIUM_LIFETIME',
+            paymentId
+          );
+        }
+      }
     }
-    
+
     // Log webhook event
-    await prisma.webhookEvent.create({
-      data: {
-        id: uuidv4(),
-        gateway: 'mercadopago',
-        eventType: 'payment.updated',
-        paymentId,
-        status,
-        amount,
-        currency,
-        signature: 'verified',
-        rawPayload: JSON.stringify(paymentData),
-        processed: true,
-      },
+    await db.insert(webhookEvents).values({
+      id: uuidv4(),
+      gateway: 'mercadopago',
+      eventType: 'payment.updated',
+      paymentId,
+      status,
+      amount: amount.toString(),
+      currency,
+      signature: 'verified',
+      rawPayload: JSON.stringify(paymentData),
+      processed: true,
     });
-    
+
     console.log(`[PaymentService] Processed webhook for payment ${paymentId}, status: ${status}`);
-    
+
     return {
       success: true,
       message: `Payment ${status}`,
     };
   } catch (error) {
     console.error('[PaymentService] Error processing webhook:', error);
-    
+
     // Log error event
     try {
-      await prisma.webhookEvent.create({
-        data: {
-          id: uuidv4(),
-          gateway: 'mercadopago',
-          eventType: 'payment.error',
-          paymentId,
-          status: 'error',
-          amount: 0,
-          currency: 'ARS',
-          signature: 'error',
-          rawPayload: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-          processed: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        },
+      await db.insert(webhookEvents).values({
+        id: uuidv4(),
+        gateway: 'mercadopago',
+        eventType: 'payment.error',
+        paymentId,
+        status: 'error',
+        amount: '0',
+        currency: 'ARS',
+        signature: 'error',
+        rawPayload: JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+        processed: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     } catch (logError) {
       console.error('[PaymentService] Error logging webhook error:', logError);
     }
-    
+
     return {
       success: false,
       message: 'Error processing webhook',
@@ -351,10 +388,18 @@ async function activateSubscription(
   externalPaymentId: string
 ): Promise<void> {
   try {
-    // Calculate end date based on plan type
+    // Get plan
+    const foundPlans = await db.select({ id: plans.id })
+      .from(plans)
+      .where(eq(plans.type, planType as any))
+      .limit(1);
+
+    const planId = foundPlans[0]?.id || null;
+
+    // Calculate end date
     let endDate: Date | undefined;
     const now = new Date();
-    
+
     if (!isLifetime) {
       if (planType === 'PREMIUM_MONTHLY') {
         endDate = new Date(now.setMonth(now.getMonth() + 1));
@@ -362,40 +407,40 @@ async function activateSubscription(
         endDate = new Date(now.setFullYear(now.getFullYear() + 1));
       }
     }
-    
-    // Create or update subscription
-    await prisma.subscription.upsert({
-      where: {
-        externalPaymentId,
-      },
-      create: {
-        id: uuidv4(),
-        userId,
-        planType: planType as any,
-        paymentGateway: 'mercadopago',
-        externalPaymentId,
-        status: 'active',
-        startDate: new Date(),
-        endDate,
-        isLifetime,
-      },
-      update: {
-        status: 'active',
-        endDate,
-        updatedAt: new Date(),
-      },
+
+    // Deactivate existing subscriptions
+    await db.update(subscriptions)
+      .set({ status: 'cancelled' })
+      .where(
+        and(
+          eq(subscriptions.userId, userId),
+          eq(subscriptions.status, 'active')
+        )
+      );
+
+    // Create new subscription
+    await db.insert(subscriptions).values({
+      id: uuidv4(),
+      userId,
+      planId,
+      paymentGateway: 'mercadopago',
+      externalPaymentId,
+      status: 'active',
+      startDate: new Date(),
+      endDate,
+      isLifetime,
     });
-    
-    // Update user's plan type
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
+
+    // Update user's plan
+    await db.update(users)
+      .set({
         planType: planType as any,
         planStatus: 'active',
         currentPeriodEnd: endDate,
-      },
-    });
-    
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
     console.log(`[PaymentService] Activated subscription for user ${userId}, plan: ${planType}`);
   } catch (error) {
     console.error('[PaymentService] Error activating subscription:', error);
@@ -406,30 +451,42 @@ async function activateSubscription(
 /**
  * Verify subscription status for a user
  */
-export async function verifySubscription(userId: string, feature?: string): Promise<{
+export async function verifySubscription(userId: string): Promise<{
   isActive: boolean;
   planType: string;
   expiresAt?: Date;
   isLifetime: boolean;
 }> {
   try {
-    const subscription = await prisma.subscription.findFirst({
-      where: {
-        userId,
-        status: 'active',
-      },
-      orderBy: {
-        endDate: 'desc',
-      },
-    });
-    
-    if (!subscription) {
-      // Check if user has planType set directly (legacy)
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { planType: true, planStatus: true, currentPeriodEnd: true },
-      });
-      
+    // Find active subscription
+    const foundSubscriptions = await db.select({
+      id: subscriptions.id,
+      planType: subscriptions.planType,
+      endDate: subscriptions.endDate,
+      isLifetime: subscriptions.isLifetime,
+    })
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.userId, userId),
+          eq(subscriptions.status, 'active')
+        )
+      )
+      .orderBy(desc(subscriptions.endDate))
+      .limit(1);
+
+    if (foundSubscriptions.length === 0) {
+      // Check user's direct plan
+      const foundUsers = await db.select({
+        planType: users.planType,
+        planStatus: users.planStatus,
+        currentPeriodEnd: users.currentPeriodEnd,
+      })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      const user = foundUsers[0];
       if (user && user.planType !== 'FREE' && user.planStatus === 'active') {
         return {
           isActive: true,
@@ -438,32 +495,32 @@ export async function verifySubscription(userId: string, feature?: string): Prom
           isLifetime: user.planType === 'PREMIUM_LIFETIME',
         };
       }
-      
+
       return {
         isActive: false,
         planType: 'FREE',
         isLifetime: false,
       };
     }
-    
-    // Check if subscription is expired
+
+    const subscription = foundSubscriptions[0];
+
+    // Check if expired
     if (subscription.endDate && subscription.endDate < new Date() && !subscription.isLifetime) {
-      // Update subscription status
-      await prisma.subscription.update({
-        where: { id: subscription.id },
-        data: { status: 'expired' },
-      });
-      
+      await db.update(subscriptions)
+        .set({ status: 'cancelled' })
+        .where(eq(subscriptions.id, subscription.id));
+
       return {
         isActive: false,
         planType: 'FREE',
         isLifetime: false,
       };
     }
-    
+
     return {
       isActive: true,
-      planType: subscription.planType,
+      planType: subscription.planType || 'FREE',
       expiresAt: subscription.endDate || undefined,
       isLifetime: subscription.isLifetime,
     };
@@ -477,9 +534,36 @@ export async function verifySubscription(userId: string, feature?: string): Prom
   }
 }
 
+/**
+ * Log payment for MAJESTADALAN bypass
+ */
+export async function logMajestadAlanPayment(userId: string, paymentId: string): Promise<void> {
+  try {
+    await db.insert(paymentLogs).values({
+      id: uuidv4(),
+      userId,
+      gateway: 'bypass',
+      amount: '0',
+      currency: 'USD',
+      status: 'approved',
+      rawPayload: JSON.stringify({
+        type: 'majestadalan_usage',
+        paymentId,
+        timestamp: new Date().toISOString(),
+      }),
+      signature: 'majestadalan',
+    });
+
+    console.log(`[PaymentService] MAJESTADALAN payment logged for user ${userId}`);
+  } catch (error) {
+    console.error('[PaymentService] Error logging MAJESTADALAN payment:', error);
+  }
+}
+
 export default {
   getPlanPricing,
   createCheckoutPreference,
   processWebhookPayment,
   verifySubscription,
+  logMajestadAlanPayment,
 };

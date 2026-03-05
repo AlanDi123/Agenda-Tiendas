@@ -1,14 +1,16 @@
 /**
  * Authentication Routes (v1)
- * Handles registration, login, verification, password reset, and token refresh
+ * Handles registration, login, verification, password reset
+ * Uses Drizzle ORM with Neon PostgreSQL
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import * as authService from '../services/authService';
-import { logAuthFailure, logApiError } from '../services/errorLogger';
+import { sendVerificationCode, verifyCode } from '../services/emailService';
 import { createError } from '../middleware/errorHandler';
 import { authMiddleware } from '../middleware/auth';
+import type { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -25,10 +27,15 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  deviceId: z.string().optional(),
 });
 
 const verifyEmailSchema = z.object({
   token: z.string(),
+});
+
+const verifyCodeSchema = z.object({
+  code: z.string().length(6),
 });
 
 const resendVerificationSchema = z.object({
@@ -48,71 +55,38 @@ const refreshTokenSchema = z.object({
   refreshToken: z.string(),
 });
 
-const sendVerificationCodeSchema = z.object({
-  email: z.string().email().optional(), // Optional if authenticated
-});
-
-const verifyCodeSchema = z.object({
-  code: z.string().length(6),
-});
-
 // ============================================
 // REGISTRATION
 // ============================================
 
-/**
- * POST /api/v1/auth/register
- * Register new user
- */
 router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = registerSchema.parse(req.body);
-
     const result = await authService.registerUser(data);
 
-    // In production: Send verification email with token
-    // For now, return token for testing
     res.status(201).json({
       success: true,
       data: {
         user: result.user,
         message: 'Registration successful. Please verify your email.',
-        // verificationToken: result.verificationToken, // Remove in production
+        verificationToken: result.verificationToken,
       },
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return next(createError('Invalid registration data', 400, 'VALIDATION_ERROR'));
     }
-
-    await logApiError(
-      '/api/v1/auth/register',
-      'POST',
-      (error as any).code || 'REGISTRATION_ERROR',
-      (error as any).message,
-      {
-        userEmail: req.body.email,
-        device: req.headers['user-agent'],
-        ipAddress: req.ip,
-      }
-    );
-
     next(error);
   }
 });
 
 // ============================================
-// EMAIL VERIFICATION
+// EMAIL VERIFICATION (TOKEN)
 // ============================================
 
-/**
- * POST /api/v1/auth/verify-email
- * Verify email with token
- */
 router.post('/verify-email', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { token } = verifyEmailSchema.parse(req.body);
-
     const result = await authService.verifyEmail(token);
 
     res.json({
@@ -120,33 +94,19 @@ router.post('/verify-email', async (req: Request, res: Response, next: NextFunct
       message: result.message,
     });
   } catch (error) {
-    await logAuthFailure(
-      '/api/v1/auth/verify-email',
-      'POST',
-      'Email verification failed',
-      {
-        device: req.headers['user-agent'],
-        ipAddress: req.ip,
-      }
-    );
     next(error);
   }
 });
 
-/**
- * POST /api/v1/auth/resend-verification
- * Resend verification email
- */
 router.post('/resend-verification', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email } = resendVerificationSchema.parse(req.body);
-
     const result = await authService.resendVerificationEmail(email);
 
     res.json({
       success: true,
       message: result.message,
-      // verificationToken: result.verificationToken, // Remove in production
+      verificationToken: result.verificationToken,
     });
   } catch (error) {
     next(error);
@@ -154,23 +114,18 @@ router.post('/resend-verification', async (req: Request, res: Response, next: Ne
 });
 
 // ============================================
-// EMAIL VERIFICATION BY CODE (NEW)
+// EMAIL VERIFICATION (CODE)
 // ============================================
 
-/**
- * POST /api/v1/auth/send-verification
- * Send verification code to user's email
- */
 router.post('/send-verification', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).userId;
-    const userEmail = (req as any).user?.email;
-    
+    const userId = (req as AuthRequest).userId;
+    const userEmail = (req as AuthRequest).user?.email;
+
     if (!userId || !userEmail) {
       throw createError('Usuario no autenticado', 401, 'UNAUTHORIZED');
     }
 
-    const { sendVerificationCode } = await import('../services/emailService');
     const result = await sendVerificationCode(userId, userEmail);
 
     res.json({
@@ -182,33 +137,16 @@ router.post('/send-verification', authMiddleware, async (req: Request, res: Resp
   }
 });
 
-/**
- * POST /api/v1/auth/verify-code
- * Verify email with 6-digit code
- */
 router.post('/verify-code', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).userId;
+    const userId = (req as AuthRequest).userId;
     const { code } = verifyCodeSchema.parse(req.body);
 
     if (!userId) {
       throw createError('Usuario no autenticado', 401, 'UNAUTHORIZED');
     }
 
-    const { verifyCode } = await import('../services/emailService');
     const result = await verifyCode(userId, code);
-
-    if (result.success && result.email) {
-      // Update user's emailVerified status
-      const prisma = (await import('../lib/prisma')).default;
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          emailVerified: true,
-          emailVerifiedAt: new Date(),
-        },
-      });
-    }
 
     res.json({
       success: true,
@@ -226,19 +164,16 @@ router.post('/verify-code', authMiddleware, async (req: Request, res: Response, 
 // LOGIN / LOGOUT
 // ============================================
 
-/**
- * POST /api/v1/auth/login
- * Login user
- */
 router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = loginSchema.parse(req.body);
+    const { email, password, deviceId } = loginSchema.parse(req.body);
 
     const result = await authService.loginUser(
       email,
       password,
       req.ip,
-      req.headers['user-agent']
+      req.headers['user-agent'],
+      deviceId
     );
 
     res.json({
@@ -251,33 +186,17 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       },
     });
   } catch (error) {
-    await logAuthFailure(
-      '/api/v1/auth/login',
-      'POST',
-      (error as any).code === 'INVALID_CREDENTIALS' ? 'Invalid credentials' : 'Login failed',
-      {
-        email: req.body.email,
-        device: req.headers['user-agent'],
-        ipAddress: req.ip,
-      }
-    );
     next(error);
   }
 });
 
-/**
- * POST /api/v1/auth/logout
- * Logout user (invalidate refresh token)
- */
 router.post('/logout', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { refreshToken } = req.body;
 
     if (refreshToken) {
-      await authService.logoutUser(refreshToken);
-    } else {
-      // Logout all sessions
-      await authService.logoutAllSessions(req.user!.id);
+      const { tokenId } = await authService.verifyRefreshToken(refreshToken);
+      await authService.invalidateRefreshToken(tokenId);
     }
 
     res.json({
@@ -289,38 +208,21 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response, next:
   }
 });
 
-// ============================================
-// TOKEN REFRESH
-// ============================================
-
-/**
- * POST /api/v1/auth/refresh
- * Refresh access token
- */
-router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/logout-all', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { refreshToken } = refreshTokenSchema.parse(req.body);
+    const userId = (req as AuthRequest).userId;
 
-    const result = await authService.refreshAccessToken(refreshToken);
+    if (!userId) {
+      throw createError('Usuario no autenticado', 401, 'UNAUTHORIZED');
+    }
+
+    await authService.invalidateAllUserTokens(userId);
 
     res.json({
       success: true,
-      data: {
-        accessToken: result.accessToken,
-        refreshToken: result.newRefreshToken,
-        expiresAt: result.expiresAt,
-      },
+      message: 'Logged out from all devices',
     });
   } catch (error) {
-    await logAuthFailure(
-      '/api/v1/auth/refresh',
-      'POST',
-      'Token refresh failed',
-      {
-        device: req.headers['user-agent'],
-        ipAddress: req.ip,
-      }
-    );
     next(error);
   }
 });
@@ -329,34 +231,24 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 // PASSWORD RESET
 // ============================================
 
-/**
- * POST /api/v1/auth/request-password-reset
- * Request password reset
- */
-router.post('/request-password-reset', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/password-reset/request', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email } = passwordResetRequestSchema.parse(req.body);
-
     const result = await authService.requestPasswordReset(email);
 
     res.json({
       success: true,
       message: result.message,
-      // resetToken: result.resetToken, // Remove in production
+      resetToken: result.resetToken,
     });
   } catch (error) {
     next(error);
   }
 });
 
-/**
- * POST /api/v1/auth/reset-password
- * Reset password with token
- */
-router.post('/reset-password', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/password-reset/confirm', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { token, newPassword } = passwordResetSchema.parse(req.body);
-
     const result = await authService.resetPassword(token, newPassword);
 
     res.json({
@@ -364,30 +256,49 @@ router.post('/reset-password', async (req: Request, res: Response, next: NextFun
       message: result.message,
     });
   } catch (error) {
-    await logAuthFailure(
-      '/api/v1/auth/reset-password',
-      'POST',
-      'Password reset failed',
-      {
-        device: req.headers['user-agent'],
-        ipAddress: req.ip,
-      }
-    );
     next(error);
   }
 });
 
 // ============================================
-// USER PROFILE
+// TOKEN REFRESH
 // ============================================
 
-/**
- * GET /api/v1/auth/me
- * Get current user profile
- */
+router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refreshToken } = refreshTokenSchema.parse(req.body);
+
+    const { userId } = await authService.verifyRefreshToken(refreshToken);
+    const user = await authService.getUserById(userId);
+
+    if (!user) {
+      throw createError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    const accessToken = authService.generateAccessToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        accessToken,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// USER INFO
+// ============================================
+
 router.get('/me', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = await authService.getUserProfile(req.user!.id);
+    const user = (req as AuthRequest).user;
 
     res.json({
       success: true,
@@ -396,19 +307,6 @@ router.get('/me', authMiddleware, async (req: Request, res: Response, next: Next
   } catch (error) {
     next(error);
   }
-});
-
-/**
- * POST /api/v1/auth/logout-all
- * Logout all sessions
- */
-router.post('/logout-all', authMiddleware, async (req: Request, res: Response) => {
-  await authService.logoutAllSessions(req.user!.id);
-
-  res.json({
-    success: true,
-    message: 'All sessions logged out',
-  });
 });
 
 export { router as authRoutes };

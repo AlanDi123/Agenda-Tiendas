@@ -1,59 +1,76 @@
 /**
  * Authentication Middleware
- * Verifies JWT access tokens and enforces role-based access
- * 
- * SECURITY HARDENED:
- * - Stateless JWT verification (no DB lookup)
- * - Signature verification
- * - Expiry checking
- * - Role enforcement
+ * Validates JWT tokens and attaches user info to request
+ * Uses Drizzle ORM
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../services/authService';
+import { verifyAccessToken, JWTPayload } from '../services/authService';
+import { eq } from 'drizzle-orm';
+import db from '../db';
+import { users } from '../db/schema';
 import { createError } from './errorHandler';
-import { UserRole } from '@prisma/client';
 
-// Extend Express Request type
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        email: string;
-        role: UserRole;
-      };
-    }
-  }
+// ============================================
+// TYPES
+// ============================================
+
+export interface AuthRequest extends Request {
+  userId?: string;
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+    emailVerified: boolean;
+    planType: string;
+  };
 }
 
+// ============================================
+// MIDDLEWARE
+// ============================================
+
 /**
- * Verify JWT access token from header
- * STATELESS - no database lookup required
+ * Extract and verify JWT token from Authorization header
  */
 export async function authMiddleware(
-  req: Request,
+  req: AuthRequest,
   _res: Response,
   next: NextFunction
-) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw createError('Missing or invalid authorization header', 401, 'MISSING_AUTH');
-  }
-
-  const accessToken = authHeader.substring(7); // Remove 'Bearer ' prefix
-
+): Promise<void> {
   try {
-    // Verify JWT signature and expiry (stateless)
-    const payload = verifyAccessToken(accessToken);
+    const authHeader = req.headers.authorization;
 
-    // Attach user to request
-    req.user = {
-      id: payload.userId,
-      email: payload.email,
-      role: payload.role,
-    };
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw createError('Authorization header required', 401, 'UNAUTHORIZED');
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    // Verify token
+    const payload: JWTPayload = verifyAccessToken(token);
+
+    // Get user from database
+    const foundUsers = await db.select({
+      id: users.id,
+      email: users.email,
+      role: users.role,
+      emailVerified: users.emailVerified,
+      planType: users.planType,
+    })
+      .from(users)
+      .where(eq(users.id, payload.userId))
+      .limit(1);
+
+    if (foundUsers.length === 0) {
+      throw createError('User not found', 401, 'USER_NOT_FOUND');
+    }
+
+    const user = foundUsers[0];
+
+    // Attach user info to request
+    req.userId = user.id;
+    req.user = user;
 
     next();
   } catch (error) {
@@ -62,82 +79,53 @@ export async function authMiddleware(
 }
 
 /**
- * Require authentication (wrapper for clarity)
- */
-export const requireAuth = authMiddleware;
-
-/**
- * Require specific role
- */
-export function requireRole(...roles: UserRole[]) {
-  return (_req: Request, _res: Response, next: NextFunction) => {
-    if (!_req.user) {
-      throw createError('Authentication required', 401, 'MISSING_AUTH');
-    }
-
-    if (!roles.includes(_req.user.role)) {
-      throw createError(
-        `Access denied. Required roles: ${roles.join(', ')}`,
-        403,
-        'INSUFFICIENT_ROLE'
-      );
-    }
-
-    next();
-  };
-}
-
-/**
- * Require owner role
- */
-export const requireOwner = requireRole(UserRole.OWNER, UserRole.ADMIN);
-
-/**
  * Require admin role
  */
-export const requireAdmin = requireRole(UserRole.ADMIN);
-
-/**
- * Check if user owns the resource
- */
-export function requireOwnership(resourceUserIdField: string = 'userId') {
-  return (_req: Request, _res: Response, next: NextFunction) => {
-    if (!_req.user) {
-      throw createError('Authentication required', 401, 'MISSING_AUTH');
-    }
-
-    const resourceUserId = _req.params[resourceUserIdField] || _req.body[resourceUserIdField];
-
-    if (!resourceUserId) {
-      throw createError('Resource user ID not found', 400, 'INVALID_REQUEST');
-    }
-
-    // Allow if user is owner/admin or owns the resource
-    if (
-      _req.user.role === UserRole.ADMIN ||
-      _req.user.role === UserRole.OWNER ||
-      _req.user.id === resourceUserId
-    ) {
-      next();
-      return;
-    }
-
-    throw createError('Access denied', 403, 'INSUFFICIENT_ROLE');
-  };
-}
-
-/**
- * Optional authentication (doesn't fail if no token)
- */
-export async function optionalAuth(
-  req: Request,
-  res: Response,
+export async function requireAdmin(
+  req: AuthRequest,
+  _res: Response,
   next: NextFunction
-) {
+): Promise<void> {
   try {
-    await authMiddleware(req, res, next);
-  } catch (error) {
-    // Ignore auth errors, continue without user
+    if (!req.user) {
+      throw createError('Authentication required', 401, 'UNAUTHORIZED');
+    }
+
+    if (req.user.role !== 'ADMIN') {
+      throw createError('Admin access required', 403, 'FORBIDDEN');
+    }
+
     next();
+  } catch (error) {
+    next(error);
   }
 }
+
+/**
+ * Require email verification
+ */
+export async function requireEmailVerified(
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    if (!req.user) {
+      throw createError('Authentication required', 401, 'UNAUTHORIZED');
+    }
+
+    if (!req.user.emailVerified) {
+      throw createError('Email verification required', 403, 'EMAIL_NOT_VERIFIED');
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+export default {
+  authMiddleware,
+  requireAdmin,
+  requireEmailVerified,
+};

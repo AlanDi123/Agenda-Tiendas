@@ -1,12 +1,15 @@
 /**
  * Email Service
  * Handles sending verification codes and other transactional emails
+ * Uses Drizzle ORM with Neon PostgreSQL
  */
 
 import nodemailer from 'nodemailer';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import prisma from '../lib/prisma';
+import { eq, and, desc } from 'drizzle-orm';
+import db from '../db';
+import { emailVerifications, users } from '../db/schema';
 
 // ============================================
 // CONFIGURATION
@@ -26,7 +29,7 @@ const CODE_EXPIRY_MINUTES = parseInt(process.env.VERIFICATION_CODE_EXPIRY_MINUTE
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
-  secure: SMTP_PORT === 465, // true for 465, false for other ports
+  secure: SMTP_PORT === 465,
   auth: {
     user: SMTP_USER,
     pass: SMTP_PASS,
@@ -34,7 +37,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Verify transporter configuration
-transporter.verify((error, success) => {
+transporter.verify((error) => {
   if (error) {
     console.error('[EmailService] SMTP verification failed:', error.message);
   } else {
@@ -48,7 +51,7 @@ transporter.verify((error, success) => {
 
 export interface VerificationCodeResult {
   success: boolean;
-  code?: string; // Only returned in development
+  code?: string;
   message: string;
 }
 
@@ -65,43 +68,35 @@ function generateVerificationCode(): string {
 
 /**
  * Send verification code to user's email
- * Creates a code hash, stores in DB, and sends email
  */
 export async function sendVerificationCode(userId: string, email: string): Promise<VerificationCodeResult> {
   try {
-    // Generate 6-digit code
     const code = generateVerificationCode();
-    
-    // Hash the code
     const codeHash = await bcrypt.hash(code, 10);
-    
-    // Set expiration time
     const expiresAt = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000);
-    
-    // Invalidate any existing unused codes for this user
-    await prisma.emailVerificationToken.updateMany({
-      where: {
-        userId,
-        used: false,
-      },
-      data: {
-        used: true,
-        usedAt: new Date(),
-      },
+
+    // Invalidate existing unused codes
+    await db.update(emailVerifications)
+      .set({
+        verified: true,
+        verifiedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(emailVerifications.userId, userId),
+          eq(emailVerifications.verified, false)
+        )
+      );
+
+    // Store new verification code
+    await db.insert(emailVerifications).values({
+      id: uuidv4(),
+      userId,
+      code: codeHash,
+      expiresAt,
+      verified: false,
     });
-    
-    // Store new verification token
-    await prisma.emailVerificationToken.create({
-      data: {
-        id: uuidv4(),
-        userId,
-        email,
-        codeHash,
-        expiresAt,
-        used: false,
-      },
-    });
-    
+
     // Send email
     const mailOptions = {
       from: SMTP_FROM,
@@ -170,14 +165,13 @@ export async function sendVerificationCode(userId: string, email: string): Promi
         Dommuss Agenda
       `,
     };
-    
+
     await transporter.sendMail(mailOptions);
-    
+
     console.log(`[EmailService] Verification code sent to ${email}`);
-    
-    // In development, return the code for testing
+
     const isDevelopment = process.env.NODE_ENV === 'development' || !SMTP_USER;
-    
+
     return {
       success: true,
       code: isDevelopment ? code : undefined,
@@ -201,58 +195,67 @@ export async function verifyCode(userId: string, code: string): Promise<{
   email?: string;
 }> {
   try {
-    // Find the most recent unused token for this user
-    const tokens = await prisma.emailVerificationToken.findMany({
-      where: {
-        userId,
-        used: false,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 1,
-    });
-    
-    if (tokens.length === 0) {
+    // Find the most recent unused code for this user
+    const verifications = await db.select({
+      id: emailVerifications.id,
+      code: emailVerifications.code,
+      expiresAt: emailVerifications.expiresAt,
+    })
+      .from(emailVerifications)
+      .where(
+        and(
+          eq(emailVerifications.userId, userId),
+          eq(emailVerifications.verified, false)
+        )
+      )
+      .orderBy(desc(emailVerifications.createdAt))
+      .limit(1);
+
+    if (verifications.length === 0) {
       return {
         success: false,
         message: 'No hay códigos de verificación pendientes',
       };
     }
-    
-    const token = tokens[0];
-    
-    // Check if expired
-    if (token.expiresAt < new Date()) {
+
+    const verification = verifications[0];
+
+    // Check expiration
+    if (verification.expiresAt < new Date()) {
       return {
         success: false,
         message: 'El código ha expirado. Solicita uno nuevo.',
       };
     }
-    
+
     // Verify the code
-    const isValid = await bcrypt.compare(code, token.codeHash);
-    
+    const isValid = await bcrypt.compare(code, verification.code);
+
     if (!isValid) {
       return {
         success: false,
         message: 'Código inválido',
       };
     }
-    
-    // Mark token as used
-    await prisma.emailVerificationToken.update({
-      where: { id: token.id },
-      data: {
-        used: true,
-        usedAt: new Date(),
-      },
-    });
-    
+
+    // Mark as verified
+    await db.update(emailVerifications)
+      .set({
+        verified: true,
+        verifiedAt: new Date(),
+      })
+      .where(eq(emailVerifications.id, verification.id));
+
+    // Get user email
+    const foundUsers = await db.select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
     return {
       success: true,
       message: 'Email verificado exitosamente',
-      email: token.email,
+      email: foundUsers[0]?.email,
     };
   } catch (error) {
     console.error('[EmailService] Error verifying code:', error);
@@ -268,10 +271,9 @@ export async function verifyCode(userId: string, code: string): Promise<{
  */
 export async function invalidateUserTokens(userId: string): Promise<void> {
   try {
-    await prisma.emailVerificationToken.updateMany({
-      where: { userId },
-      data: { used: true, usedAt: new Date() },
-    });
+    await db.update(emailVerifications)
+      .set({ verified: true, verifiedAt: new Date() })
+      .where(eq(emailVerifications.userId, userId));
   } catch (error) {
     console.error('[EmailService] Error invalidating tokens:', error);
   }
