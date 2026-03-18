@@ -3,6 +3,8 @@
  * Handles communication with backend payment APIs
  */
 
+import type { PaymentSession, PaymentMethodType } from '../types/payment';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 /**
@@ -166,28 +168,28 @@ export async function checkPaymentStatus(paymentId?: string): Promise<{
   message: string;
 }> {
   const token = getAuthToken();
-  
+
   if (!token) {
     return {
       status: 'error',
       message: 'Usuario no autenticado',
     };
   }
-  
+
   try {
-    const url = paymentId 
+    const url = paymentId
       ? `${API_BASE_URL}/api/v1/payments/status/${paymentId}`
       : `${API_BASE_URL}/api/v1/payments/status`;
-    
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
       },
     });
-    
+
     const result = await response.json();
-    
+
     return {
       status: result.status || 'unknown',
       message: result.message || 'Estado desconocido',
@@ -201,9 +203,58 @@ export async function checkPaymentStatus(paymentId?: string): Promise<{
   }
 }
 
+/**
+ * Create gateway payment preference
+ */
+export async function createGatewayPayment(
+  session: PaymentSession,
+  _method: PaymentMethodType
+): Promise<{
+  success: boolean;
+  gatewayUrl?: string;
+  gatewayPaymentId?: string;
+  error?: string;
+}> {
+  const token = getAuthToken();
+  if (!token) {
+    return { success: false, error: 'Usuario no autenticado. Por favor inicia sesión.' };
+  }
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/payments/checkout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        sessionId: session.id,
+        planType: session.planType,
+        discountCode: session.discountCode,
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return { success: false, error: err.message || 'Error al crear preferencia de pago' };
+    }
+    const result = await response.json();
+    if (result.success && result.data?.initPoint) {
+      return {
+        success: true,
+        gatewayUrl: result.data.initPoint,
+        gatewayPaymentId: result.data.paymentId,
+      };
+    }
+    return { success: false, error: 'Error al obtener URL de pago' };
+  } catch (error) {
+    console.error('[PaymentGateway] createGatewayPayment error:', error);
+    return { success: false, error: 'Error de red al procesar el pago' };
+  }
+}
+
 export default {
   redirectToCheckout,
   getSubscriptionStatus,
   validateDiscountCode,
   checkPaymentStatus,
+  createGatewayPayment,
 };

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button } from '../Button';
-import { Modal } from '../Modal';
+import { Button } from './Button';
+import { Modal } from './Modal';
 import './EmailVerificationModal.css';
 
 interface EmailVerificationModalProps {
