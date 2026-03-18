@@ -93,16 +93,23 @@ jobs:
 
       # ── 11. Notificar al backend la nueva versión ───────────────────────────
       - name: Update backend version manifest
-        if: ${{ secrets.VITE_API_URL != '' && secrets.BACKEND_API_KEY != '' }}
+        env:
+          API_URL: ${{ secrets.VITE_API_URL }}
+          DEPLOY_KEY: ${{ secrets.BACKEND_API_KEY }}
         run: |
+          if [ -z "$API_URL" ] || [ -z "$DEPLOY_KEY" ]; then
+            echo "⚠️ Secrets no configurados, saltando notificación al backend"
+            exit 0
+          fi
+
           COMMIT_NUM=$(git rev-list --count HEAD)
           BUILD_VERSION="1.0.${COMMIT_NUM}"
           CHANGELOG=$(git log -1 --pretty=%s)
           BUNDLE_URL="https://github.com/${{ github.repository }}/releases/latest/download/bundle.zip"
 
-          curl -s -f -X POST "${{ secrets.VITE_API_URL }}/api/v1/app/version/manifest" \
+          curl -s -f -X POST "${API_URL}/api/v1/app/version/manifest" \
             -H "Content-Type: application/json" \
-            -H "x-deploy-secret: ${{ secrets.BACKEND_API_KEY }}" \
+            -H "x-deploy-secret: ${DEPLOY_KEY}" \
             -d "{
               \"latestVersion\": \"${BUILD_VERSION}\",
               \"versionCode\": ${COMMIT_NUM},
