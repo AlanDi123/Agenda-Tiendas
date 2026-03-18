@@ -14,7 +14,7 @@ on:
 env:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2048m"
   NODE_VERSION: '22'
-  JAVA_VERSION: '17'
+  JAVA_VERSION: '21'
 
 jobs:
   # ============================================
