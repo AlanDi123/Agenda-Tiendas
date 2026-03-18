@@ -140,7 +140,7 @@ export async function verifyEmail(token: string): Promise<boolean> {
 export async function resendVerificationEmail(email: string): Promise<boolean> {
   // Primero intentar contra el backend real
   try {
-    const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const response = await fetch(`${API_URL}/api/v1/auth/resend-verification`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

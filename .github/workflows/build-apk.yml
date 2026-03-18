@@ -5,48 +5,72 @@ on:
     branches:
       - main
 
+env:
+  NODE_VERSION: '22'
+  JAVA_VERSION: '17'
+
 jobs:
   build-android:
     runs-on: ubuntu-latest
 
     steps:
+      # ── 1. Código fuente ──────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup Node.js
+      # ── 2. Node.js ────────────────────────────────────────────────────────
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install Dependencies
+      # ── 3. Instalar dependencias ──────────────────────────────────────────
+      - name: Install dependencies
         run: npm ci
 
+      # ── 4. Build del frontend (inyectando la URL del backend real) ────────
       - name: Build Web App
         run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
-      - name: Setup Java (JDK 17)
+      # ── 5. Java ───────────────────────────────────────────────────────────
+      - name: Setup JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
 
+      # ── 6. Android SDK (explícito para garantizar SDK 34) ────────────────
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android Licenses
-        run: yes | sdkmanager --licenses
-
-      - name: Capacitor Sync
+      - name: Install Android SDK 34
         run: |
-          npm install -D @capacitor/cli@5
-          npx cap sync android
+          echo y | sdkmanager "platforms;android-34" "build-tools;34.0.0"
+          echo "Android SDK 34 ready"
 
-      - name: Build APK with Gradle
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses || true
+
+      # ── 7. Capacitor sync (usa la versión ya instalada en package.json) ───
+      - name: Capacitor sync
+        run: npx cap sync android
+
+      # ── 8. Gradle build ───────────────────────────────────────────────────
+      - name: Build APK
         working-directory: ./android
-        run: ./gradlew assembleDebug
+        run: |
+          chmod +x gradlew
+          ./gradlew clean assembleDebug --no-daemon
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2048m"
 
-      - name: Upload APK Artifact
+      # ── 9. Subir artefacto ────────────────────────────────────────────────
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Dommuss-Agenda-APK
