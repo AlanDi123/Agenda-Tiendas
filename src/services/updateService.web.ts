@@ -63,7 +63,10 @@ export async function getVersionManifest(): Promise<VersionManifest | null> {
  * Download and install APK - Web implementation
  * Throws error as APK installation is not supported on web
  */
-export async function downloadAndInstall(_apkUrl: string): Promise<void> {
+export async function downloadAndInstall(
+  _apkUrl: string,
+  _onProgress?: (percent: number) => void
+): Promise<void> {
   throw new Error('APK installation is only supported on Android devices');
 }
 

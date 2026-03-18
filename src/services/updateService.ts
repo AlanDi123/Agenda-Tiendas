@@ -97,9 +97,9 @@ export async function getVersionManifest(): Promise<VersionManifest | null> {
  * On web: throws error (not supported)
  * On native: opens browser to download APK
  */
-export async function downloadAndInstall(apkUrl: string): Promise<void> {
+export async function downloadAndInstall(apkUrl: string, onProgress?: (percent: number) => void): Promise<void> {
   const service = await getService();
-  return service.downloadAndInstall(apkUrl);
+  return service.downloadAndInstall(apkUrl, onProgress);
 }
 
 /**
