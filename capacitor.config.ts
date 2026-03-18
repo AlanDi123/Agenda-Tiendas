@@ -10,8 +10,8 @@ const config: CapacitorConfig = {
   },
   plugins: {
     CapacitorUpdater: {
-      autoUpdate: false,          // lo manejamos manualmente para mostrar UI
-      resetWhenUpdate: false,     // NO borrar bundle al actualizar APK nativo
+      autoUpdate: false,
+      resetWhenUpdate: false,
       autoDeleteFailed: true,
       autoDeletePrevious: true,
       appReadyTimeout: 10000,
@@ -21,7 +21,6 @@ const config: CapacitorConfig = {
       iconColor: '#FF6B35',
       sound: 'default',
     },
-    StatusBar: { style: 'DARK', backgroundColor: '#2D3E50' },
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
