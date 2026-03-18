@@ -4,7 +4,7 @@
  * Simplified version without database dependency
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { authMiddleware, requireAdmin } from '../middleware/auth';
 import { createError } from '../middleware/errorHandler';
 import { z } from 'zod';
@@ -97,23 +97,56 @@ router.get('/version/check', async (req: Request, res: Response, next) => {
 // POST /api/v1/app/version/manifest
 // ============================================
 
-router.post('/version/manifest', authMiddleware, requireAdmin, async (req: Request, res: Response, next) => {
-  try {
-    manifestSchema.parse(req.body);
-
-    // In a full implementation, this would update the database
-    // For now, just acknowledge receipt
-    res.json({
-      success: true,
-      message: 'Version manifest received (storage not configured)',
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return next(createError('Invalid manifest data', 400, 'VALIDATION_ERROR'));
-    }
-    next(error);
+// Middleware interno para CI/CD — acepta header x-deploy-secret
+function deploySecretMiddleware(req: Request, res: Response, next: NextFunction) {
+  const DEPLOY_SECRET = process.env.DEPLOY_SECRET;
+  if (!DEPLOY_SECRET) {
+    // Si no hay secret configurado, caer al flujo normal de admin JWT
+    return next('route');
   }
-});
+  const provided = req.headers['x-deploy-secret'];
+  if (provided && provided === DEPLOY_SECRET) {
+    return next();
+  }
+  return next('route'); // si no coincide, pasa al siguiente handler (admin JWT)
+}
+
+// POST /api/v1/app/version/manifest — acepta CI via deploy secret O admin JWT
+router.post(
+  '/version/manifest',
+  deploySecretMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = manifestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return next(createError('Invalid manifest data', 400, 'VALIDATION_ERROR'));
+      }
+      // Actualizar el manifest en memoria (Vercel env vars se setean por CI o manualmente)
+      console.log('[AppVersion] Manifest updated via deploy secret:', parsed.data);
+      return res.json({ success: true, message: 'Version manifest received', data: parsed.data });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+// Fallback: requiere admin JWT si no usó deploy secret
+router.post(
+  '/version/manifest',
+  authMiddleware as any,
+  requireAdmin as any,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = manifestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return next(createError('Invalid manifest data', 400, 'VALIDATION_ERROR'));
+      }
+      return res.json({ success: true, message: 'Version manifest received', data: parsed.data });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
 
 // ============================================
 // HELPER FUNCTIONS

@@ -91,21 +91,27 @@ jobs:
           path: bundle.zip
           retention-days: 30
 
-      - name: Update backend version info
+      # ── 11. Notificar al backend la nueva versión ───────────────────────────
+      - name: Update backend version manifest
         if: ${{ secrets.VITE_API_URL != '' && secrets.BACKEND_API_KEY != '' }}
         run: |
-          VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "1.0.0")
           COMMIT_NUM=$(git rev-list --count HEAD)
-          BUILD="$VERSION.$COMMIT_NUM"
-          curl -s -X POST "${{ secrets.VITE_API_URL }}/api/v1/app/version/manifest" \
+          BUILD_VERSION="1.0.${COMMIT_NUM}"
+          CHANGELOG=$(git log -1 --pretty=%s)
+          BUNDLE_URL="https://github.com/${{ github.repository }}/releases/latest/download/bundle.zip"
+
+          curl -s -f -X POST "${{ secrets.VITE_API_URL }}/api/v1/app/version/manifest" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.BACKEND_API_KEY }}" \
+            -H "x-deploy-secret: ${{ secrets.BACKEND_API_KEY }}" \
             -d "{
-              \"latestVersion\": \"$BUILD\",
-              \"versionCode\": $COMMIT_NUM,
+              \"latestVersion\": \"${BUILD_VERSION}\",
+              \"versionCode\": ${COMMIT_NUM},
               \"mandatory\": false,
               \"minVersion\": \"1.0.0\",
-              \"apkUrl\": \"https://github.com/${{ github.repository }}/releases/latest/download/bundle.zip\",
-              \"changelog\": \"Build ${{ github.run_number }} - $(git log -1 --pretty=%s)\",
-              \"publishedAt\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-            }" || echo "Backend update skipped"
+              \"apkUrl\": \"${BUNDLE_URL}\",
+              \"changelog\": \"${CHANGELOG}\",
+              \"publishedAt\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"buildNumber\": ${{ github.run_number }}
+            }" \
+            && echo "✅ Backend notificado correctamente" \
+            || echo "⚠️ Backend no disponible, continuando de todos modos"
