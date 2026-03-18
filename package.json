@@ -18,7 +18,6 @@
     "@capacitor/local-notifications": "5.0.8",
     "@capacitor/preferences": "5.0.8",
     "@capacitor/status-bar": "5.0.8",
-    "@capgo/capacitor-updater": "5.3.2",
     "date-fns": "^4.1.0",
     "idb": "^8.0.3",
     "react": "^19.2.0",
@@ -28,6 +27,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "5.7.0",
+    "@capgo/capacitor-updater": "lts-v5",
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",

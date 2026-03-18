@@ -1,6 +1,5 @@
 import { App } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
-import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import type { VersionManifest, UpdateCheckResult, UpdateCheckResponse } from '../types/update';
 
 const DISMISSED_KEY_PREFIX = 'update_dismissed_';
@@ -100,20 +99,17 @@ export async function downloadAndInstall(
 ): Promise<void> {
   onProgress?.(0);
 
-  // Descargar el bundle zip
+  const { CapacitorUpdater } = await import('@capgo/capacitor-updater');
+  
   const bundle = await CapacitorUpdater.download({
     url: bundleUrl,
     version: String(Date.now()),
   });
-
   onProgress?.(80);
-
-  // Aplicar el bundle descargado
+  
   await CapacitorUpdater.set(bundle);
   onProgress?.(100);
-
-  // El app se va a recargar automáticamente al hacer set()
-  // En algunos devices hay que hacer reload manual:
+  
   await CapacitorUpdater.reload();
 }
 
