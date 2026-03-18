@@ -66,6 +66,7 @@ function AppContent() {
     expandedEvents,
     loadEvents,
     createEvent,
+    updateEvent,
     deleteEvent,
     viewDate,
     setViewDate,
@@ -353,11 +354,17 @@ function AppContent() {
   const handleUpdateEvent = useCallback(async (eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!selectedEvent) return;
 
-    await createEvent({
+    const fullEvent: Event = {
       ...eventData,
-      assignedProfileIds: eventData.assignedProfileIds.length > 0 ? eventData.assignedProfileIds : selectedEvent.assignedProfileIds,
-    });
-  }, [selectedEvent, createEvent]);
+      id: selectedEvent.baseEventId,
+      assignedProfileIds: eventData.assignedProfileIds.length > 0
+        ? eventData.assignedProfileIds
+        : selectedEvent.assignedProfileIds,
+      createdAt: selectedEvent.startDate,
+      updatedAt: new Date(),
+    };
+    await updateEvent(fullEvent, editScope);
+  }, [selectedEvent, updateEvent, editScope]);
 
   const handleDeleteClick = useCallback(() => {
     if (!selectedEvent) return;

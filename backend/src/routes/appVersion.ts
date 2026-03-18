@@ -16,13 +16,14 @@ const router = Router();
 // ============================================
 
 const DEFAULT_VERSION = {
-  latestVersion: '0.0.1',
-  versionCode: 1,
-  mandatory: false,
-  minVersion: '0.0.1',
-  apkUrl: 'https://github.com/AlanDi123/Agenda-Tiendas/releases/latest/download/app-release-signed.apk',
-  changelog: 'Initial release',
-  publishedAt: new Date().toISOString(),
+  latestVersion: process.env.APP_LATEST_VERSION || '1.0.0',
+  versionCode: parseInt(process.env.APP_VERSION_CODE || '10000', 10),
+  mandatory: process.env.APP_UPDATE_MANDATORY === 'true',
+  minVersion: process.env.APP_MIN_VERSION || '1.0.0',
+  apkUrl: process.env.APP_BUNDLE_URL ||
+    'https://github.com/AlanDi123/Agenda-Tiendas/releases/latest/download/bundle.zip',
+  changelog: process.env.APP_CHANGELOG || 'Nueva versión disponible',
+  publishedAt: process.env.APP_PUBLISHED_AT || new Date().toISOString(),
 };
 
 // ============================================

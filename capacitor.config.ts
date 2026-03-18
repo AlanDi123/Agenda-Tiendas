@@ -5,24 +5,23 @@ const config: CapacitorConfig = {
   appName: 'Dommuss Agenda',
   webDir: 'dist',
   server: {
-    // URL de producción en Vercel
     url: 'https://agenda-tienda.vercel.app',
     cleartext: true
   },
   plugins: {
     CapacitorUpdater: {
-      autoDeleteBundles: true,
-      immediate: true
+      autoUpdate: false,          // lo manejamos manualmente para mostrar UI
+      resetWhenUpdate: false,     // NO borrar bundle al actualizar APK nativo
+      autoDeleteFailed: true,
+      autoDeletePrevious: true,
+      appReadyTimeout: 10000,
     },
     LocalNotifications: {
       smallIcon: 'ic_notification_small',
       iconColor: '#FF6B35',
       sound: 'default',
     },
-    StatusBar: {
-      style: 'DARK',
-      backgroundColor: '#2D3E50'
-    },
+    StatusBar: { style: 'DARK', backgroundColor: '#2D3E50' },
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
@@ -30,9 +29,6 @@ const config: CapacitorConfig = {
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
-      androidSpinnerStyle: 'large',
-      iosSpinnerStyle: 'small',
-      spinnerColor: '#FF6B35',
       splashFullScreen: true,
       splashImmersive: true,
     }

@@ -37,6 +37,12 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
+      # ── 4b. Empaquetar bundle web para OTA ───────────────────────────────
+      - name: Package web bundle for OTA
+        run: |
+          cd dist && zip -r ../bundle.zip . && cd ..
+          echo "bundle.zip size: $(du -sh bundle.zip | cut -f1)"
+
       # ── 5. Java ───────────────────────────────────────────────────────────
       - name: Setup JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
@@ -69,10 +75,37 @@ jobs:
         env:
           GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2048m"
 
-      # ── 9. Subir artefacto ────────────────────────────────────────────────
+      # ── 9. Subir artefacto APK ────────────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Dommuss-Agenda-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+      # ── 10. Subir bundle.zip para OTA ───────────────────────────────────────
+      - name: Upload bundle.zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle.zip
+          path: bundle.zip
+          retention-days: 30
+
+      - name: Update backend version info
+        if: ${{ secrets.VITE_API_URL != '' && secrets.BACKEND_API_KEY != '' }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "1.0.0")
+          COMMIT_NUM=$(git rev-list --count HEAD)
+          BUILD="$VERSION.$COMMIT_NUM"
+          curl -s -X POST "${{ secrets.VITE_API_URL }}/api/v1/app/version/manifest" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.BACKEND_API_KEY }}" \
+            -d "{
+              \"latestVersion\": \"$BUILD\",
+              \"versionCode\": $COMMIT_NUM,
+              \"mandatory\": false,
+              \"minVersion\": \"1.0.0\",
+              \"apkUrl\": \"https://github.com/${{ github.repository }}/releases/latest/download/bundle.zip\",
+              \"changelog\": \"Build ${{ github.run_number }} - $(git log -1 --pretty=%s)\",
+              \"publishedAt\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+            }" || echo "Backend update skipped"

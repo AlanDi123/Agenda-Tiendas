@@ -2,6 +2,14 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import { AppLogger } from './services/logger'
+import { Capacitor } from '@capacitor/core'
+
+// Notificar a CapacitorUpdater que el bundle arrancó OK (evita rollback automático)
+if (Capacitor.isNativePlatform()) {
+  import('@capgo/capacitor-updater').then(({ CapacitorUpdater }) => {
+    CapacitorUpdater.notifyAppReady();
+  }).catch(() => {});
+}
 
 // Global error handler for uncaught errors
 window.onerror = (message, source, lineno, colno, error) => {

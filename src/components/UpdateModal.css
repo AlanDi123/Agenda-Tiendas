@@ -126,6 +126,33 @@
   border-top: 1px solid var(--color-divider);
 }
 
+.update-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.update-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.update-progress-bar {
+  height: 8px;
+  background-color: var(--color-surface-variant);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.update-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
 /* Mobile optimization */
 @media (max-width: 480px) {
   .update-modal {

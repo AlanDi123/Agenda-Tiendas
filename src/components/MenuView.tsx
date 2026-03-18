@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import './MenuView.css';
 
 const DAYS_OF_WEEK = [
@@ -11,35 +11,38 @@ const DAYS_OF_WEEK = [
   { key: 'sunday', label: 'Domingo' },
 ];
 
-interface MealPlan {
-  lunch: string;
-  dinner: string;
-}
+interface MealPlan { lunch: string; dinner: string; }
+interface WeeklyMenu { [key: string]: MealPlan; }
 
-interface WeeklyMenu {
-  [key: string]: MealPlan;
+const STORAGE_KEY = 'dommuss_menu_semanal';
+const DEFAULT_MENU: WeeklyMenu = {
+  monday: { lunch: '', dinner: '' },
+  tuesday: { lunch: '', dinner: '' },
+  wednesday: { lunch: '', dinner: '' },
+  thursday: { lunch: '', dinner: '' },
+  friday: { lunch: '', dinner: '' },
+  saturday: { lunch: '', dinner: '' },
+  sunday: { lunch: '', dinner: '' },
+};
+
+function loadMenu(): WeeklyMenu {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return { ...DEFAULT_MENU, ...JSON.parse(stored) };
+  } catch (_) {}
+  return DEFAULT_MENU;
 }
 
 export function MenuView() {
   const [selectedDay, setSelectedDay] = useState<string>('monday');
-  const [menu, setMenu] = useState<WeeklyMenu>({
-    monday: { lunch: '', dinner: '' },
-    tuesday: { lunch: '', dinner: '' },
-    wednesday: { lunch: '', dinner: '' },
-    thursday: { lunch: '', dinner: '' },
-    friday: { lunch: '', dinner: '' },
-    saturday: { lunch: '', dinner: '' },
-    sunday: { lunch: '', dinner: '' },
-  });
+  const [menu, setMenu] = useState<WeeklyMenu>(loadMenu);
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(menu)); } catch (_) {}
+  }, [menu]);
 
   const updateMeal = useCallback((day: string, mealType: 'lunch' | 'dinner', value: string) => {
-    setMenu(prev => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        [mealType]: value,
-      },
-    }));
+    setMenu(prev => ({ ...prev, [day]: { ...prev[day], [mealType]: value } }));
   }, []);
 
   const selectedDayLabel = DAYS_OF_WEEK.find(d => d.key === selectedDay)?.label;
@@ -49,7 +52,6 @@ export function MenuView() {
       <div className="menu-header">
         <h2 className="menu-title">Menú Semanal</h2>
       </div>
-
       <div className="menu-days-container">
         <div className="menu-days-scroll">
           {DAYS_OF_WEEK.map((day) => (
@@ -63,13 +65,11 @@ export function MenuView() {
           ))}
         </div>
       </div>
-
       <div className="menu-content">
         <div className="menu-day-header">
           <span className="menu-day-icon">📅</span>
           <h3 className="menu-day-title">{selectedDayLabel}</h3>
         </div>
-
         <div className="menu-meals">
           <div className="menu-meal-card">
             <div className="menu-meal-header">
@@ -84,7 +84,6 @@ export function MenuView() {
               rows={3}
             />
           </div>
-
           <div className="menu-meal-card">
             <div className="menu-meal-header">
               <span className="menu-meal-icon">🌙</span>
@@ -99,12 +98,9 @@ export function MenuView() {
             />
           </div>
         </div>
-
         <div className="menu-tips">
           <span className="menu-tips-icon">💡</span>
-          <p className="menu-tips-text">
-            Planifica tus comidas con anticipación para ahorrar tiempo y dinero.
-          </p>
+          <p className="menu-tips-text">Planifica tus comidas con anticipación para ahorrar tiempo y dinero.</p>
         </div>
       </div>
     </div>

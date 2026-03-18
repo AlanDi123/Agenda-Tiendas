@@ -87,11 +87,12 @@ export function EventsProvider({ children }: { children: ReactNode }) {
 
   // Expandir eventos cuando cambie la vista o los eventos
   useEffect(() => {
-    const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
-    const endOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
-    
-    // Expandir un poco más para cubrir semanas completas
-    const expanded = expandRecurringEvents(events, startOfMonth, endOfMonth);
+    // Expandir 6 semanas antes y después del mes visible para cubrir week/day view
+    const start = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+    start.setDate(start.getDate() - 42);
+    const end = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+    end.setDate(end.getDate() + 42);
+    const expanded = expandRecurringEvents(events, start, end);
     setExpandedEvents(expanded);
   }, [events, viewDate]);
 
