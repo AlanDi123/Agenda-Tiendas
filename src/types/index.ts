@@ -1,6 +1,6 @@
 // Tipos principales de la aplicación
 
-export type EventCategory = 'salud' | 'deporte' | 'comida' | 'cumple' | 'colegio' | 'otro';
+export type EventCategory = 'invitada' | 'mama_xv' | 'mama_novios' | 'madrina' | 'dama_honor' | 'otro';
 
 export interface EventAlarm {
   id: string;

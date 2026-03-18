@@ -127,13 +127,16 @@ function AppContent() {
     }
   }, [isAuthenticated, isAuthLoading]);
 
-  // Hide splash screen
+  // Hide splash screen — esperar a que auth termine, con fallback mínimo de 800ms
   useEffect(() => {
-    const splashTimer = setTimeout(() => {
-      setShowSplash(false);
-    }, 1500);
-    return () => clearTimeout(splashTimer);
-  }, []);
+    if (!isAuthLoading) {
+      // Auth ya resolvió: mantener un mínimo de 800ms para no parpadear
+      const splashTimer = setTimeout(() => {
+        setShowSplash(false);
+      }, 800);
+      return () => clearTimeout(splashTimer);
+    }
+  }, [isAuthLoading]);
 
   // Online/Offline detection
   useEffect(() => {
@@ -523,8 +526,8 @@ function AppContent() {
     }
   };
 
-  // Show splash screen
-  if (showSplash) {
+  // Show splash screen — también mientras auth sigue cargando
+  if (showSplash || isAuthLoading) {
     return <SplashScreen />;
   }
 

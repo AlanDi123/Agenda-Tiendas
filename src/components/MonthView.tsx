@@ -15,11 +15,11 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 // Iconos de categoría
 const getCategoryIcon = (category?: string) => {
   const icons: Record<string, string> = {
-    salud: '🏥',
-    deporte: '⚽',
-    comida: '🍴',
-    cumple: '🎂',
-    colegio: '📚',
+    invitada: '💌',
+    mama_xv: '👑',
+    mama_novios: '💍',
+    madrina: '🌸',
+    dama_honor: '💐',
     otro: '📌',
   };
   return category ? (icons[category] || '📌') : '📌';
@@ -98,7 +98,7 @@ export function MonthView({
 
               {dayEvents.length > 0 && (
                 <div className="month-day-events">
-                  {dayEvents.slice(0, 4).map((event) => (
+                  {dayEvents.slice(0, 3).map((event) => (
                     <div
                       key={event.id}
                       className="month-day-event-bar"
@@ -111,9 +111,9 @@ export function MonthView({
                       <span className="month-day-event-title">{event.title}</span>
                     </div>
                   ))}
-                  {dayEvents.length > 4 && (
+                  {dayEvents.length > 3 && (
                     <span className="month-day-more">
-                      +{dayEvents.length - 4}
+                      +{dayEvents.length - 3}
                     </span>
                   )}
                 </div>

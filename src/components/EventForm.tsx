@@ -19,11 +19,11 @@ interface EventFormProps {
 
 // Categorías con iconos y colores
 const CATEGORIES: { value: EventCategory; label: string; icon: string; color: string }[] = [
-  { value: 'salud', label: 'Salud', icon: '🏥', color: '#E57373' },
-  { value: 'deporte', label: 'Deporte', icon: '⚽', color: '#81C784' },
-  { value: 'comida', label: 'Comida', icon: '🍴', color: '#FFB74D' },
-  { value: 'cumple', label: 'Cumple', icon: '🎂', color: '#BA68C8' },
-  { value: 'colegio', label: 'Colegio', icon: '📚', color: '#64B5F6' },
+  { value: 'invitada', label: 'Invitada', icon: '💌', color: '#F06292' },
+  { value: 'mama_xv', label: 'Mamá de XV', icon: '👑', color: '#AB47BC' },
+  { value: 'mama_novios', label: 'Mamá de Novios', icon: '💍', color: '#7E57C2' },
+  { value: 'madrina', label: 'Madrina', icon: '🌸', color: '#26C6DA' },
+  { value: 'dama_honor', label: 'Dama de Honor', icon: '💐', color: '#66BB6A' },
   { value: 'otro', label: 'Otro', icon: '📌', color: '#9E9E9E' },
 ];
 

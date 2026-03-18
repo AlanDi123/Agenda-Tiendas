@@ -246,7 +246,7 @@
 /* FAB positioning adjustment for mobile */
 @media (max-width: 480px) {
   .btn-fab {
-    bottom: calc(var(--bottom-nav-height) + var(--spacing-md));
+    bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--spacing-md));
     right: var(--spacing-md);
   }
 }
@@ -264,6 +264,22 @@
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+/* View transition animations for Lists and Menu */
+.app-scroll-container > * {
+  animation: viewFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

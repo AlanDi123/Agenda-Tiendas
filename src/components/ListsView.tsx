@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import './ListsView.css';
 
 interface ListItem {
@@ -7,14 +7,31 @@ interface ListItem {
   checked: boolean;
 }
 
-export function ListsView() {
-  const [items, setItems] = useState<ListItem[]>([
+const STORAGE_KEY = 'dommuss_lista_compras';
+
+function loadItems(): ListItem[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch (_) {}
+  return [
     { id: '1', text: 'Leche', checked: false },
     { id: '2', text: 'Pan', checked: false },
     { id: '3', text: 'Huevos', checked: true },
     { id: '4', text: 'Frutas', checked: false },
-  ]);
+  ];
+}
+
+export function ListsView() {
+  const [items, setItems] = useState<ListItem[]>(loadItems);
   const [newItemText, setNewItemText] = useState('');
+
+  // Persistir en localStorage cada vez que cambia la lista
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    } catch (_) {}
+  }, [items]);
 
   const toggleItem = useCallback((id: string) => {
     setItems(prev =>

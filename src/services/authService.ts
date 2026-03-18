@@ -138,6 +138,24 @@ export async function verifyEmail(token: string): Promise<boolean> {
 }
 
 export async function resendVerificationEmail(email: string): Promise<boolean> {
+  // Primero intentar contra el backend real
+  try {
+    const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+    const response = await fetch(`${API_URL}/api/v1/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.toLowerCase() }),
+    });
+    if (response.ok) {
+      console.log('[AuthService] Verification email sent via backend');
+      return true;
+    }
+    console.warn('[AuthService] Backend resend failed, status:', response.status);
+  } catch (networkError) {
+    console.warn('[AuthService] Backend unreachable, falling back to local token:', networkError);
+  }
+
+  // Fallback local (offline o backend no configurado)
   const db = await getDB();
   const user = await db.get('users', email.toLowerCase());
 
