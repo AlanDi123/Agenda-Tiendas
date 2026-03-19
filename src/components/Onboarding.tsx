@@ -31,7 +31,7 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
   const [showPin, setShowPin] = useState(false);
   const [profiles, setProfiles] = useState<Array<{ name: string; permissions: 'admin' | 'readonly' }>>([]);
   const [newProfileName, setNewProfileName] = useState('');
-  const [newProfilePermissions, setNewProfilePermissions] = useState<'admin' | 'readonly'>('admin');
+  const [newProfilePermissions] = useState<'admin' | 'readonly'>('admin');
   const [selectedPlan, setSelectedPlan] = useState<'FREE' | 'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY'>('FREE');
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
@@ -169,10 +169,7 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
                 placeholder="Ej. Juan, María..."
                 onKeyDown={e => e.key === 'Enter' && handleAddProfile()}
               />
-              <div className="onboarding-permissions">
-                <button className={`permission-btn ${newProfilePermissions === 'admin' ? 'active' : ''}`} onClick={() => setNewProfilePermissions('admin')} type="button">Administrador</button>
-                <button className={`permission-btn ${newProfilePermissions === 'readonly' ? 'active' : ''}`} onClick={() => setNewProfilePermissions('readonly')} type="button">Solo lectura</button>
-              </div>
+              {/* Todos los perfiles tienen acceso completo — sin modo lectura */}
               <Button variant="secondary" onClick={handleAddProfile} disabled={!newProfileName.trim()}
                 leftIcon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>}>
                 Agregar
@@ -184,7 +181,6 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
                   <div key={i} className="onboarding-profile-item">
                     <Avatar name={p.name} initials={getInitials(p.name)} color="#1E88E5" size="md"/>
                     <span className="onboarding-profile-name">{p.name}</span>
-                    <span className="onboarding-profile-permission">{p.permissions === 'admin' ? 'Admin' : 'Lectura'}</span>
                     <button className="onboarding-profile-remove" onClick={() => removeProfile(i)}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>

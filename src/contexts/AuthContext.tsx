@@ -225,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: currentUser?.email || '',
           avatarColor: generateAvatarColor(),
           initials: getInitials(prof.name),
-          permissions: prof.permissions,
+          permissions: 'admin',
           createdAt: new Date(),
         };
         profiles.push(profile);
@@ -294,10 +294,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('No environment loaded');
     }
 
-    // Límite de perfiles en plan FREE
-    const isFreePlan = !currentEnv.planType || currentEnv.planType === 'FREE';
-    if (isFreePlan && currentEnv.profiles.length >= 3) {
-      throw new Error('El plan gratuito permite hasta 3 perfiles. Actualizá tu plan para agregar más.');
+    // Solo 1 perfil por familia (el dueño de la cuenta)
+    if (currentEnv.profiles.length >= 1) {
+      throw new Error('Solo puede haber 1 perfil por familia. Cada miembro debe ingresar con su propio código de familia.');
     }
 
     // Verificar que el email no esté ya en esta familia

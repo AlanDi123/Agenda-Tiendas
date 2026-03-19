@@ -48,9 +48,6 @@ export function ProfileSelector({
               />
               <div className="profile-selector-info">
                 <span className="profile-selector-name">{profile.name}</span>
-                <span className="profile-selector-permission">
-                  {profile.permissions === 'admin' ? 'Administrador' : 'Solo lectura'}
-                </span>
               </div>
               {profile.id === activeProfileId && (
                 <span className="profile-selector-check">
@@ -62,20 +59,23 @@ export function ProfileSelector({
             </button>
           ))}
         </div>
-        
-        <Button
-          variant="secondary"
-          fullWidth
-          onClick={onAddProfile}
-          leftIcon={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          }
-        >
-          Agregar perfil
-        </Button>
+
+        {/* Botón Agregar perfil solo si no hay ningún perfil */}
+        {profiles.length === 0 && (
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={onAddProfile}
+            leftIcon={
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            }
+          >
+            Agregar perfil
+          </Button>
+        )}
       </div>
     </Modal>
   );
@@ -89,7 +89,6 @@ interface AddProfileModalProps {
 
 export function AddProfileModal({ isOpen, onClose, onAdd }: AddProfileModalProps) {
   const [name, setName] = useState('');
-  const [permissions, setPermissions] = useState<'admin' | 'readonly'>('readonly');
   const [color, setColor] = useState('#1976d2');
   const [error, setError] = useState('');
 
@@ -106,16 +105,14 @@ export function AddProfileModal({ isOpen, onClose, onAdd }: AddProfileModalProps
     }
 
     setError('');
-    onAdd(name.trim(), permissions, color);
+    onAdd(name.trim(), 'admin', color);
     setName('');
-    setPermissions('readonly');
     setColor('#1976d2');
     onClose();
   };
 
   const handleClose = () => {
     setName('');
-    setPermissions('readonly');
     setColor('#1976d2');
     setError('');
     onClose();
@@ -166,34 +163,9 @@ export function AddProfileModal({ isOpen, onClose, onAdd }: AddProfileModalProps
           />
           {error && <span className="input-error-message">{error}</span>}
         </div>
-        
-        <div className="add-profile-permissions">
-          <label className="input-label">Permisos</label>
-          <div className="add-profile-permission-options">
-            <button
-              className={`permission-option ${permissions === 'readonly' ? 'selected' : ''}`}
-              onClick={() => setPermissions('readonly')}
-              type="button"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0110 0v4" />
-              </svg>
-              <span>Solo lectura</span>
-            </button>
-            <button
-              className={`permission-option ${permissions === 'admin' ? 'selected' : ''}`}
-              onClick={() => setPermissions('admin')}
-              type="button"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-              <span>Administrador</span>
-            </button>
-          </div>
-        </div>
-        
+
+        {/* Todos los perfiles tienen permisos completos — sin modo lectura */}
+
         <div className="add-profile-actions">
           <Button variant="secondary" onClick={handleClose} type="button">
             Cancelar
