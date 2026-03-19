@@ -1,10 +1,9 @@
 /**
  * Email Service
  * Handles sending verification codes and other transactional emails
- * Uses Drizzle ORM with Neon PostgreSQL
+ * Uses Resend API for email delivery
  */
 
-import nodemailer from 'nodemailer';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { eq, and, desc } from 'drizzle-orm';
@@ -15,35 +14,53 @@ import { emailVerifications, users } from '../db/schema';
 // CONFIGURATION
 // ============================================
 
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.ethereal.email';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
-const SMTP_USER = process.env.SMTP_USER || '';
-const SMTP_PASS = process.env.SMTP_PASS || '';
-const SMTP_FROM = process.env.SMTP_FROM || 'Dommuss Agenda <noreply@dommuss.com>';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const SMTP_FROM = process.env.SMTP_FROM || 'Dommuss Agenda <onboarding@resend.dev>';
 const CODE_EXPIRY_MINUTES = parseInt(process.env.VERIFICATION_CODE_EXPIRY_MINUTES || '15');
+
+// Use Resend API if configured, otherwise fallback to SMTP
+const USE_RESEND = !!RESEND_API_KEY;
 
 // ============================================
 // TRANSPORTER
 // ============================================
 
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure: SMTP_PORT === 465,
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASS,
-  },
-});
+// Resend API transport
+async function sendViaResend(to: string, subject: string, html: string, text: string): Promise<void> {
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: SMTP_FROM,
+        to,
+        subject,
+        html,
+        text,
+      }),
+    });
 
-// Verify transporter configuration
-transporter.verify((error) => {
-  if (error) {
-    console.error('[EmailService] SMTP verification failed:', error.message);
-  } else {
-    console.log('[EmailService] SMTP connection established successfully');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to send email via Resend');
+    }
+
+    console.log('[EmailService] Email sent via Resend');
+  } catch (error) {
+    console.error('[EmailService] Resend error:', error instanceof Error ? error.message : error);
+    throw error;
   }
-});
+}
+
+// Verify configuration on startup
+if (USE_RESEND) {
+  console.log('[EmailService] Using Resend API for email delivery');
+} else {
+  console.warn('[EmailService] RESEND_API_KEY not configured. Email sending disabled in production.');
+}
 
 // ============================================
 // TYPES
@@ -97,17 +114,15 @@ export async function sendVerificationCode(userId: string, email: string): Promi
       verified: false,
     });
 
-    // Send email
+    // Prepare email content
     const mailOptions = {
-      from: SMTP_FROM,
-      to: email,
       subject: 'Código de Verificación - Dommuss Agenda',
       html: `
         <!DOCTYPE html>
         <html>
           <head>
             <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
               .container { max-width: 600px; margin: 0 auto; padding: 20px; }
               .header { background: linear-gradient(135deg, #2D3E50 0%, #4A6FA5 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
               .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
@@ -126,12 +141,12 @@ export async function sendVerificationCode(userId: string, email: string): Promi
               <div class="content">
                 <p>Hola,</p>
                 <p>Has solicitado verificar tu dirección de email en Dommuss Agenda. Usa el siguiente código para completar la verificación:</p>
-                
+
                 <div class="code-box">
                   <div class="code">${code}</div>
                   <p style="margin: 10px 0 0 0; color: #666; font-size: 14px;">Código de 6 dígitos</p>
                 </div>
-                
+
                 <div class="warning">
                   <strong>⚠️ Importante:</strong>
                   <ul style="margin: 10px 0 0 0; padding-left: 20px;">
@@ -140,9 +155,9 @@ export async function sendVerificationCode(userId: string, email: string): Promi
                     <li>Si no solicitaste este código, ignora este email</li>
                   </ul>
                 </div>
-                
+
                 <p>Una vez verificado, tendrás acceso completo a todas las funcionalidades de Dommuss Agenda.</p>
-                
+
                 <div class="footer">
                   <p>© ${new Date().getFullYear()} Dommuss Agenda. Todos los derechos reservados.</p>
                   <p>Este es un email automático, por favor no respondas.</p>
@@ -154,19 +169,24 @@ export async function sendVerificationCode(userId: string, email: string): Promi
       `,
       text: `
         Verificación de Email - Dommuss Agenda
-        
+
         Tu código de verificación es: ${code}
-        
+
         Este código expira en ${CODE_EXPIRY_MINUTES} minutos.
-        
+
         Si no solicitaste este código, ignora este email.
-        
+
         ---
         Dommuss Agenda
       `,
     };
 
-    await transporter.sendMail(mailOptions);
+    // Send email via Resend
+    if (USE_RESEND) {
+      await sendViaResend(email, mailOptions.subject, mailOptions.html, mailOptions.text);
+    } else {
+      console.log('[EmailService] Development mode - showing code in console:', code);
+    }
 
     console.log(`[EmailService] Verification code sent to ${email}`);
 
