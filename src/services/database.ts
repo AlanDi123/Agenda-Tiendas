@@ -62,7 +62,7 @@ interface AgendaDB extends DBSchema {
 }
 
 const DB_NAME = 'agenda-tiendas-db';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let dbInstance: IDBPDatabase<AgendaDB> | null = null;
 

@@ -25,45 +25,33 @@ const PLANS: PlanOption[] = [
   {
     id: 'PREMIUM_MONTHLY',
     name: 'Mensual',
-    priceUsd: 9.99,
-    priceArs: 10000,
+    priceUsd: 0,
+    priceArs: 35000,
     interval: 'monthly',
-    description: 'Ideal para probar',
+    description: 'Ideal para empezar',
     features: [
+      'Perfiles ilimitados',
+      'Eventos ilimitados',
       'Eventos recurrentes',
       'Alarmas personalizadas',
-      'Hasta 5 perfiles',
       'Soporte por email',
     ],
   },
   {
     id: 'PREMIUM_YEARLY',
     name: 'Anual',
-    priceUsd: 99.99,
-    priceArs: 100000,
+    priceUsd: 0,
+    priceArs: 336000,
     interval: 'yearly',
-    description: 'Ahorra 2 meses',
+    description: '1er mes gratis · 20% de descuento',
     features: [
       'Todo lo del plan mensual',
-      'Perfiles ilimitados',
+      'Equivale a $28.000/mes',
+      'Primer mes gratis incluido',
       'Soporte prioritario',
       'Actualizaciones anticipadas',
     ],
     popular: true,
-  },
-  {
-    id: 'PREMIUM_LIFETIME',
-    name: 'De por vida',
-    priceUsd: 199.99,
-    priceArs: 200000,
-    interval: 'lifetime',
-    description: 'Pago único',
-    features: [
-      'Acceso de por vida',
-      'Todas las features futuras',
-      'Soporte VIP',
-      'Early access a nuevas features',
-    ],
   },
 ];
 
@@ -155,14 +143,18 @@ export function SubscriptionModal({ isOpen, onClose, onSuccess }: SubscriptionMo
               <div className="plan-header">
                 <h3 className="plan-name">{plan.name}</h3>
                 <div className="plan-price">
-                  <span className="plan-amount">${plan.priceUsd}</span>
+                  <span className="plan-amount">
+                    ${plan.priceArs.toLocaleString('es-AR')}
+                  </span>
                   <span className="plan-currency">
-                    {plan.interval === 'lifetime' ? 'único' : plan.interval === 'yearly' ? '/año' : '/mes'}
+                    {' '}ARS{plan.interval === 'yearly' ? '/año' : '/mes'}
                   </span>
                 </div>
-                <p className="plan-price-ars">
-                  o ${plan.priceArs.toLocaleString('es-AR')} ARS
-                </p>
+                {plan.interval === 'yearly' && (
+                  <p className="plan-price-ars" style={{ color: 'var(--color-success, #43a047)', fontWeight: 500 }}>
+                    Equivale a $28.000/mes
+                  </p>
+                )}
               </div>
               
               <p className="plan-description">{plan.description}</p>
@@ -250,7 +242,7 @@ export function SubscriptionModal({ isOpen, onClose, onSuccess }: SubscriptionMo
             loading={isProcessing}
             disabled={!selectedPlan}
           >
-            {isProcessing ? 'Procesando...' : appliedDiscount === 'MAJESTADALAN' ? 'Activar Premium' : `Pagar $${selectedPlanData?.priceUsd}`}
+            {isProcessing ? 'Procesando...' : appliedDiscount === 'MAJESTADALAN' ? 'Activar Premium' : `Pagar $${selectedPlanData?.priceArs.toLocaleString('es-AR')} ARS`}
           </Button>
           
           {!isProcessing && (

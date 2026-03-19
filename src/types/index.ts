@@ -35,6 +35,9 @@ export interface Environment {
   pin?: string;
   profiles: Profile[];
   activeProfileId?: string;
+  familyCode: string;
+  planType: 'FREE' | 'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY';
+  planExpiresAt?: Date;
   createdAt: Date;
 }
 

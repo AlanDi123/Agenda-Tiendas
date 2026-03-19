@@ -23,7 +23,7 @@ import {
   upgradeToPremium as upgradeService,
 } from '../services/authService';
 import { hasPremiumAccess as _hasPremiumAccess, getUserPlan, getUserSubscription as _getUserSubscription, initializeDiscountCodes } from '../services/subscriptionService';
-import { generateId, getInitials, generateAvatarColor } from '../utils/helpers';
+import { generateId, getInitials, generateAvatarColor, generateFamilyCode } from '../utils/helpers';
 
 interface AuthContextType {
   // User auth
@@ -236,6 +236,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       pin,
       profiles,
       activeProfileId,
+      familyCode: generateFamilyCode(),
+      planType: 'FREE',
       createdAt: new Date(),
     };
     await saveEnvironment(env);
@@ -287,6 +289,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!currentEnv) {
       throw new Error('No environment loaded');
+    }
+
+    // Límite de perfiles en plan FREE
+    const isFreePlan = !currentEnv.planType || currentEnv.planType === 'FREE';
+    if (isFreePlan && currentEnv.profiles.length >= 3) {
+      throw new Error('El plan gratuito permite hasta 3 perfiles. Actualizá tu plan para agregar más.');
     }
 
     // Verificar que el email no esté ya en esta familia
