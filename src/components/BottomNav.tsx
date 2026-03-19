@@ -1,21 +1,6 @@
 import type { CalendarView } from '../types';
 import './BottomNav.css';
 
-interface BottomNavProps {
-  currentView: CalendarView;
-  onViewChange: (view: CalendarView) => void;
-}
-
-// Iconos Dommuss style - SVG
-function HomeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  );
-}
-
 function CalendarIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -40,12 +25,25 @@ function ListIcon() {
   );
 }
 
-function CartIcon() {
+function ContactsIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="9" cy="21" r="1" />
-      <circle cx="20" cy="21" r="1" />
-      <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 00-3-3.87" />
+      <path d="M16 3.13a4 4 0 010 7.75" />
+    </svg>
+  );
+}
+
+function NotesIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
     </svg>
   );
 }
@@ -60,71 +58,34 @@ function MenuIcon() {
   );
 }
 
+interface BottomNavProps {
+  currentView: CalendarView;
+  onViewChange: (view: CalendarView) => void;
+}
+
 export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
+  const items = [
+    { view: 'month' as CalendarView, icon: <CalendarIcon />, label: 'Agenda' },
+    { view: 'lists' as CalendarView, icon: <ListIcon />, label: 'Lista' },
+    { view: 'contacts' as CalendarView, icon: <ContactsIcon />, label: 'Contactos' },
+    { view: 'notes' as CalendarView, icon: <NotesIcon />, label: 'Notas' },
+    { view: 'menu' as CalendarView, icon: <MenuIcon />, label: 'Menú' },
+  ];
+
   return (
     <nav className="bottom-nav" role="navigation" aria-label="Navegación principal">
-      {/* Casa - Deshabilitado */}
-      <button
-        className="bottom-nav-item disabled"
-        aria-label="Inicio (deshabilitado)"
-        disabled
-      >
-        <span className="bottom-nav-icon">
-          <HomeIcon />
-        </span>
-        <span>Casa</span>
-      </button>
-
-      {/* Calendario - Activo */}
-      <button
-        className={`bottom-nav-item ${currentView === 'month' ? 'active' : ''}`}
-        onClick={() => onViewChange('month')}
-        aria-label="Vista mensual"
-        aria-current={currentView === 'month' ? 'page' : undefined}
-      >
-        <span className="bottom-nav-icon">
-          <CalendarIcon />
-        </span>
-        <span>Agenda</span>
-      </button>
-
-      {/* Lista - Habilitado */}
-      <button
-        className={`bottom-nav-item ${currentView === 'lists' ? 'active' : ''}`}
-        onClick={() => onViewChange('lists')}
-        aria-label="Lista de compras"
-        aria-current={currentView === 'lists' ? 'page' : undefined}
-      >
-        <span className="bottom-nav-icon">
-          <ListIcon />
-        </span>
-        <span>Lista</span>
-      </button>
-
-      {/* Carrito - Deshabilitado */}
-      <button
-        className="bottom-nav-item disabled"
-        aria-label="Tienda (deshabilitado)"
-        disabled
-      >
-        <span className="bottom-nav-icon">
-          <CartIcon />
-        </span>
-        <span>Tienda</span>
-      </button>
-
-      {/* Menú - Habilitado */}
-      <button
-        className={`bottom-nav-item ${currentView === 'menu' ? 'active' : ''}`}
-        onClick={() => onViewChange('menu')}
-        aria-label="Menú semanal"
-        aria-current={currentView === 'menu' ? 'page' : undefined}
-      >
-        <span className="bottom-nav-icon">
-          <MenuIcon />
-        </span>
-        <span>Menú</span>
-      </button>
+      {items.map(({ view, icon, label }) => (
+        <button
+          key={view}
+          className={`bottom-nav-item ${currentView === view ? 'active' : ''}`}
+          onClick={() => onViewChange(view)}
+          aria-label={label}
+          aria-current={currentView === view ? 'page' : undefined}
+        >
+          <span className="bottom-nav-icon">{icon}</span>
+          <span>{label}</span>
+        </button>
+      ))}
     </nav>
   );
 }

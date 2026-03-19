@@ -21,6 +21,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReloadPrompt } from './components/ReloadPrompt';
 import { ListsView } from './components/ListsView';
 import { MenuView } from './components/MenuView';
+import { ContactsView } from './components/ContactsView';
+import { NotesView } from './components/NotesView';
 import { Login } from './components/Auth/Login';
 import { Register } from './components/Auth/Register';
 import { VerifyEmail } from './components/Auth/VerifyEmail';
@@ -531,6 +533,10 @@ function AppContent() {
         return <ListsView />;
       case 'menu':
         return <MenuView />;
+      case 'contacts':
+        return <ContactsView />;
+      case 'notes':
+        return <NotesView />;
       default:
         return (
           <MonthView

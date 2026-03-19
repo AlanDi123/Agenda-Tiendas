@@ -299,6 +299,51 @@ export async function invalidateUserTokens(userId: string): Promise<void> {
   }
 }
 
+/**
+ * Notificar a miembros de la familia sobre un cambio en un evento
+ */
+export async function sendFamilyEventNotification(
+  emails: string[],
+  actorName: string,
+  action: 'create' | 'update' | 'delete',
+  eventTitle: string,
+  eventDate?: Date
+): Promise<void> {
+  if (!emails.length) return;
+
+  const actionLabels = {
+    create: '📅 creó un nuevo evento',
+    update: '✏️ modificó el evento',
+    delete: '🗑️ eliminó el evento',
+  };
+
+  const subject = `${actorName} ${actionLabels[action]}: "${eventTitle}"`;
+  const dateStr = eventDate
+    ? `<p style="color:#666;font-size:14px;">📆 ${eventDate.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>`
+    : '';
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;">
+      <div style="background:#1565C0;color:white;padding:20px;border-radius:10px 10px 0 0;">
+        <h3 style="margin:0;">Actualización en tu agenda familiar</h3>
+      </div>
+      <div style="background:#f9f9f9;padding:20px;border-radius:0 0 10px 10px;">
+        <p><strong>${actorName}</strong> ${actionLabels[action]}:</p>
+        <div style="background:white;border-left:4px solid #1565C0;padding:14px;border-radius:0 8px 8px 0;margin:12px 0;">
+          <strong style="font-size:16px;">${eventTitle}</strong>
+          ${dateStr}
+        </div>
+        <p style="margin-top:20px;text-align:center;color:#888;font-size:12px;">© ${new Date().getFullYear()} Dommuss Agenda</p>
+      </div>
+    </div>
+  `;
+
+  // Enviar a todos sin bloquear
+  await Promise.allSettled(
+    emails.map(to => transporter.sendMail({ from: SMTP_FROM, to, subject, html }))
+  );
+}
+
 export default {
   sendVerificationCode,
   verifyCode,

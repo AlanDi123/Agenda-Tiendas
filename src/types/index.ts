@@ -85,7 +85,31 @@ export interface ExpandedEvent {
   comments?: EventComment[];
 }
 
-export type CalendarView = 'month' | 'week' | 'day' | 'lists' | 'menu';
+export type CalendarView = 'month' | 'week' | 'day' | 'lists' | 'menu' | 'contacts' | 'notes';
+
+export interface SharedContact {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+  avatarColor: string;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SharedNote {
+  id: string;
+  title: string;
+  content: string;
+  color: string;
+  pinned: boolean;
+  createdBy: string;
+  createdByName: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export type RecurrencePattern = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 

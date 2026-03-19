@@ -63,14 +63,31 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // Notificación a la familia (simulada)
+  // Notificación a la familia (simulada + backend push)
   const notifyFamily = useCallback((event: Event, action: 'create' | 'update' | 'delete') => {
-    const messages = {
+    const labels = {
       create: `📅 Nuevo evento: "${event.title}"`,
       update: `✏️ Evento actualizado: "${event.title}"`,
       delete: `🗑️ Evento eliminado: "${event.title}"`,
     };
-    addToast(messages[action], action === 'delete' ? 'warning' : 'info');
+    // Toast local para el usuario actual
+    addToast(labels[action], action === 'delete' ? 'warning' : 'info');
+
+    // Notificar al backend para push a otros miembros de la familia
+    const API_URL = import.meta.env.VITE_API_URL || '';
+    const token = localStorage.getItem('authToken');
+    if (API_URL && token) {
+      fetch(`${API_URL}/api/v1/notifications/family`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action,
+          eventTitle: event.title,
+          eventId: event.id,
+          startDate: event.startDate,
+        }),
+      }).catch(() => {}); // Ignorar errores — no bloquear la UX
+    }
   }, [addToast]);
 
   const loadEvents = useCallback(async () => {

@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Environment, Event } from '../types';
+import type { Environment, Event, SharedContact, SharedNote } from '../types';
 import type { User, EmailVerificationToken, PasswordResetToken, AuthSession } from '../types/auth';
 import type { Payment, PaymentSession, Subscription, DiscountCode, UserDiscountUsage } from '../types/payment';
 
@@ -59,10 +59,20 @@ interface AgendaDB extends DBSchema {
     value: UserDiscountUsage;
     indexes: { 'by-user': string; 'by-code': string };
   };
+  contacts: {
+    key: string;
+    value: SharedContact & { environmentId: string };
+    indexes: { 'by-env': string };
+  };
+  notes: {
+    key: string;
+    value: SharedNote & { environmentId: string };
+    indexes: { 'by-env': string };
+  };
 }
 
 const DB_NAME = 'agenda-tiendas-db';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let dbInstance: IDBPDatabase<AgendaDB> | null = null;
 
@@ -133,6 +143,16 @@ export async function getDB(): Promise<IDBPDatabase<AgendaDB>> {
         const usageStore = db.createObjectStore('userDiscountUsage', { keyPath: 'id' });
         usageStore.createIndex('by-user', 'userId');
         usageStore.createIndex('by-code', 'discountCode');
+      }
+
+      // Contacts and Notes stores (v6)
+      if (!db.objectStoreNames.contains('contacts')) {
+        const contactStore = db.createObjectStore('contacts', { keyPath: 'id' });
+        contactStore.createIndex('by-env', 'environmentId');
+      }
+      if (!db.objectStoreNames.contains('notes')) {
+        const noteStore = db.createObjectStore('notes', { keyPath: 'id' });
+        noteStore.createIndex('by-env', 'environmentId');
       }
     },
   });
@@ -233,4 +253,44 @@ export async function clearUserSession(email: string): Promise<void> {
 
 export async function getAllUserSessions(): Promise<Record<string, string>> {
   return await getSetting<Record<string, string>>('userSessions') || {};
+}
+
+// ============================================
+// CONTACTS OPERATIONS
+// ============================================
+
+export async function saveContact(contact: SharedContact & { environmentId: string }): Promise<void> {
+  const db = await getDB();
+  await db.put('contacts', contact);
+}
+
+export async function getAllContacts(environmentId: string): Promise<(SharedContact & { environmentId: string })[]> {
+  const db = await getDB();
+  const all = await db.getAll('contacts');
+  return all.filter(c => c.environmentId === environmentId) as any;
+}
+
+export async function deleteContact(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('contacts', id);
+}
+
+// ============================================
+// NOTES OPERATIONS
+// ============================================
+
+export async function saveNote(note: SharedNote & { environmentId: string }): Promise<void> {
+  const db = await getDB();
+  await db.put('notes', note);
+}
+
+export async function getAllNotes(environmentId: string): Promise<(SharedNote & { environmentId: string })[]> {
+  const db = await getDB();
+  const all = await db.getAll('notes');
+  return all.filter(n => n.environmentId === environmentId) as any;
+}
+
+export async function deleteNote(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('notes', id);
 }
