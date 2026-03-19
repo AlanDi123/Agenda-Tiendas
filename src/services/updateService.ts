@@ -139,10 +139,10 @@ export async function isUpdateDismissed(version: string): Promise<boolean> {
  * On native: checks for updates and calls callback if available
  */
 export async function initializeUpdateChecker(
-  onUpdateAvailable?: (update: UpdateCheckResult) => void
+  onUpdateAvailable: (update: UpdateCheckResult) => void
 ): Promise<void> {
   const service = await getService();
-  return service.initializeUpdateChecker(onUpdateAvailable);
+  await service.initializeUpdateChecker(onUpdateAvailable);
 }
 
 /**

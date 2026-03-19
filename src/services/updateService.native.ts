@@ -22,6 +22,10 @@ export function compareVersions(v1: string, v2: string): number {
   return 0;
 }
 
+export function isNewerVersion(v1: string, v2: string): boolean {
+  return compareVersions(v1, v2) > 0;
+}
+
 export async function getCurrentVersion(): Promise<string> {
   try {
     const info = await App.getInfo();
@@ -79,6 +83,8 @@ export async function checkForUpdates(force = false): Promise<UpdateCheckRespons
         : `Versión ${latestVersion} disponible`,
       mandatory: release.body?.includes('[MANDATORY]') ?? false,
       publishedAt: release.published_at ?? new Date().toISOString(),
+      versionCode: 0,
+      minVersionSupported: true,
     };
 
     return { hasUpdate: true, platform: 'android', updateInfo };
@@ -117,6 +123,40 @@ export async function isUpdateDismissed(version: string): Promise<boolean> {
     const { value } = await Preferences.get({ key: `${DISMISSED_PREFIX}${version}` });
     return !!value;
   } catch { return false; }
+}
+
+export async function clearUpdatePreferences(): Promise<void> {
+  try {
+    await Preferences.clear();
+  } catch {}
+}
+
+export async function shouldCheckForUpdates(): Promise<boolean> {
+  try {
+    const { value } = await Preferences.get({ key: LAST_CHECK_KEY });
+    if (!value) return true;
+    return (Date.now() - new Date(value).getTime()) > CHECK_INTERVAL_MS;
+  } catch { return true; }
+}
+
+export async function getVersionManifest(): Promise<import('../types/update').VersionManifest | null> {
+  try {
+    const res = await fetch(GITHUB_RELEASES_API, {
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      latestVersion: data.tag_name?.replace(/^v/, '') ?? '0.0.0',
+      versionCode: 0,
+      mandatory: false,
+      minVersion: '0.0.0',
+      apkUrl: data.assets?.[0]?.browser_download_url ?? '',
+      changelog: data.body ?? '',
+      publishedAt: data.published_at ?? new Date().toISOString(),
+    };
+  } catch { return null; }
 }
 
 // ─── Inicialización ──────────────────────────────────────────────────────────

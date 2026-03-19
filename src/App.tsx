@@ -12,7 +12,6 @@ import { EventDetail } from './components/EventDetail';
 import { ProfileSelector, AddProfileModal } from './components/ProfileSelector';
 import { Onboarding } from './components/Onboarding';
 import { ConfirmDialog } from './components/Modal';
-import { Button } from './components/Button';
 import { UserAuthModal } from './components/UserAuth';
 import { UserSettingsModal } from './components/UserSettings';
 import { SplashScreen } from './components/SplashScreen';
