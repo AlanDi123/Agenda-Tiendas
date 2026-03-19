@@ -161,3 +161,16 @@ export const ALARM_OPTIONS = [
   { value: 120, label: '2 horas antes' },
   { value: 1440, label: '1 día antes' },
 ];
+
+/**
+ * Genera un código alfanumérico de 8 caracteres para identificar una familia.
+ * Excluye O, 0, I, 1 para evitar confusiones visuales.
+ */
+export function generateFamilyCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
