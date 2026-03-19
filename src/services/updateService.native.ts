@@ -2,10 +2,12 @@ import { App } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
 import type { VersionManifest, UpdateCheckResult, UpdateCheckResponse } from '../types/update';
 
+// API URL configuration - fallback para nativo
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://agenda-tiendas.vercel.app';
+
 const DISMISSED_KEY_PREFIX = 'update_dismissed_';
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hora
 const LAST_CHECK_KEY = 'last_update_check';
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export function compareVersions(v1: string, v2: string): number {
   const p1 = v1.split('.').map(Number);

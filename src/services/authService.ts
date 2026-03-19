@@ -4,9 +4,11 @@
 
 import type { User } from '../types/auth';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+// API URL configuration - fallback para nativo/PWA
+const API_URL = import.meta.env.VITE_API_URL || 'https://agenda-tiendas.vercel.app';
+
 if (!API_URL) {
-  console.error('[AuthService] VITE_API_URL no está configurada. Las llamadas al backend fallarán.');
+  console.error('[AuthService] VITE_API_URL no está configurada. Usando URL por defecto.');
 }
 
 // ============================================

@@ -5,7 +5,8 @@
 
 import type { PaymentSession, PaymentMethodType } from '../types/payment';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// API URL configuration - fallback para nativo/PWA
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://agenda-tiendas.vercel.app';
 
 /**
  * Get authentication token from storage
