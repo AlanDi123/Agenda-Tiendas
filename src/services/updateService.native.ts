@@ -1,28 +1,25 @@
 import { App } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
-import type { VersionManifest, UpdateCheckResult, UpdateCheckResponse } from '../types/update';
+import type { UpdateCheckResult, UpdateCheckResponse } from '../types/update';
 
-// API URL configuration - fallback para nativo
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://agenda-tiendas.vercel.app';
+// ─── Configuración ──────────────────────────────────────────────────────────
+const GITHUB_REPO = 'AlanDi123/Agenda-Tiendas';
+const GITHUB_RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+const LAST_CHECK_KEY = 'update_last_check';
+const DISMISSED_PREFIX = 'update_dismissed_';
+const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
-const DISMISSED_KEY_PREFIX = 'update_dismissed_';
-const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hora
-const LAST_CHECK_KEY = 'last_update_check';
-
+// ─── Helpers de versión ──────────────────────────────────────────────────────
 export function compareVersions(v1: string, v2: string): number {
-  const p1 = v1.split('.').map(Number);
-  const p2 = v2.split('.').map(Number);
+  const p1 = v1.replace(/^v/, '').split('.').map(Number);
+  const p2 = v2.replace(/^v/, '').split('.').map(Number);
   const len = Math.max(p1.length, p2.length);
   for (let i = 0; i < len; i++) {
-    const a = p1[i] || 0, b = p2[i] || 0;
+    const a = p1[i] ?? 0, b = p2[i] ?? 0;
     if (a > b) return 1;
     if (a < b) return -1;
   }
   return 0;
-}
-
-export function isNewerVersion(v1: string, v2: string): boolean {
-  return compareVersions(v1, v2) > 0;
 }
 
 export async function getCurrentVersion(): Promise<string> {
@@ -34,96 +31,101 @@ export async function getCurrentVersion(): Promise<string> {
   }
 }
 
-export async function shouldCheckForUpdates(): Promise<boolean> {
-  try {
-    const { value } = await Preferences.get({ key: LAST_CHECK_KEY });
-    if (!value) return true;
-    return (Date.now() - new Date(value).getTime()) > CHECK_INTERVAL_MS;
-  } catch { return true; }
-}
-
-export async function getVersionManifest(): Promise<VersionManifest | null> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/app/version`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.success ? data.data : null;
-  } catch { return null; }
-}
-
+// ─── Chequeo de actualización vía GitHub Releases ───────────────────────────
 export async function checkForUpdates(force = false): Promise<UpdateCheckResponse> {
   try {
     if (!force) {
-      const should = await shouldCheckForUpdates();
-      if (!should) return { hasUpdate: false, platform: 'android' };
+      const { value: lastCheck } = await Preferences.get({ key: LAST_CHECK_KEY });
+      if (lastCheck && Date.now() - new Date(lastCheck).getTime() < CHECK_INTERVAL_MS) {
+        return { hasUpdate: false, platform: 'android' };
+      }
     }
 
     const currentVersion = await getCurrentVersion();
-    const res = await fetch(`${API_BASE_URL}/api/v1/app/version/check?version=${currentVersion}`);
-    if (!res.ok) return { hasUpdate: false, platform: 'android' };
 
-    const data = await res.json();
+    const response = await fetch(GITHUB_RELEASES_API, {
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!response.ok) {
+      console.warn('[UpdateService] GitHub API error:', response.status);
+      return { hasUpdate: false, platform: 'android' };
+    }
+
+    const release = await response.json();
     await Preferences.set({ key: LAST_CHECK_KEY, value: new Date().toISOString() });
 
-    if (data.success && data.data.updateAvailable) {
-      return { hasUpdate: true, platform: 'android', updateInfo: data.data as UpdateCheckResult };
+    const latestVersion: string = release.tag_name?.replace(/^v/, '') ?? '0.0.0';
+
+    if (compareVersions(latestVersion, currentVersion) <= 0) {
+      return { hasUpdate: false, platform: 'android' };
     }
-    return { hasUpdate: false, platform: 'android' };
-  } catch {
+
+    const apkAsset = release.assets?.find(
+      (a: any) => a.name.endsWith('.apk') || a.name.endsWith('-signed.apk')
+    );
+
+    const apkUrl: string = apkAsset?.browser_download_url ??
+      `https://github.com/${GITHUB_REPO}/releases/download/v${latestVersion}/app-release-signed.apk`;
+
+    const updateInfo: UpdateCheckResult = {
+      latestVersion,
+      currentVersion,
+      updateAvailable: true,
+      apkUrl,
+      changelog: release.body
+        ? release.body.replace(/#+\s/g, '').replace(/\*\*/g, '').slice(0, 300)
+        : `Versión ${latestVersion} disponible`,
+      mandatory: release.body?.includes('[MANDATORY]') ?? false,
+      publishedAt: release.published_at ?? new Date().toISOString(),
+    };
+
+    return { hasUpdate: true, platform: 'android', updateInfo };
+  } catch (err) {
+    console.warn('[UpdateService] checkForUpdates failed:', err);
     return { hasUpdate: false, platform: 'android' };
   }
 }
 
-export async function dismissUpdate(version: string): Promise<void> {
+// ─── Instalar actualización ──────────────────────────────────────────────────
+export async function downloadAndInstall(
+  apkUrl: string,
+  onProgress?: (pct: number) => void
+): Promise<void> {
+  onProgress?.(10);
   try {
-    await Preferences.set({ key: `${DISMISSED_KEY_PREFIX}${version}`, value: new Date().toISOString() });
-  } catch {}
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.open({ url: apkUrl });
+    onProgress?.(100);
+  } catch {
+    window.open(apkUrl, '_system');
+    onProgress?.(100);
+  }
+}
+
+// ─── Dismiss ─────────────────────────────────────────────────────────────────
+export async function dismissUpdate(version: string): Promise<void> {
+  await Preferences.set({
+    key: `${DISMISSED_PREFIX}${version}`,
+    value: new Date().toISOString(),
+  }).catch(() => {});
 }
 
 export async function isUpdateDismissed(version: string): Promise<boolean> {
   try {
-    const { value } = await Preferences.get({ key: `${DISMISSED_KEY_PREFIX}${version}` });
+    const { value } = await Preferences.get({ key: `${DISMISSED_PREFIX}${version}` });
     return !!value;
   } catch { return false; }
 }
 
-export async function clearUpdatePreferences(): Promise<void> {
-  try { await Preferences.clear(); } catch {}
-}
-
-/**
- * Descarga el bundle JS/CSS/HTML desde GitHub Releases y lo aplica en caliente.
- * onProgress: callback con porcentaje 0-100
- */
-export async function downloadAndInstall(
-  bundleUrl: string,
-  onProgress?: (percent: number) => void
-): Promise<void> {
-  onProgress?.(0);
-
-  const { CapacitorUpdater } = await import('@capgo/capacitor-updater');
-
-  const bundle = await CapacitorUpdater.download({
-    url: bundleUrl,
-    version: String(Date.now()),
-  });
-  onProgress?.(80);
-
-  await CapacitorUpdater.set(bundle);
-  onProgress?.(100);
-
-  // Delay para que set() se persista antes de recargar
-  await new Promise(r => setTimeout(r, 600));
-  const { App: CapApp } = await import('@capacitor/app');
-  await CapApp.exitApp(); // cierra limpio; el usuario reabre con el nuevo bundle
-}
-
+// ─── Inicialización ──────────────────────────────────────────────────────────
 export async function initializeUpdateChecker(
-  onUpdateAvailable?: (update: UpdateCheckResult) => void
+  onUpdateAvailable: (update: UpdateCheckResult) => void
 ): Promise<void> {
   try {
     const result = await checkForUpdates(false);
-    if (result.hasUpdate && result.updateInfo && onUpdateAvailable) {
+    if (result.hasUpdate && result.updateInfo) {
       const dismissed = await isUpdateDismissed(result.updateInfo.latestVersion);
       if (!dismissed) onUpdateAvailable(result.updateInfo);
     }

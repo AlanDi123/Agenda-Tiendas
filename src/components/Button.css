@@ -124,22 +124,26 @@
 
 /* FAB (Floating Action Button) - Dommuss style */
 .btn-fab {
-  position: fixed;
-  bottom: calc(var(--bottom-nav-height) + var(--spacing-lg));
-  right: var(--spacing-lg);
-  width: var(--fab-size);
-  height: var(--fab-size);
+  position: fixed !important;
+  bottom: calc(var(--bottom-nav-height) + var(--spacing-lg)) !important;
+  right: var(--spacing-lg) !important;
+  left: unset !important;
+  top: unset !important;
+  width: var(--fab-size) !important;
+  height: var(--fab-size) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   border-radius: var(--radius-full);
   background-color: var(--color-accent);
   color: white;
   box-shadow: var(--shadow-fab);
-  z-index: 1000; /* Aumentado para estar sobre BottomNav */
+  z-index: 1000;
   font-size: 1.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   transition: all var(--transition-fast);
-  pointer-events: auto; /* Asegurar que sea clicable */
+  pointer-events: auto;
+  border: none;
+  cursor: pointer;
 }
 
 .fab-emoji {

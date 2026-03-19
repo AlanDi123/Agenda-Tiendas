@@ -63,6 +63,7 @@ function AppContent() {
     logout,
     darkMode,
     toggleDarkMode,
+    refreshSubscription,
   } = useAuth();
 
   const {
@@ -102,6 +103,8 @@ function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
   const [filterProfileId, setFilterProfileId] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [waitingForPayment, setWaitingForPayment] = useState(false);
+  const [pendingPlanType, setPendingPlanType] = useState<string | null>(null);
 
   // User auth modal state
   const [showUserAuth, setShowUserAuth] = useState(false);
@@ -130,6 +133,16 @@ function AppContent() {
       setAuthState('login');
     }
   }, [isAuthenticated, isAuthLoading]);
+
+  // Al volver del checkout de MP, refrescar suscripción
+  useEffect(() => {
+    const url = window.location.href;
+    if (url.includes('/payment/success') || url.includes('payment_id=')) {
+      refreshSubscription().then(() => {
+        window.history.replaceState({}, '', '/');
+      });
+    }
+  }, [refreshSubscription]);
 
   // Hide splash screen — esperar a que auth termine, con fallback mínimo de 800ms
   useEffect(() => {
@@ -444,16 +457,19 @@ function AppContent() {
         await createEnvironment(environmentName, pin, profileList);
       }
       
-      // Si eligió un plan pago, redirigir a Mercado Pago
+      // Si eligió plan pago → redirigir a MP y bloquear entrada
       if (planType === 'PREMIUM_MONTHLY' || planType === 'PREMIUM_YEARLY') {
+        setPendingPlanType(planType);
+        setWaitingForPayment(true);
         try {
           const { redirectToCheckout } = await import('./services/paymentGatewayService');
           await redirectToCheckout(planType);
-          // La redirección ocurre en redirectToCheckout — si llegamos acá, hubo error silencioso
-        } catch (paymentError) {
-          console.error('[Onboarding] Error al redirigir a pago:', paymentError);
-          // Mostrar error al usuario — el environment ya fue creado como FREE
-          // No bloquear el flujo, el usuario puede pagar desde Configuración
+          // Si llegamos aquí, el window.location.href ya fue seteado — la app se redirige
+        } catch (payErr) {
+          console.error('[Onboarding] Error al redirigir a pago:', payErr);
+          setWaitingForPayment(false);
+          setPendingPlanType(null);
+          alert('Error al conectar con Mercado Pago. Podés intentarlo desde Configuración > Suscripción.');
         }
       }
     } catch (error) {
@@ -642,6 +658,57 @@ function AppContent() {
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
 
+  // Pantalla de espera mientras MP procesa el pago
+  if (waitingForPayment) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', background: 'var(--color-background)',
+        gap: 24, padding: 32, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 64 }}>🔄</div>
+        <h2 style={{ margin: 0, color: 'var(--color-text-primary)' }}>
+          Completá el pago
+        </h2>
+        <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: 15 }}>
+          Serás redirigido a Mercado Pago para confirmar tu suscripción <strong>{pendingPlanType === 'PREMIUM_YEARLY' ? 'Anual' : 'Mensual'}</strong>.
+          <br/><br/>
+          Una vez confirmado el pago, tu cuenta quedará activa automáticamente.
+        </p>
+        <button
+          type="button"
+          onClick={async () => {
+            const { getSubscriptionStatus } = await import('./services/paymentGatewayService');
+            const status = await getSubscriptionStatus();
+            if (status.isActive) {
+              setWaitingForPayment(false);
+              setPendingPlanType(null);
+            } else {
+              alert('El pago aún no fue confirmado. Si ya pagaste, esperá unos minutos y volvé a intentar.');
+            }
+          }}
+          style={{
+            background: 'var(--color-primary)', color: 'white', border: 'none',
+            borderRadius: 12, padding: '14px 28px', fontSize: 15, fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Ya pagué — Verificar
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setWaitingForPayment(false);
+            setPendingPlanType(null);
+          }}
+          style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 14 }}
+        >
+          Continuar gratis por ahora
+        </button>
+      </div>
+    );
+  }
+
   if (!activeProfile) {
     if (environment.profiles.length > 0) {
       setActiveProfile(environment.profiles[0].id);
@@ -719,7 +786,7 @@ function AppContent() {
       </main>
 
       {(currentView === 'month' || currentView === 'day') && !isReadOnly && (
-        <Button
+        <button
           className="btn-fab"
           onClick={() => {
             setSelectedEvent(null);
@@ -727,9 +794,10 @@ function AppContent() {
           }}
           aria-label="Crear evento"
           title="Crear turno/evento"
+          type="button"
         >
           <span className="fab-emoji">➕</span>
-        </Button>
+        </button>
       )}
 
       <BottomNav
