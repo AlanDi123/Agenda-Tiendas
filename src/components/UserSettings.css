@@ -136,3 +136,66 @@
 .user-settings-logout:hover {
   background-color: rgba(229, 57, 53, 0.1);
 }
+
+/* Subscription Tab */
+.subscription-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: var(--color-surface-variant);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.subscription-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  color: white;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 1.125rem;
+  align-self: center;
+}
+
+.badge-icon {
+  font-size: 1.25rem;
+}
+
+.badge-text {
+  font-size: 1rem;
+}
+
+.subscription-description {
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .user-settings-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .user-settings-tabs {
+    overflow-x: auto;
+  }
+  
+  .user-settings-tab {
+    white-space: nowrap;
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .user-settings * {
+    transition: none !important;
+  }
+}

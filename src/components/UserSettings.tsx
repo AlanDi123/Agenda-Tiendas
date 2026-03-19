@@ -5,6 +5,8 @@ import { Input } from './Input';
 import { Button } from './Button';
 import { Avatar } from './Avatar';
 import { LogViewer } from './LogViewer';
+import { SubscriptionStatus } from './Subscription/SubscriptionStatus';
+import { useAuth } from '../contexts/AuthContext';
 import './UserSettings.css';
 
 interface UserSettingsModalProps {
@@ -22,7 +24,8 @@ export function UserSettingsModal({
   onUpdateProfile,
   onLogout,
 }: UserSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile');
+  const { isPremium, userPlan } = useAuth();
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'subscription'>('profile');
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -30,6 +33,7 @@ export function UserSettingsModal({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showLogViewer, setShowLogViewer] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
 
   const colors = [
     '#1E88E5', '#43A047', '#FB8C00', '#8E24AA',
@@ -125,6 +129,13 @@ export function UserSettingsModal({
           >
             Seguridad
           </button>
+          <button
+            className={`user-settings-tab ${activeTab === 'subscription' ? 'active' : ''}`}
+            onClick={() => setActiveTab('subscription')}
+            type="button"
+          >
+            {isPremium ? '⭐ Premium' : '🚀 Upgrade'}
+          </button>
         </div>
 
         {activeTab === 'profile' && (
@@ -141,6 +152,56 @@ export function UserSettingsModal({
                     type="button"
                   />
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'subscription' && (
+          <div className="user-settings-content">
+            <div className="user-settings-section">
+              <h4 className="user-settings-section-title">Tu Plan</h4>
+              
+              <div className="subscription-summary-card">
+                <div className="subscription-badge">
+                  {isPremium ? (
+                    <>
+                      <span className="badge-icon">⭐</span>
+                      <span className="badge-text">Premium</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="badge-icon">🆓</span>
+                      <span className="badge-text">Gratis</span>
+                    </>
+                  )}
+                </div>
+                
+                <p className="subscription-description">
+                  {isPremium 
+                    ? 'Tenés acceso a todas las funcionalidades premium.'
+                    : 'Desbloqueá eventos recurrentes, alarmas y más.'}
+                </p>
+                
+                {!isPremium && (
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    onClick={() => setShowSubscription(true)}
+                  >
+                    Actualizar a Premium
+                  </Button>
+                )}
+                
+                {isPremium && (
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    onClick={() => setShowSubscription(true)}
+                  >
+                    Ver detalles de suscripción
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -238,6 +299,13 @@ export function UserSettingsModal({
 
       {/* Log Viewer Modal */}
       <LogViewer isOpen={showLogViewer} onClose={() => setShowLogViewer(false)} />
+      
+      {/* Subscription Status Modal */}
+      <SubscriptionStatus
+        isOpen={showSubscription}
+        onClose={() => setShowSubscription(false)}
+        onUpgrade={() => {}}
+      />
     </Modal>
   );
 }
