@@ -1,8 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import { Input } from './Input';
-import { useAuth } from '../contexts/AuthContext';
 import './EmailVerificationModal.css';
 
 interface EmailVerificationModalProps {
