@@ -23,43 +23,28 @@ async function migrate() {
   try {
     // Create enums first
     console.log('Creating enums...');
-    await sql`
-      DO $$ BEGIN
-        CREATE TYPE user_role AS ENUM ('USER', 'OWNER', 'STAFF', 'ADMIN');
-      EXCEPTION
-        WHEN duplicate_object THEN null;
-      END $$;
+    const enums = [
+      "user_role AS ENUM ('USER', 'OWNER', 'STAFF', 'ADMIN')",
+      "plan_type AS ENUM ('FREE', 'PREMIUM_MONTHLY', 'PREMIUM_YEARLY')",
+      "plan_status AS ENUM ('active', 'expired', 'grace_period', 'cancelled')",
+      "subscription_status AS ENUM ('pending', 'active', 'failed', 'refunded', 'cancelled')",
+      "payment_status AS ENUM ('pending', 'approved', 'rejected', 'refunded', 'cancelled', 'in_process')",
+      "discount_type AS ENUM ('percentage', 'fixed')",
+    ];
 
-      DO $$ BEGIN
-        CREATE TYPE plan_type AS ENUM ('FREE', 'PREMIUM_MONTHLY', 'PREMIUM_YEARLY', 'PREMIUM_LIFETIME');
-      EXCEPTION
-        WHEN duplicate_object THEN null;
-      END $$;
-
-      DO $$ BEGIN
-        CREATE TYPE plan_status AS ENUM ('active', 'expired', 'grace_period', 'cancelled');
-      EXCEPTION
-        WHEN duplicate_object THEN null;
-      END $$;
-
-      DO $$ BEGIN
-        CREATE TYPE subscription_status AS ENUM ('pending', 'active', 'failed', 'refunded', 'cancelled');
-      EXCEPTION
-        WHEN duplicate_object THEN null;
-      END $$;
-
-      DO $$ BEGIN
-        CREATE TYPE payment_status AS ENUM ('pending', 'approved', 'rejected', 'refunded', 'cancelled', 'in_process');
-      EXCEPTION
-        WHEN duplicate_object THEN null;
-      END $$;
-
-      DO $$ BEGIN
-        CREATE TYPE discount_type AS ENUM ('percentage', 'fixed');
-      EXCEPTION
-        WHEN duplicate_object THEN null;
-      END $$;
-    `;
+    for (const enumDef of enums) {
+      try {
+        await sql(`
+          DO $$ BEGIN
+            CREATE TYPE ${enumDef};
+          EXCEPTION
+            WHEN duplicate_object THEN null;
+          END $$;
+        `);
+      } catch (e) {
+        // Ignore if already exists
+      }
+    }
 
     // Create users table
     console.log('Creating users table...');
