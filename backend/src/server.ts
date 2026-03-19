@@ -39,15 +39,20 @@ const allowedOrigins = [
   CORS_ORIGIN,
   'http://localhost:5173',
   'http://localhost:3000',
+  'https://agenda-tienda.vercel.app',
 ];
+
+console.log('[Server] CORS allowed origins:', allowedOrigins);
 
 app.use(cors({
   origin: (origin, callback) => {
+    console.log('[CORS] Request origin:', origin);
     // Permitir requests sin origin (mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    // Permitir cualquier subdominio de vercel.app en desarrollo
+    // Permitir cualquier subdominio de vercel.app
     if (origin.endsWith('.vercel.app')) return callback(null, true);
+    console.log('[CORS] Blocked origin:', origin);
     callback(new Error(`CORS: origin ${origin} no permitido`));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -61,7 +66,10 @@ app.use(cors({
 }));
 
 // Handle OPTIONS preflight requests explicitly
-app.options('*', cors());
+app.options('*', (req, res) => {
+  console.log('[CORS] OPTIONS preflight:', req.path);
+  res.sendStatus(204);
+});
 
 // ============================================
 // BODY PARSING — DEBE IR ANTES DE RATE LIMIT Y ROUTES
