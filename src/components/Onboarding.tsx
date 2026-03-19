@@ -22,7 +22,7 @@ interface OnboardingProps {
   existingEnvName?: string;
 }
 
-type Step = 'welcome' | 'choice' | 'join' | 'environment' | 'first-profile' | 'plan' | 'family-code';
+type Step = 'welcome' | 'choice' | 'join' | 'environment' | 'first-profile' | 'plan' | 'family-code' | 'done';
 
 export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
   const [step, setStep] = useState<Step>(existingEnvName ? 'first-profile' : 'welcome');

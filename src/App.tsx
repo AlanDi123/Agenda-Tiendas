@@ -426,12 +426,19 @@ function AppContent() {
   }, [logout]);
 
   // Onboarding handlers
-  const handleOnboardingComplete = useCallback(async (
-    environmentName: string,
-    pin: string | undefined,
-    profileList: Array<{ name: string; permissions: 'admin' | 'readonly' }>
-  ) => {
+  const handleOnboardingComplete = useCallback(async (data: {
+    environmentName: string;
+    pin?: string;
+    profiles: Array<{ name: string; permissions: 'admin' | 'readonly' }>;
+    planType: 'FREE' | 'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY';
+    familyCode?: string;
+  }) => {
     try {
+      const { environmentName, pin, profiles: profileList, planType } = data;
+      
+      // Store plan type in environment (future implementation)
+      console.log('[Onboarding] Selected plan:', planType);
+      
       if (environment && environment.profiles.length === 0 && profileList.length > 0) {
         for (const profileData of profileList) {
           await addProfile(profileData.name, currentUser?.email || '', profileData.permissions);

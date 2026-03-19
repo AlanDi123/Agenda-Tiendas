@@ -126,18 +126,6 @@ export const EVENT_COLORS = [
 ];
 
 /**
- * Genera un código alfanumérico de 8 caracteres para identificar una familia
- */
-export function generateFamilyCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin O,0,I,1 para evitar confusiones
-  let code = '';
-  for (let i = 0; i < 8; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
-
-/**
  * Patrones de recurrencia
  */
 export const RECURRENCE_PATTERNS = [
