@@ -110,14 +110,10 @@ export async function downloadAndInstall(
   await CapacitorUpdater.set(bundle);
   onProgress?.(100);
 
-  // No llamar reload() directamente — causa race condition con notifyAppReady()
-  // en el nuevo bundle. Capgo recomienda no usar reload() cuando autoUpdate: false.
-  // El bundle ya está seteado: en el próximo arranque Capgo lo usará.
-  // Forzar reinicio limpio via App plugin:
-  const { App: CapacitorApp } = await import('@capacitor/app');
-  // Pequeño delay para que set() se persista correctamente
-  await new Promise(r => setTimeout(r, 500));
-  await CapacitorApp.exitApp(); // cierra y el usuario reabre con el nuevo bundle
+  // Delay para que set() se persista antes de recargar
+  await new Promise(r => setTimeout(r, 600));
+  const { App: CapApp } = await import('@capacitor/app');
+  await CapApp.exitApp(); // cierra limpio; el usuario reabre con el nuevo bundle
 }
 
 export async function initializeUpdateChecker(

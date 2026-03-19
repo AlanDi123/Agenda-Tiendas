@@ -4,10 +4,7 @@ const config: CapacitorConfig = {
   appId: 'com.importmania.agenda',
   appName: 'Dommuss Agenda',
   webDir: 'dist',
-  server: {
-    url: 'https://agenda-tienda.vercel.app',
-    cleartext: true
-  },
+  // sin bloque server — Capacitor carga desde el dist bundleado en el APK
   plugins: {
     CapacitorUpdater: {
       autoUpdate: false,
@@ -15,7 +12,6 @@ const config: CapacitorConfig = {
       autoDeleteFailed: true,
       autoDeletePrevious: true,
       appReadyTimeout: 30000,
-      directUpdate: false,
     },
     LocalNotifications: {
       smallIcon: 'ic_notification_small',
