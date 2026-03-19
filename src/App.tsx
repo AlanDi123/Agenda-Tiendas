@@ -154,14 +154,17 @@ function AppContent() {
     }
   }, [isAuthLoading]);
 
-  // Seguridad absoluta: si después de 8 segundos el splash sigue visible, forzar cierre
-  // Previene el freeze en caso de que isAuthLoading nunca resuelva
+  // Failsafe: Si tarda más de 5 segundos en autenticar, asumimos modo OFFLINE
   useEffect(() => {
-    const hardTimeout = setTimeout(() => {
-      setShowSplash(false);
-    }, 8000);
-    return () => clearTimeout(hardTimeout);
-  }, []); // solo al montar, sin dependencias
+    if (isAuthLoading) {
+      const offlineTimeout = setTimeout(() => {
+        console.warn('Timeout de conexión: Iniciando en modo Offline');
+        setIsOnline(false); // Forzamos modo offline visual
+        setShowSplash(false); // Quitamos el splash
+      }, 5000);
+      return () => clearTimeout(offlineTimeout);
+    }
+  }, [isAuthLoading]);
 
   // Online/Offline detection
   useEffect(() => {

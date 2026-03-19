@@ -11,6 +11,9 @@ if (!API_URL) {
   console.error('[AuthService] VITE_API_URL no está configurada. Usando URL por defecto.');
 }
 
+// Lock global para evitar múltiples llamadas simultáneas de refresh
+let refreshPromise: Promise<boolean> | null = null;
+
 // ============================================
 // TOKEN MANAGEMENT
 // ============================================
@@ -226,25 +229,33 @@ async function refreshAccessToken(): Promise<boolean> {
   const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) return false;
 
-  try {
-    const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
+  // Si ya hay una petición de refresh en curso, esperamos a que termine
+  if (refreshPromise) return refreshPromise;
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data.success && data.data.accessToken) {
-        saveAuthToken(data.data.accessToken);
-        return true;
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data.accessToken) {
+          saveAuthToken(data.data.accessToken);
+          return true;
+        }
       }
+    } catch {
+      // Error de red
+    } finally {
+      refreshPromise = null; // Liberamos el cerrojo
     }
-  } catch {
-    // Network error
-  }
+    return false;
+  })();
 
-  return false;
+  return refreshPromise;
 }
 
 // ============================================

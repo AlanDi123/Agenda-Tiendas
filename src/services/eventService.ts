@@ -35,6 +35,7 @@ export function checkEventOverlap(
 
 /**
  * Suggest an alternative time slot that doesn't conflict
+ * Only suggests times within business hours (8 AM - 8 PM)
  */
 export function suggestAlternativeTime(
   events: Array<Pick<Event, 'startDate' | 'endDate'>>,
@@ -42,40 +43,36 @@ export function suggestAlternativeTime(
   durationMinutes: number = 60
 ): Date | null {
   const preferredStartTime = preferredStart.getTime();
-  
-  // Check if preferred time is available
   const preferredEnd = new Date(preferredStartTime + (durationMinutes * 60 * 1000));
+  
   const hasOverlap = events.some(event => 
-    eventsOverlap(
-      { startDate: preferredStart, endDate: preferredEnd },
-      event
-    )
+    eventsOverlap({ startDate: preferredStart, endDate: preferredEnd }, event)
   );
 
-  if (!hasOverlap) {
-    return preferredStart;
-  }
+  if (!hasOverlap) return preferredStart;
 
-  // Try to find next available slot (check every 30 minutes for next 24 hours)
   const msPerMinute = 60 * 1000;
-  const searchEnd = Date.now() + (24 * 60 * 60 * 1000); // 24 hours from now
+  const searchEnd = Date.now() + (24 * 60 * 60 * 1000); 
   
   let candidateStart = preferredStartTime + (30 * msPerMinute);
   
   while (candidateStart < searchEnd) {
-    const candidateEnd = candidateStart + (durationMinutes * msPerMinute);
-    const candidateEvent = { startDate: new Date(candidateStart), endDate: new Date(candidateEnd) };
+    const candidateDate = new Date(candidateStart);
+    const hour = candidateDate.getHours();
     
-    const hasConflict = events.some(event => eventsOverlap(candidateEvent, event));
-    
-    if (!hasConflict) {
-      return new Date(candidateStart);
+    // Solo sugerir turnos en horario comercial (8 AM a 8 PM)
+    if (hour >= 8 && hour < 20) {
+      const candidateEnd = candidateStart + (durationMinutes * msPerMinute);
+      const candidateEvent = { startDate: candidateDate, endDate: new Date(candidateEnd) };
+      
+      const hasConflict = events.some(event => eventsOverlap(candidateEvent, event));
+      if (!hasConflict) return candidateDate;
     }
     
     candidateStart += (30 * msPerMinute);
   }
 
-  return null; // No available slot found
+  return null; 
 }
 
 /**

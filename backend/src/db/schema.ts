@@ -313,6 +313,210 @@ export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
 }));
 
 // ============================================
+// ENVIRONMENTS / NEGOCIOS (Reemplaza "Familias")
+// ============================================
+export const environments = pgTable('environments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  familyCode: text('family_code').unique(), // Para unirse con código
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at'), // Borrado lógico para offline-first
+}, (table) => ({
+  ownerIdIdx: index('environments_owner_id_idx').on(table.ownerId),
+  familyCodeIdx: index('environments_family_code_idx').on(table.familyCode),
+}));
+
+export const profiles = pgTable('profiles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  environmentId: uuid('environment_id').notNull().references(() => environments.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id), // Null si es un perfil sin cuenta
+  name: text('name').notNull(),
+  email: text('email'),
+  avatarColor: text('avatar_color'),
+  permissions: text('permissions').notNull().default('readonly'), // 'admin' | 'readonly'
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+  environmentIdIdx: index('profiles_environment_id_idx').on(table.environmentId),
+  userIdIdx: index('profiles_user_id_idx').on(table.userId),
+}));
+
+// ============================================
+// AGENDA (Turnos y Eventos)
+// ============================================
+export const events = pgTable('events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  environmentId: uuid('environment_id').notNull().references(() => environments.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  startDate: timestamp('start_date').notNull(),
+  endDate: timestamp('end_date').notNull(),
+  isAllDay: boolean('is_all_day').default(false),
+  isRecurring: boolean('is_recurring').default(false),
+  rrule: text('rrule'), // Regla de recurrencia
+  baseEventId: uuid('base_event_id'), // Para excepciones de eventos recurrentes
+  location: text('location'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+  environmentIdIdx: index('events_environment_id_idx').on(table.environmentId),
+  startDateIdx: index('events_start_date_idx').on(table.startDate),
+  baseEventIdIdx: index('events_base_event_id_idx').on(table.baseEventId),
+}));
+
+// Relación de a quiénes está asignado el turno
+export const eventAssignments = pgTable('event_assignments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  profileId: uuid('profile_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+}, (table) => ({
+  eventIdIdx: index('event_assignments_event_id_idx').on(table.eventId),
+  profileIdIdx: index('event_assignments_profile_id_idx').on(table.profileId),
+}));
+
+// ============================================
+// LISTAS DE COMPRAS / TAREAS
+// ============================================
+export const shoppingLists = pgTable('shopping_lists', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  environmentId: uuid('environment_id').notNull().references(() => environments.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+  environmentIdIdx: index('shopping_lists_environment_id_idx').on(table.environmentId),
+}));
+
+export const shoppingItems = pgTable('shopping_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  listId: uuid('list_id').notNull().references(() => shoppingLists.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  isCompleted: boolean('is_completed').default(false).notNull(),
+  assignedProfileId: uuid('assigned_profile_id').references(() => profiles.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+  listIdIdx: index('shopping_items_list_id_idx').on(table.listId),
+  assignedProfileIdIdx: index('shopping_items_assigned_profile_id_idx').on(table.assignedProfileId),
+}));
+
+// ============================================
+// CONTACTOS (Proveedores, Clientes, etc.)
+// ============================================
+export const contacts = pgTable('contacts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  environmentId: uuid('environment_id').notNull().references(() => environments.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  phone: text('phone'),
+  email: text('email'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+  environmentIdIdx: index('contacts_environment_id_idx').on(table.environmentId),
+}));
+
+// ============================================
+// MENÚ SEMANAL (Organización interna del local)
+// ============================================
+export const menus = pgTable('menus', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  environmentId: uuid('environment_id').notNull().references(() => environments.id, { onDelete: 'cascade' }),
+  date: timestamp('date').notNull(),
+  mealType: text('meal_type').notNull(), // 'Almuerzo', 'Cena', etc.
+  description: text('description').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+  environmentIdIdx: index('menus_environment_id_idx').on(table.environmentId),
+  dateIdx: index('menus_date_idx').on(table.date),
+}));
+
+// ============================================
+// RELATIONS
+// ============================================
+export const environmentsRelations = relations(environments, ({ many }) => ({
+  profiles: many(profiles),
+  events: many(events),
+  shoppingLists: many(shoppingLists),
+  contacts: many(contacts),
+  menus: many(menus),
+}));
+
+export const profilesRelations = relations(profiles, ({ one, many }) => ({
+  environment: one(environments, {
+    fields: [profiles.environmentId],
+    references: [environments.id],
+  }),
+  user: one(users, {
+    fields: [profiles.userId],
+    references: [users.id],
+  }),
+  eventAssignments: many(eventAssignments),
+  shoppingItems: many(shoppingItems),
+}));
+
+export const eventsRelations = relations(events, ({ one, many }) => ({
+  environment: one(environments, {
+    fields: [events.environmentId],
+    references: [environments.id],
+  }),
+  eventAssignments: many(eventAssignments),
+}));
+
+export const eventAssignmentsRelations = relations(eventAssignments, ({ one }) => ({
+  event: one(events, {
+    fields: [eventAssignments.eventId],
+    references: [events.id],
+  }),
+  profile: one(profiles, {
+    fields: [eventAssignments.profileId],
+    references: [profiles.id],
+  }),
+}));
+
+export const shoppingListsRelations = relations(shoppingLists, ({ one, many }) => ({
+  environment: one(environments, {
+    fields: [shoppingLists.environmentId],
+    references: [environments.id],
+  }),
+  items: many(shoppingItems),
+}));
+
+export const shoppingItemsRelations = relations(shoppingItems, ({ one }) => ({
+  list: one(shoppingLists, {
+    fields: [shoppingItems.listId],
+    references: [shoppingLists.id],
+  }),
+  assignedProfile: one(profiles, {
+    fields: [shoppingItems.assignedProfileId],
+    references: [profiles.id],
+  }),
+}));
+
+export const contactsRelations = relations(contacts, ({ one }) => ({
+  environment: one(environments, {
+    fields: [contacts.environmentId],
+    references: [environments.id],
+  }),
+}));
+
+export const menusRelations = relations(menus, ({ one }) => ({
+  environment: one(environments, {
+    fields: [menus.environmentId],
+    references: [environments.id],
+  }),
+}));
+
+// ============================================
 // DEFAULT EXPORT
 // ============================================
 
@@ -327,4 +531,12 @@ export default {
   paymentLogs,
   webhookEvents,
   refreshTokens,
+  environments,
+  profiles,
+  events,
+  eventAssignments,
+  shoppingLists,
+  shoppingItems,
+  contacts,
+  menus,
 };

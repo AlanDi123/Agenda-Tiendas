@@ -294,11 +294,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('No environment loaded');
     }
 
-    // Solo 1 perfil por familia (el dueño de la cuenta)
-    if (currentEnv.profiles.length >= 1) {
-      throw new Error('Solo puede haber 1 perfil por familia. Cada miembro debe ingresar con su propio código de familia.');
-    }
-
     // Verificar que el email no esté ya en esta familia
     const emailNorm = email.trim().toLowerCase();
     if (emailNorm) {
@@ -342,17 +337,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(async (profile: Profile) => {
     if (!environment) throw new Error('No environment loaded');
 
-    // Propagar cambio de color a todos los eventos asignados a este perfil
-    const { getAllEvents, saveEvent } = await import('../services/database');
-    const oldProfile = environment.profiles.find(p => p.id === profile.id);
-    if (oldProfile && oldProfile.avatarColor !== profile.avatarColor) {
-      const allEvents = await getAllEvents();
-      for (const event of allEvents) {
-        if (event.assignedProfileIds.includes(profile.id)) {
-          await saveEvent({ ...event, color: profile.avatarColor, updatedAt: new Date() });
-        }
-      }
-    }
+    // El color se resuelve en tiempo de renderizado en la UI
 
     const updatedEnv = {
       ...environment,
