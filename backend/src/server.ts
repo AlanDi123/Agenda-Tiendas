@@ -37,17 +37,25 @@ app.use(helmet({
 
 // CORS — acepta el frontend y localhost para dev
 const allowedOrigins = [
-  CORS_ORIGIN,
+  'https://agenda-tienda.vercel.app',
+  'https://agenda-tiendas.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://agenda-tienda.vercel.app',
-  '*.vercel.app',
 ];
 
 console.log('[Server] CORS allowed origins:', allowedOrigins);
 
 app.use(cors({
-  origin: true, // Aceptar TODO temporalmente para debug
+  origin: (origin, callback) => {
+    // Permitir requests sin origin (mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+    // Permitir dominios específicos
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    console.warn('[CORS] Blocked origin:', origin);
+    callback(new Error(`CORS: origin ${origin} no permitido`));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
     'Content-Type', 'Authorization',
@@ -58,9 +66,12 @@ app.use(cors({
   exposedHeaders: ['X-Request-Id', 'X-RateLimit-Remaining'],
 }));
 
-// Handle OPTIONS preflight requests explicitly
+// Handle OPTIONS preflight requests - DEBE IR ANTES DEL BODY PARSING
 app.options('*', (req, res) => {
-  console.log('[CORS] OPTIONS preflight:', req.path);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Webhook-Signature, X-Device, X-App-Version, x-deploy-secret');
+  res.header('Access-Control-Allow-Credentials', 'true');
   res.sendStatus(204);
 });
 
