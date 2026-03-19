@@ -14,7 +14,8 @@ const config: CapacitorConfig = {
       resetWhenUpdate: false,
       autoDeleteFailed: true,
       autoDeletePrevious: true,
-      appReadyTimeout: 10000,
+      appReadyTimeout: 30000,
+      directUpdate: false,
     },
     LocalNotifications: {
       smallIcon: 'ic_notification_small',

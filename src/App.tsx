@@ -139,6 +139,15 @@ function AppContent() {
     }
   }, [isAuthLoading]);
 
+  // Seguridad absoluta: si después de 8 segundos el splash sigue visible, forzar cierre
+  // Previene el freeze en caso de que isAuthLoading nunca resuelva
+  useEffect(() => {
+    const hardTimeout = setTimeout(() => {
+      setShowSplash(false);
+    }, 8000);
+    return () => clearTimeout(hardTimeout);
+  }, []); // solo al montar, sin dependencias
+
   // Online/Offline detection
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);

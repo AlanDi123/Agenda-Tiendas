@@ -4,10 +4,16 @@ import App from './App'
 import { AppLogger } from './services/logger'
 import { Capacitor } from '@capacitor/core'
 
-// Notificar a CapacitorUpdater que el bundle arrancó OK (evita rollback automático)
+// Notificar a CapacitorUpdater que el bundle arrancó OK — DEBE ser lo primero
+// El dynamic import agrega latencia; si la init tarda, Capgo hace rollback automático
 if (Capacitor.isNativePlatform()) {
+  // Llamada inmediata via plugin bridge nativo (sin esperar JS module resolution)
+  try {
+    (window as any).Capacitor?.Plugins?.CapacitorUpdater?.notifyAppReady();
+  } catch (_) {}
+  // Fallback con import estático por si el bridge directo no está disponible
   import('@capgo/capacitor-updater').then(({ CapacitorUpdater }) => {
-    CapacitorUpdater.notifyAppReady();
+    CapacitorUpdater.notifyAppReady().catch(() => {});
   }).catch(() => {});
 }
 
