@@ -105,6 +105,24 @@ app.use(requestLogger);
 // ROUTES
 // ============================================
 
+// Root endpoint — información del backend
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Dommuss Agenda Backend',
+    version: '1.0.0',
+    apiVersion: API_VERSION,
+    endpoints: {
+      health: '/api/health',
+      auth: `/api/${API_VERSION}/auth`,
+      subscriptions: `/api/${API_VERSION}/subscriptions`,
+      agenda: `/api/${API_VERSION}/agenda`,
+      discounts: `/api/${API_VERSION}/discounts`,
+      app: `/api/${API_VERSION}/app`,
+      webhooks: '/api/webhooks',
+    },
+  });
+});
+
 app.use('/api/health', healthRoutes);
 app.use(`/api/${API_VERSION}/auth`, authLimiter, authRoutes);
 app.use(`/api/${API_VERSION}/subscriptions`, apiLimiter, subscriptionRoutes);
