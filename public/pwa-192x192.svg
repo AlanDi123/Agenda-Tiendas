@@ -1,16 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
-  <!-- Background -->
   <rect width="192" height="192" rx="36" fill="#FFFFFF"/>
-  
-  <!-- House base (blue) -->
-  <path d="M96 48 L144 86 L144 144 L48 144 L48 86 Z" fill="#1E88E5"/>
-  
-  <!-- House roof (blue) -->
-  <path d="M38 86 L96 38 L154 86 L144 96 L96 58 L48 96 Z" fill="#1E88E5"/>
-  
-  <!-- Door (white) -->
-  <rect x="80" y="100" width="32" height="44" rx="4" fill="#FFFFFF"/>
-  
-  <!-- Checkmark/Tilde (yellow) -->
-  <path d="M146 58 L160 72 L174 50" stroke="#FFC107" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Casa azul -->
+  <path d="M96 36 L156 78 L156 156 L36 156 L36 78 Z" fill="#1565C0"/>
+  <!-- Techo más oscuro -->
+  <path d="M22 80 L96 24 L170 80 L156 90 L96 42 L36 90 Z" fill="#1E88E5"/>
+  <!-- Puerta -->
+  <rect x="78" y="110" width="36" height="46" rx="6" fill="#FFFFFF"/>
+  <!-- Tilde blanco central dentro de la casa -->
+  <path d="M52 98 L80 126 L138 72" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>
