@@ -40,21 +40,13 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'https://agenda-tienda.vercel.app',
+  '*.vercel.app',
 ];
 
 console.log('[Server] CORS allowed origins:', allowedOrigins);
 
 app.use(cors({
-  origin: (origin, callback) => {
-    console.log('[CORS] Request origin:', origin);
-    // Permitir requests sin origin (mobile apps, Postman, curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    // Permitir cualquier subdominio de vercel.app
-    if (origin.endsWith('.vercel.app')) return callback(null, true);
-    console.log('[CORS] Blocked origin:', origin);
-    callback(new Error(`CORS: origin ${origin} no permitido`));
-  },
+  origin: true, // Aceptar TODO temporalmente para debug
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
     'Content-Type', 'Authorization',
