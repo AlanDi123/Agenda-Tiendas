@@ -40,12 +40,8 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
           <div className="auth-logo">
             <img
               src={AppLogo}
-              alt="Logotipo Principal"
-              className="w-40 h-auto mx-auto mb-8 rounded-full shadow-lg border-4 border-white"
-              onError={(e) => {
-                console.error('Error loading PNG logo in login');
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
+              alt="Importmania / Sol y Verde"
+              className="w-48 h-auto mx-auto mb-8 rounded-2xl shadow-md object-cover"
             />
           </div>
           <h1 className="auth-title">Iniciar Sesión</h1>
