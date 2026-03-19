@@ -21,19 +21,13 @@ interface TopAppBarProps {
 function DommussLogo() {
   return (
     <svg width="28" height="28" viewBox="0 0 100 100" fill="none" className="dommuss-logo" aria-label="Dommuss">
-      {/* Casa azul */}
-      <path
-        d="M10 40L50 10L90 40V85H10V40Z"
-        fill="#2D3E50"
-      />
-      {/* Tilde naranja central */}
-      <path
-        d="M35 55L45 65L70 40"
-        stroke="#FF6B35"
-        strokeWidth="10"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <rect x="2" y="2" width="96" height="96" rx="20" fill="white" />
+      <path d="M15 50L50 18L85 50" stroke="#4A90D9" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M22 50L22 82" stroke="#4A90D9" strokeWidth="7" strokeLinecap="round" fill="none" />
+      <path d="M78 50L78 82" stroke="#4A90D9" strokeWidth="7" strokeLinecap="round" fill="none" />
+      <path d="M22 82L78 82" stroke="#4A90D9" strokeWidth="7" strokeLinecap="round" fill="none" />
+      <path d="M22 50L78 50" stroke="#4A90D9" strokeWidth="7" strokeLinecap="round" fill="none" />
+      <path d="M30 63L45 77L72 51" stroke="#F5A623" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" fill="none" />
     </svg>
   );
 }
