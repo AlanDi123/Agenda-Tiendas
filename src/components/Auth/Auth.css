@@ -37,17 +37,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
-  background-color: var(--color-primary-light);
-  border-radius: var(--radius-xl);
   margin-bottom: var(--spacing-md);
 }
 
-.auth-logo svg {
-  width: 36px;
-  height: 36px;
-  color: white;
+.auth-logo img {
+  width: 160px;
+  height: auto;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+  border: 4px solid white;
+  object-fit: cover;
 }
 
 .auth-success-icon {

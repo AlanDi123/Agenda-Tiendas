@@ -27,6 +27,7 @@
     "vite-plugin-pwa": "^0.21.2"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "5.7.0",
     "@capgo/capacitor-updater": "lts-v5",
     "@eslint/js": "^9.39.1",

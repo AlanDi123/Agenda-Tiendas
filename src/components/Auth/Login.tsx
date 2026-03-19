@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Button';
 import { Input } from '../Input';
 import './Auth.css';
+import AppLogo from '../../assets/logo/logo_principal.png';
 
 interface LoginProps {
   onSwitchToRegister: () => void;
@@ -37,15 +38,15 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-logo">
-            <svg viewBox="0 0 120 120" fill="none" width="56" height="56">
-              <rect width="120" height="120" rx="22" fill="#FFFFFF"/>
-              <rect width="120" height="120" rx="22" fill="none" stroke="#E0E0E0" strokeWidth="1"/>
-              <path d="M60 28 L95 52 L95 92 L25 92 L25 52 Z" fill="#2196F3"/>
-              <path d="M14 54 L60 18 L106 54 L95 60 L60 28 L25 60 Z" fill="#1565C0"/>
-              <rect x="49" y="65" width="22" height="27" rx="3" fill="white"/>
-              <circle cx="85" cy="34" r="18" fill="#FFC107"/>
-              <path d="M75 34 L82 41 L96 27" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-            </svg>
+            <img
+              src={AppLogo}
+              alt="Logotipo Principal"
+              className="w-40 h-auto mx-auto mb-8 rounded-full shadow-lg border-4 border-white"
+              onError={(e) => {
+                console.error('Error loading PNG logo in login');
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
           </div>
           <h1 className="auth-title">Iniciar Sesión</h1>
           <p className="auth-subtitle">Accede a tu agenda Dommuss</p>

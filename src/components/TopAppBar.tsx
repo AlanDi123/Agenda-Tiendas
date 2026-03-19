@@ -1,5 +1,6 @@
 import type { CalendarView, Profile } from '../types';
 import './TopAppBar.css';
+import AppLogo from '../assets/logo/logo_principal.png';
 
 interface TopAppBarProps {
   title: string;
@@ -17,55 +18,15 @@ interface TopAppBarProps {
   onFilterChange?: (profileId: string | null) => void;
 }
 
-// Dommuss Logo SVG - Diseño oficial mejorado
+// Dommuss Logo - PNG oficial
 function DommussLogo() {
   return (
-    <svg 
-      width="32" 
-      height="32" 
-      viewBox="0 0 100 100" 
-      fill="none" 
-      className="dommuss-logo" 
-      aria-label="Dommuss"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      {/* Fondo circular con gradiente */}
-      <defs>
-        <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#4A90D9" />
-          <stop offset="100%" stopColor="#357ABD" />
-        </linearGradient>
-        <filter id="logoShadow" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.2" />
-        </filter>
-      </defs>
-      
-      {/* Círculo base */}
-      <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" filter="url(#logoShadow)" />
-      
-      {/* Casa simplificada - techo */}
-      <path 
-        d="M25 55L50 30L75 55" 
-        stroke="white" 
-        strokeWidth="6" 
-        strokeLinecap="round" 
-        strokeLinejoin="round" 
-        fill="none"
-      />
-      
-      {/* Casa - paredes */}
-      <rect x="30" y="55" width="40" height="20" stroke="white" strokeWidth="6" fill="none" strokeLinejoin="round" />
-      
-      {/* Checkmark naranja - éxito/verificación */}
-      <path 
-        d="M42 65L50 73L62 58" 
-        stroke="#F5A623" 
-        strokeWidth="7" 
-        strokeLinecap="round" 
-        strokeLinejoin="round" 
-        fill="none"
-      />
-    </svg>
+    <img 
+      src={AppLogo} 
+      alt="Dommuss Logo" 
+      className="dommuss-logo-png"
+      style={{ height: '40px', width: 'auto', borderRadius: '8px' }}
+    />
   );
 }
 
