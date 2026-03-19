@@ -101,7 +101,7 @@ export function UpdateModal({ isOpen, update, onClose, onDismiss }: UpdateModalP
 
         {!isDownloading && (
           <p className="update-modal-info">
-            📱 La actualización se aplica sin reinstalar el APK
+            📦 Se descargará e instalará una nueva versión del APK
           </p>
         )}
       </div>

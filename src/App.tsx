@@ -543,6 +543,21 @@ function AppContent() {
     }
   };
 
+  // Mostrar update modal ANTES del splash si hay actualización disponible
+  if (hasUpdate && updateInfo) {
+    return (
+      <>
+        <SplashScreen />
+        <UpdateModal
+          isOpen={true}
+          update={updateInfo}
+          onClose={() => { if (!isMandatory) dismissUpdate(); }}
+          onDismiss={() => dismissUpdate()}
+        />
+      </>
+    );
+  }
+
   // Show splash screen — también mientras auth sigue cargando
   if (showSplash || isAuthLoading) {
     return <SplashScreen />;
@@ -794,20 +809,6 @@ function AppContent() {
 
       {/* PWA Reload Prompt */}
       <ReloadPrompt />
-
-      {/* App Update Modal */}
-      <UpdateModal
-        isOpen={hasUpdate}
-        update={updateInfo}
-        onClose={() => {
-          if (!isMandatory) {
-            dismissUpdate();
-          }
-        }}
-        onDismiss={() => {
-          dismissUpdate();
-        }}
-      />
 
       {/* Payment Modal */}
       <PaymentModal
