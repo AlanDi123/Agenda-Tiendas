@@ -266,7 +266,7 @@ export async function resendVerificationEmail(email: string): Promise<boolean> {
 // ============================================
 
 export async function requestPasswordReset(email: string): Promise<boolean> {
-  const response = await fetch(`${API_URL}/api/v1/auth/password-reset/request`, {
+  await fetch(`${API_URL}/api/v1/auth/password-reset/request`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email.toLowerCase() }),
@@ -296,7 +296,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
 // PREMIUM (delegated to backend via payment)
 // ============================================
 
-export async function upgradeToPremium(email: string, untilDate?: Date): Promise<void> {
+export async function upgradeToPremium(_email: string, _untilDate?: Date): Promise<void> {
   // Premium status is managed by the backend via webhooks from Mercado Pago.
   // This function exists for compatibility but the real upgrade happens
   // automatically when the payment webhook is processed.
@@ -307,7 +307,7 @@ export async function upgradeToPremium(email: string, untilDate?: Date): Promise
   }
 }
 
-export async function downgradeToFree(email: string): Promise<void> {
+export async function downgradeToFree(_email: string): Promise<void> {
   const cached = loadCurrentUser();
   if (cached) {
     cached.planStatus = 'FREE';
