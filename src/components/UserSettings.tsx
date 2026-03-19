@@ -24,7 +24,7 @@ export function UserSettingsModal({
   onUpdateProfile,
   onLogout,
 }: UserSettingsModalProps) {
-  const { isPremium, userPlan } = useAuth();
+  const { isPremium } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'subscription'>('profile');
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
