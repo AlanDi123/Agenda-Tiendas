@@ -143,13 +143,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Auth actions
   const register = useCallback(async (email: string, password: string) => {
     const result = await createUser(email, password);
-    setCurrentUser(result);
+    // createUser ya guardó el user en localStorage vía saveCurrentUser()
+    // solo actualizar el estado local sin llamar getCurrentUser() de nuevo
+    const { passwordHash: _ph, ...userForState } = result;
+    setCurrentUser(userForState as User);
     return result;
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const user = await loginUser(email, password);
-    setCurrentUser(user);
+    if (user) setCurrentUser(user);
 
     // Load subscription status
     if (user) {

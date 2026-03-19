@@ -145,15 +145,39 @@ export async function getCurrentUser(): Promise<User | null> {
       }
     }
 
-    // Token expired or invalid — try refresh
+    // Token expirado — intentar refresh UNA sola vez sin recursión
     if (response.status === 401) {
       const refreshed = await refreshAccessToken();
       if (!refreshed) {
         clearAuthToken();
         return null;
       }
-      // Retry once with new token
-      return getCurrentUser();
+      // Reintentar con el nuevo token directamente, SIN llamar getCurrentUser()
+      const newToken = getAuthToken();
+      if (!newToken) return null;
+      try {
+        const retryRes = await fetch(`${API_URL}/api/v1/auth/me`, {
+          headers: { Authorization: `Bearer ${newToken}` },
+        });
+        if (retryRes.ok) {
+          const retryData = await retryRes.json();
+          if (retryData.success && retryData.data) {
+            const user: User = {
+              id: retryData.data.id,
+              email: retryData.data.email,
+              passwordHash: '',
+              emailVerified: retryData.data.emailVerified ?? false,
+              planStatus: retryData.data.planType === 'FREE' ? 'FREE' : 'PREMIUM',
+              createdAt: new Date(retryData.data.createdAt || Date.now()),
+              updatedAt: new Date(retryData.data.updatedAt || Date.now()),
+            };
+            saveCurrentUser(user);
+            return user;
+          }
+        }
+      } catch { /* ignorar */ }
+      clearAuthToken();
+      return null;
     }
   } catch {
     // Network offline — fall back to cached user
