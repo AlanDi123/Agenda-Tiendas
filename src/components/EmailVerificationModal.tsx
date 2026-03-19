@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { Button } from './Button';
+import { useState, useCallback, useEffect } from 'react';
 import { Modal } from './Modal';
+import { Button } from './Button';
+import { Input } from './Input';
+import { useAuth } from '../contexts/AuthContext';
 import './EmailVerificationModal.css';
 
 interface EmailVerificationModalProps {
@@ -31,19 +33,19 @@ export function EmailVerificationModal({
   const [resendTimer, setResendTimer] = useState(0);
 
   // Handle resend timer
-  useState(() => {
+  useEffect(() => {
     if (resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
       return () => clearTimeout(timer);
     } else {
       setCanResend(true);
     }
-  });
+  }, [resendTimer]);
 
   const handleSendCode = async () => {
     setIsSending(true);
     setError(null);
-    
+
     try {
       await onSendCode();
       setCanResend(false);
@@ -57,18 +59,18 @@ export function EmailVerificationModal({
 
   const handleVerify = async () => {
     const codeString = code.join('');
-    
+
     if (codeString.length !== 6) {
       setError('Ingresa los 6 dígitos');
       return;
     }
-    
+
     setIsVerifying(true);
     setError(null);
-    
+
     try {
       const success = await onVerifyCode(codeString);
-      
+
       if (success) {
         setSuccess(true);
         setTimeout(() => {
@@ -86,11 +88,11 @@ export function EmailVerificationModal({
 
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) value = value.slice(0, 1);
-    
+
     const newCode = [...code];
     newCode[index] = value;
     setCode(newCode);
-    
+
     // Auto-focus next input
     if (value && index < 5) {
       const nextInput = document.getElementById(`code-${index + 1}`);
@@ -198,7 +200,7 @@ export function EmailVerificationModal({
           >
             {isVerifying ? 'Verificando...' : 'Verificar Email'}
           </Button>
-          
+
           {!isRequired && onSkip && (
             <Button
               variant="text"

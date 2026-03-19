@@ -31,9 +31,23 @@
 }
 
 .dommuss-logo {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
+  transition: transform var(--transition-normal);
+}
+
+.dommuss-logo:hover {
+  transform: scale(1.1) rotate(-5deg);
+}
+
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.dommuss-logo {
+  animation: logoFloat 3s ease-in-out infinite;
 }
 
 .top-app-bar-brand {

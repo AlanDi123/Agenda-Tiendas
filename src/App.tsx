@@ -38,6 +38,7 @@ import type { CalendarView, ExpandedEvent, Event, DeleteScope, Profile } from '.
 import { formatMonthYear } from './utils/helpers';
 import { saveUserSession, getEnvironment } from './services/database';
 import './styles/global.css';
+import './styles/animations.css';
 import './App.css';
 
 // Auth flow states

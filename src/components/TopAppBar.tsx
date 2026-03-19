@@ -17,17 +17,54 @@ interface TopAppBarProps {
   onFilterChange?: (profileId: string | null) => void;
 }
 
-// Dommuss Logo SVG - Casa azul con tilde naranja (oficial)
+// Dommuss Logo SVG - Diseño oficial mejorado
 function DommussLogo() {
   return (
-    <svg width="28" height="28" viewBox="0 0 100 100" fill="none" className="dommuss-logo" aria-label="Dommuss">
-      <rect x="2" y="2" width="96" height="96" rx="20" fill="white" />
-      <path d="M15 50L50 18L85 50" stroke="#4A90D9" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M22 50L22 82" stroke="#4A90D9" strokeWidth="7" strokeLinecap="round" fill="none" />
-      <path d="M78 50L78 82" stroke="#4A90D9" strokeWidth="7" strokeLinecap="round" fill="none" />
-      <path d="M22 82L78 82" stroke="#4A90D9" strokeWidth="7" strokeLinecap="round" fill="none" />
-      <path d="M22 50L78 50" stroke="#4A90D9" strokeWidth="7" strokeLinecap="round" fill="none" />
-      <path d="M30 63L45 77L72 51" stroke="#F5A623" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <svg 
+      width="32" 
+      height="32" 
+      viewBox="0 0 100 100" 
+      fill="none" 
+      className="dommuss-logo" 
+      aria-label="Dommuss"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {/* Fondo circular con gradiente */}
+      <defs>
+        <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#4A90D9" />
+          <stop offset="100%" stopColor="#357ABD" />
+        </linearGradient>
+        <filter id="logoShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.2" />
+        </filter>
+      </defs>
+      
+      {/* Círculo base */}
+      <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" filter="url(#logoShadow)" />
+      
+      {/* Casa simplificada - techo */}
+      <path 
+        d="M25 55L50 30L75 55" 
+        stroke="white" 
+        strokeWidth="6" 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        fill="none"
+      />
+      
+      {/* Casa - paredes */}
+      <rect x="30" y="55" width="40" height="20" stroke="white" strokeWidth="6" fill="none" strokeLinejoin="round" />
+      
+      {/* Checkmark naranja - éxito/verificación */}
+      <path 
+        d="M42 65L50 73L62 58" 
+        stroke="#F5A623" 
+        strokeWidth="7" 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        fill="none"
+      />
     </svg>
   );
 }
