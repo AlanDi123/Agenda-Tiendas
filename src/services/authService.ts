@@ -1,283 +1,316 @@
 // Authentication Service
-// Handles user registration, login, email verification, and password recovery
+// Unified with backend JWT — all auth goes through the API
+// Local IndexedDB is only used for environment/profile storage (offline-first calendar data)
 
-import { getDB } from './database';
-import type { User, AuthSession } from '../types/auth';
-import { generateId } from '../utils/helpers';
+import type { User } from '../types/auth';
 
-const TOKEN_EXPIRY_HOURS = 24;
-const SESSION_EXPIRY_DAYS = 30;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-// Simple hash function for demo purposes (use bcrypt in production)
-function hashPassword(password: string): string {
-  // In production, use bcrypt or similar
-  return btoa(unescape(encodeURIComponent(password + '_dommuss_salt')));
+// ============================================
+// TOKEN MANAGEMENT
+// ============================================
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem('authToken');
 }
 
-function verifyPassword(password: string, hash: string): boolean {
-  return hashPassword(password) === hash;
+function saveAuthToken(token: string): void {
+  localStorage.setItem('authToken', token);
 }
 
-function generateToken(): string {
-  return Math.random().toString(36).substring(2, 15) + 
-         Math.random().toString(36).substring(2, 15);
+function clearAuthToken(): void {
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('currentUser');
 }
 
-// User operations
-export async function createUser(email: string, password: string): Promise<User & { verificationToken: string }> {
-  const db = await getDB();
-  
-  // Check if user already exists
-  const existingUser = await db.get('users', email.toLowerCase());
-  if (existingUser) {
-    throw new Error('El email ya está registrado');
+function saveCurrentUser(user: User): void {
+  localStorage.setItem('currentUser', JSON.stringify(user));
+}
+
+function loadCurrentUser(): User | null {
+  try {
+    const raw = localStorage.getItem('currentUser');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ============================================
+// REGISTRATION
+// ============================================
+
+export async function createUser(
+  email: string,
+  password: string
+): Promise<User & { verificationToken: string }> {
+  const response = await fetch(`${API_URL}/api/v1/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.toLowerCase(), password }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    const msg = data.message || data.error || 'Error al registrarse';
+    if (response.status === 409) throw new Error('El email ya está registrado');
+    throw new Error(msg);
   }
 
-  const verificationToken = generateToken();
-  const tokenExpiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
-
-  const user: User & { verificationToken: string } = {
-    id: generateId(),
-    email: email.toLowerCase(),
-    passwordHash: hashPassword(password),
-    emailVerified: false,
-    verificationToken,
-    tokenExpiresAt,
+  const user: User = {
+    id: data.data.user.id,
+    email: data.data.user.email,
+    passwordHash: '',
+    emailVerified: data.data.user.emailVerified ?? false,
     planStatus: 'FREE',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
-  await db.put('users', user);
-  
-  // Store verification token separately
-  await db.put('emailVerificationTokens', {
-    email: email.toLowerCase(),
-    token: verificationToken,
-    expiresAt: tokenExpiresAt,
+  saveCurrentUser(user);
+
+  return {
+    ...user,
+    verificationToken: data.data.verificationToken || '',
+  };
+}
+
+// ============================================
+// LOGIN
+// ============================================
+
+export async function loginUser(email: string, password: string): Promise<User | null> {
+  const response = await fetch(`${API_URL}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.toLowerCase(), password }),
   });
 
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error('Email o contraseña incorrectos');
+  }
+
+  // Save JWT tokens
+  saveAuthToken(data.data.accessToken);
+  if (data.data.refreshToken) {
+    localStorage.setItem('refreshToken', data.data.refreshToken);
+  }
+
+  const user: User = {
+    id: data.data.user.id,
+    email: data.data.user.email,
+    passwordHash: '',
+    emailVerified: data.data.user.emailVerified ?? false,
+    planStatus: data.data.user.planType === 'FREE' ? 'FREE' : 'PREMIUM',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  saveCurrentUser(user);
   return user;
 }
 
-export async function loginUser(email: string, password: string): Promise<User | null> {
-  const db = await getDB();
-  const user = await db.get('users', email.toLowerCase());
-  
-  if (!user) {
-    // Generic error message for security
-    throw new Error('Email o contraseña incorrectos');
-  }
-
-  if (!verifyPassword(password, user.passwordHash)) {
-    throw new Error('Email o contraseña incorrectos');
-  }
-
-  // Create session
-  const session: AuthSession = {
-    userId: user.id,
-    email: user.email,
-    expiresAt: new Date(Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
-  };
-  
-  await db.put('sessions', session);
-  await saveSetting('currentUserEmail', user.email);
-
-  // Return user without sensitive data
-  const { passwordHash, ...userWithoutHash } = user;
-  return userWithoutHash as unknown as User;
-}
+// ============================================
+// CURRENT USER
+// ============================================
 
 export async function getCurrentUser(): Promise<User | null> {
-  const db = await getDB();
-  const email = await getSetting<string>('currentUserEmail');
-  
-  if (!email) return null;
-  
-  const user = await db.get('users', email);
-  if (!user) return null;
+  const token = getAuthToken();
+  if (!token) return null;
 
-  const { passwordHash, ...userWithoutHash } = user;
-  return userWithoutHash as unknown as User;
+  // Try to get fresh data from backend
+  try {
+    const response = await fetch(`${API_URL}/api/v1/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.data) {
+        const user: User = {
+          id: data.data.id,
+          email: data.data.email,
+          passwordHash: '',
+          emailVerified: data.data.emailVerified ?? false,
+          planStatus: data.data.planType === 'FREE' ? 'FREE' : 'PREMIUM',
+          createdAt: new Date(data.data.createdAt || Date.now()),
+          updatedAt: new Date(data.data.updatedAt || Date.now()),
+        };
+        saveCurrentUser(user);
+        return user;
+      }
+    }
+
+    // Token expired or invalid — try refresh
+    if (response.status === 401) {
+      const refreshed = await refreshAccessToken();
+      if (!refreshed) {
+        clearAuthToken();
+        return null;
+      }
+      // Retry once with new token
+      return getCurrentUser();
+    }
+  } catch {
+    // Network offline — fall back to cached user
+    return loadCurrentUser();
+  }
+
+  return loadCurrentUser();
 }
+
+// ============================================
+// LOGOUT
+// ============================================
 
 export async function logoutUser(): Promise<void> {
-  await saveSetting('currentUserEmail', null);
-  const db = await getDB();
-  const sessions = await db.getAll('sessions');
-  for (const session of sessions) {
-    await db.delete('sessions', session.email);
+  const token = getAuthToken();
+
+  if (token) {
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      await fetch(`${API_URL}/api/v1/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+    } catch {
+      // Ignore network errors on logout
+    }
   }
+
+  clearAuthToken();
 }
 
-// Email verification
+// ============================================
+// TOKEN REFRESH
+// ============================================
+
+async function refreshAccessToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) return false;
+
+  try {
+    const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.data.accessToken) {
+        saveAuthToken(data.data.accessToken);
+        return true;
+      }
+    }
+  } catch {
+    // Network error
+  }
+
+  return false;
+}
+
+// ============================================
+// EMAIL VERIFICATION
+// ============================================
+
 export async function verifyEmail(token: string): Promise<boolean> {
-  const db = await getDB();
-  const tokens = await db.getAll('emailVerificationTokens');
-  const validToken = tokens.find(t => t.token === token && new Date(t.expiresAt) > new Date());
+  const response = await fetch(`${API_URL}/api/v1/auth/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
 
-  if (!validToken) {
-    throw new Error('Token inválido o expirado');
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.message || 'Token inválido o expirado');
   }
 
-  const user = await db.get('users', validToken.email);
-  if (!user) {
-    throw new Error('Usuario no encontrado');
+  // Update cached user
+  const cached = loadCurrentUser();
+  if (cached) {
+    cached.emailVerified = true;
+    saveCurrentUser(cached);
   }
-
-  // Update user
-  user.emailVerified = true;
-  user.verificationToken = undefined;
-  user.tokenExpiresAt = undefined;
-  user.updatedAt = new Date();
-  
-  await db.put('users', user);
-  await db.delete('emailVerificationTokens', validToken.email);
 
   return true;
 }
 
 export async function resendVerificationEmail(email: string): Promise<boolean> {
-  // Primero intentar contra el backend real
-  try {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const response = await fetch(`${API_URL}/api/v1/auth/resend-verification`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.toLowerCase() }),
-    });
-    if (response.ok) {
-      console.log('[AuthService] Verification email sent via backend');
-      return true;
-    }
-    console.warn('[AuthService] Backend resend failed, status:', response.status);
-  } catch (networkError) {
-    console.warn('[AuthService] Backend unreachable, falling back to local token:', networkError);
-  }
-
-  // Fallback local (offline o backend no configurado)
-  const db = await getDB();
-  const user = await db.get('users', email.toLowerCase());
-
-  if (!user) {
-    throw new Error('Usuario no encontrado');
-  }
-
-  if (user.emailVerified) {
-    throw new Error('El email ya está verificado');
-  }
-
-  const verificationToken = generateToken();
-  const tokenExpiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
-
-  user.verificationToken = verificationToken;
-  user.tokenExpiresAt = tokenExpiresAt;
-  user.updatedAt = new Date();
-
-  await db.put('users', user);
-  await db.put('emailVerificationTokens', {
-    email: email.toLowerCase(),
-    token: verificationToken,
-    expiresAt: tokenExpiresAt,
+  const response = await fetch(`${API_URL}/api/v1/auth/resend-verification`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.toLowerCase() }),
   });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Error al reenviar verificación');
+  }
 
   return true;
 }
 
-// Password recovery
+// ============================================
+// PASSWORD RECOVERY
+// ============================================
+
 export async function requestPasswordReset(email: string): Promise<boolean> {
-  const db = await getDB();
-  const user = await db.get('users', email.toLowerCase());
-
-  if (!user) {
-    // Don't reveal if email exists
-    return true;
-  }
-
-  const resetToken = generateToken();
-  const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
-
-  await db.put('passwordResetTokens', {
-    email: email.toLowerCase(),
-    token: resetToken,
-    expiresAt,
+  const response = await fetch(`${API_URL}/api/v1/auth/password-reset/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.toLowerCase() }),
   });
 
-  // In production, send email with reset link
-  // For now, we'll store it and retrieve via console/dev tools
-  console.log('Password reset token:', resetToken);
-
+  // Always return true (don't reveal if email exists)
   return true;
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
-  const db = await getDB();
-  const tokens = await db.getAll('passwordResetTokens');
-  const validToken = tokens.find(t => t.token === token && new Date(t.expiresAt) > new Date());
+  const response = await fetch(`${API_URL}/api/v1/auth/password-reset/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, newPassword }),
+  });
 
-  if (!validToken) {
-    throw new Error('Token inválido o expirado');
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.message || 'Token inválido o expirado');
   }
-
-  const user = await db.get('users', validToken.email);
-  if (!user) {
-    throw new Error('Usuario no encontrado');
-  }
-
-  // Validate password strength
-  if (newPassword.length < 6) {
-    throw new Error('La contraseña debe tener al menos 6 caracteres');
-  }
-
-  user.passwordHash = hashPassword(newPassword);
-  user.updatedAt = new Date();
-
-  await db.put('users', user);
-  await db.delete('passwordResetTokens', validToken.email);
 
   return true;
 }
 
-// Premium upgrade
+// ============================================
+// PREMIUM (delegated to backend via payment)
+// ============================================
+
 export async function upgradeToPremium(email: string, untilDate?: Date): Promise<void> {
-  const db = await getDB();
-  const user = await db.get('users', email.toLowerCase());
-
-  if (!user) {
-    throw new Error('Usuario no encontrado');
+  // Premium status is managed by the backend via webhooks from Mercado Pago.
+  // This function exists for compatibility but the real upgrade happens
+  // automatically when the payment webhook is processed.
+  const cached = loadCurrentUser();
+  if (cached) {
+    cached.planStatus = 'PREMIUM';
+    saveCurrentUser(cached);
   }
-
-  user.planStatus = 'PREMIUM';
-  user.premiumUntil = untilDate;
-  user.updatedAt = new Date();
-
-  await db.put('users', user);
-  await saveSetting('currentUserEmail', email.toLowerCase());
 }
 
 export async function downgradeToFree(email: string): Promise<void> {
-  const db = await getDB();
-  const user = await db.get('users', email.toLowerCase());
-
-  if (!user) {
-    throw new Error('Usuario no encontrado');
+  const cached = loadCurrentUser();
+  if (cached) {
+    cached.planStatus = 'FREE';
+    saveCurrentUser(cached);
   }
-
-  user.planStatus = 'FREE';
-  user.premiumUntil = undefined;
-  user.updatedAt = new Date();
-
-  await db.put('users', user);
-}
-
-// Helper functions
-async function saveSetting<T>(key: string, value: T): Promise<void> {
-  const db = await getDB();
-  await db.put('settings', { key, value });
-}
-
-async function getSetting<T>(key: string): Promise<T | undefined> {
-  const db = await getDB();
-  const setting = await db.get('settings', key);
-  return setting?.value as T;
 }

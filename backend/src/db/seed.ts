@@ -32,32 +32,24 @@ async function seed() {
         type: 'FREE',
         priceUsd: '0',
         priceArs: '0',
-        features: JSON.stringify(['Basic calendar', 'Up to 3 profiles', 'Email support']),
+        features: JSON.stringify(['Hasta 3 perfiles', 'Hasta 10 eventos por día', 'Vista de calendario', 'Código de familia incluido']),
         interval: 'lifetime',
       },
       {
         name: 'Premium Monthly',
         type: 'PREMIUM_MONTHLY',
-        priceUsd: '9.99',
-        priceArs: '14500',
-        features: JSON.stringify(['Recurring events', 'Custom alarms', 'Up to 5 profiles', 'Priority support']),
+        priceUsd: '0',
+        priceArs: '35000',
+        features: JSON.stringify(['Perfiles ilimitados', 'Eventos ilimitados', 'Eventos recurrentes', 'Alarmas y recordatorios', 'Drag & Drop', 'Soporte por email']),
         interval: 'monthly',
       },
       {
         name: 'Premium Yearly',
         type: 'PREMIUM_YEARLY',
-        priceUsd: '99.99',
-        priceArs: '145000',
-        features: JSON.stringify(['All monthly features', 'Unlimited profiles', 'VIP support', 'Early access']),
+        priceUsd: '0',
+        priceArs: '336000',
+        features: JSON.stringify(['Todo lo del plan mensual', 'Equivale a 9,6 meses (20% off)', 'Primer mes gratis', 'Soporte prioritario', 'Actualizaciones anticipadas']),
         interval: 'yearly',
-      },
-      {
-        name: 'Premium Lifetime',
-        type: 'PREMIUM_LIFETIME',
-        priceUsd: '199.99',
-        priceArs: '290000',
-        features: JSON.stringify(['All yearly features', 'Lifetime access', 'All future features', 'VIP support']),
-        interval: 'lifetime',
       },
     ];
 
@@ -82,7 +74,7 @@ async function seed() {
     // ============================================
     console.log('Creating discount codes...');
 
-    // MAJESTADALAN - Special lifetime code (100% off)
+    // MAJESTADALAN - Special lifetime code (100% off) - Now for PREMIUM_YEARLY
     await sql`
       INSERT INTO discount_codes (code, type, value, currency, max_uses, per_user_limit, applicable_plans, expires_at, total_used, active)
       VALUES (
@@ -92,7 +84,7 @@ async function seed() {
         NULL,
         NULL,
         1,
-        '["PREMIUM_LIFETIME"]'::text,
+        '["PREMIUM_YEARLY"]'::text,
         NULL,
         0,
         true

@@ -48,10 +48,9 @@ export interface CheckoutResult {
 // PLAN PRICING
 // ============================================
 
-const PLAN_PRICES: Record<string, { usd: number; interval: 'monthly' | 'yearly' | 'lifetime' }> = {
-  PREMIUM_MONTHLY: { usd: 9.99, interval: 'monthly' },
-  PREMIUM_YEARLY: { usd: 99.99, interval: 'yearly' },
-  PREMIUM_LIFETIME: { usd: 199.99, interval: 'lifetime' },
+const PLAN_PRICES: Record<string, { ars: number; interval: 'monthly' | 'yearly' | 'lifetime' }> = {
+  PREMIUM_MONTHLY: { ars: 35000, interval: 'monthly' },
+  PREMIUM_YEARLY:  { ars: 336000, interval: 'yearly' },
 };
 
 function getPlanDescription(planType: string): string {
@@ -74,13 +73,10 @@ export async function getPlanPricing(planType: string): Promise<PlanPricing | nu
   const plan = PLAN_PRICES[planType];
   if (!plan) return null;
 
-  const rate = await getUsdToArsRate();
-  const priceArs = Math.ceil(plan.usd * rate);
-
   return {
     planType,
-    priceUsd: plan.usd,
-    priceArs,
+    priceUsd: 0,      // no se usa, MP cobra en ARS
+    priceArs: plan.ars,
     interval: plan.interval,
     description: getPlanDescription(planType),
   };
@@ -123,7 +119,7 @@ export async function createCheckoutPreference(
     }
 
     // Apply discount if provided
-    let finalPriceUsd = pricing.priceUsd;
+    let finalPriceArs = pricing.priceArs;
     let discountAmount = 0;
 
     if (discountCode) {
@@ -148,18 +144,14 @@ export async function createCheckoutPreference(
           applicablePlans.includes(planType)) {
 
           if (discount.type === 'percentage') {
-            discountAmount = finalPriceUsd * (parseFloat(discount.value) / 100);
+            discountAmount = Math.ceil(finalPriceArs * (parseFloat(discount.value) / 100));
           } else if (discount.type === 'fixed') {
             discountAmount = parseFloat(discount.value);
           }
-          finalPriceUsd = Math.max(0, finalPriceUsd - discountAmount);
+          finalPriceArs = Math.max(0, finalPriceArs - discountAmount);
         }
       }
     }
-
-    // Convert to ARS for Mercado Pago
-    const rate = await getUsdToArsRate();
-    const finalPriceArs = Math.ceil(finalPriceUsd * rate);
 
     // Create preference
     const preference = new Preference(client);

@@ -28,7 +28,7 @@ export async function redirectToCheckout(
   }
   
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/payments/checkout`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/subscriptions/checkout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -220,7 +220,7 @@ export async function createGatewayPayment(
     return { success: false, error: 'Usuario no autenticado. Por favor inicia sesión.' };
   }
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/payments/checkout`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/subscriptions/checkout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
