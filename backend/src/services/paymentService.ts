@@ -187,7 +187,7 @@ export async function createCheckoutPreference(
         finalPriceUsd,
         discountAmount,
       },
-      notification_url: `${BACKEND_BASE_URL}/api/webhooks/mercadopago`,
+      notification_url: `${BACKEND_BASE_URL}/api/webhooks/mercadopago?source_news=webhooks`,
     };
 
     const result = await preference.create({ body: preferenceData });
