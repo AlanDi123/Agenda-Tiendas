@@ -4,7 +4,10 @@
 
 import type { User } from '../types/auth';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
+if (!API_URL) {
+  console.error('[AuthService] VITE_API_URL no está configurada. Las llamadas al backend fallarán.');
+}
 
 // ============================================
 // TOKEN MANAGEMENT
