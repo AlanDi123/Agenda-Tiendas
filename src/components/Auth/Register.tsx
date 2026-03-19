@@ -64,12 +64,14 @@ export function Register({ onSwitchToLogin, onRegisterSuccess }: RegisterProps) 
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-logo">
-            <svg viewBox="0 0 120 120" fill="none" width="48" height="48">
-              <rect width="120" height="120" rx="24" fill="#1565C0"/>
-              <path d="M60 22 L98 48 L98 98 L22 98 L22 48 Z" fill="#1E88E5"/>
-              <path d="M12 50 L60 16 L108 50 L98 57 L60 26 L22 57 Z" fill="#1565C0"/>
-              <rect x="48" y="68" width="24" height="30" rx="4" fill="white"/>
-              <path d="M32 58 L50 76 L86 44" stroke="white" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg viewBox="0 0 120 120" fill="none" width="56" height="56">
+              <rect width="120" height="120" rx="22" fill="#FFFFFF"/>
+              <rect width="120" height="120" rx="22" fill="none" stroke="#E0E0E0" strokeWidth="1"/>
+              <path d="M60 28 L95 52 L95 92 L25 92 L25 52 Z" fill="#2196F3"/>
+              <path d="M14 54 L60 18 L106 54 L95 60 L60 28 L25 60 Z" fill="#1565C0"/>
+              <rect x="49" y="65" width="22" height="27" rx="3" fill="white"/>
+              <circle cx="85" cy="34" r="18" fill="#FFC107"/>
+              <path d="M75 34 L82 41 L96 27" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
             </svg>
           </div>
           <h1 className="auth-title">Crear Cuenta</h1>

@@ -436,15 +436,25 @@ function AppContent() {
     try {
       const { environmentName, pin, profiles: profileList, planType } = data;
       
-      // Store plan type in environment (future implementation)
-      console.log('[Onboarding] Selected plan:', planType);
-      
       if (environment && environment.profiles.length === 0 && profileList.length > 0) {
         for (const profileData of profileList) {
           await addProfile(profileData.name, currentUser?.email || '', profileData.permissions);
         }
       } else {
         await createEnvironment(environmentName, pin, profileList);
+      }
+      
+      // Si eligió un plan pago, redirigir a Mercado Pago
+      if (planType === 'PREMIUM_MONTHLY' || planType === 'PREMIUM_YEARLY') {
+        try {
+          const { redirectToCheckout } = await import('./services/paymentGatewayService');
+          await redirectToCheckout(planType);
+          // La redirección ocurre en redirectToCheckout — si llegamos acá, hubo error silencioso
+        } catch (paymentError) {
+          console.error('[Onboarding] Error al redirigir a pago:', paymentError);
+          // Mostrar error al usuario — el environment ya fue creado como FREE
+          // No bloquear el flujo, el usuario puede pagar desde Configuración
+        }
       }
     } catch (error) {
       console.error('Error during onboarding:', error);

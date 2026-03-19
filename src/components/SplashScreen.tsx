@@ -4,15 +4,18 @@ function DommussLogo() {
   return (
     <svg width="120" height="120" viewBox="0 0 120 120" fill="none" className="splash-logo">
       {/* Fondo blanco redondeado */}
-      <rect width="120" height="120" rx="24" fill="white"/>
-      {/* Casa azul */}
-      <path d="M60 22 L98 48 L98 98 L22 98 L22 48 Z" fill="#1565C0"/>
-      {/* Techo */}
-      <path d="M12 50 L60 16 L108 50 L98 57 L60 26 L22 57 Z" fill="#1E88E5"/>
-      {/* Puerta */}
-      <rect x="48" y="68" width="24" height="30" rx="4" fill="white"/>
-      {/* Tilde blanco */}
-      <path d="M32 58 L50 76 L86 44" stroke="white" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
+      <rect width="120" height="120" rx="22" fill="#FFFFFF"/>
+      {/* Sombra/borde sutil */}
+      <rect width="120" height="120" rx="22" fill="none" stroke="#E0E0E0" strokeWidth="1"/>
+      {/* Cuerpo de la casa - azul */}
+      <path d="M60 28 L95 52 L95 92 L25 92 L25 52 Z" fill="#2196F3"/>
+      {/* Techo - azul más oscuro */}
+      <path d="M14 54 L60 18 L106 54 L95 60 L60 28 L25 60 Z" fill="#1565C0"/>
+      {/* Puerta - blanca */}
+      <rect x="49" y="65" width="22" height="27" rx="3" fill="white"/>
+      {/* Tilde/checkmark - AMARILLO, fuera de la casa (arriba a la derecha) */}
+      <circle cx="85" cy="34" r="18" fill="#FFC107"/>
+      <path d="M75 34 L82 41 L96 27" stroke="white" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
     </svg>
   );
 }

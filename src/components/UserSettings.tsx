@@ -6,6 +6,7 @@ import { Button } from './Button';
 import { Avatar } from './Avatar';
 import { LogViewer } from './LogViewer';
 import { SubscriptionStatus } from './Subscription/SubscriptionStatus';
+import { SubscriptionModal } from './Subscription/SubscriptionModal';
 import { useAuth } from '../contexts/AuthContext';
 import './UserSettings.css';
 
@@ -34,6 +35,7 @@ export function UserSettingsModal({
   const [success, setSuccess] = useState('');
   const [showLogViewer, setShowLogViewer] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const colors = [
     '#1E88E5', '#43A047', '#FB8C00', '#8E24AA',
@@ -187,7 +189,7 @@ export function UserSettingsModal({
                   <Button
                     variant="primary"
                     fullWidth
-                    onClick={() => setShowSubscription(true)}
+                    onClick={() => setShowUpgradeModal(true)}
                   >
                     Actualizar a Premium
                   </Button>
@@ -304,7 +306,17 @@ export function UserSettingsModal({
       <SubscriptionStatus
         isOpen={showSubscription}
         onClose={() => setShowSubscription(false)}
-        onUpgrade={() => {}}
+        onUpgrade={() => setShowUpgradeModal(true)}
+      />
+      
+      {/* Subscription Upgrade Modal */}
+      <SubscriptionModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onSuccess={() => {
+          setShowUpgradeModal(false);
+          setShowSubscription(false);
+        }}
       />
     </Modal>
   );

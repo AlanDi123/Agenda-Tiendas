@@ -7,7 +7,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import * as authService from '../services/authService';
-import { sendVerificationCode, verifyCode } from '../services/emailService';
+import { sendVerificationCode, verifyCode, sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
 import { createError } from '../middleware/errorHandler';
 import { authMiddleware } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
@@ -64,12 +64,21 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     const data = registerSchema.parse(req.body);
     const result = await authService.registerUser(data);
 
+    // Enviar el mail de verificación por Resend
+    try {
+      await sendVerificationEmail(result.user.email, result.verificationToken);
+    } catch (emailError) {
+      console.error('[Auth] Error enviando mail de verificación:', emailError);
+      // No fallar el registro si el mail falla — el usuario puede reenviar
+    }
+
     res.status(201).json({
       success: true,
       data: {
         user: result.user,
-        message: 'Registration successful. Please verify your email.',
-        verificationToken: result.verificationToken,
+        message: 'Registro exitoso. Verificá tu email.',
+        // Solo devolver el token en desarrollo para testing
+        verificationToken: process.env.NODE_ENV !== 'production' ? result.verificationToken : undefined,
       },
     });
   } catch (error) {
@@ -103,10 +112,20 @@ router.post('/resend-verification', async (req: Request, res: Response, next: Ne
     const { email } = resendVerificationSchema.parse(req.body);
     const result = await authService.resendVerificationEmail(email);
 
+    // Enviar el nuevo token por Resend
+    if (result.verificationToken) {
+      try {
+        await sendVerificationEmail(email, result.verificationToken);
+      } catch (emailError) {
+        console.error('[Auth] Error reenviando mail:', emailError);
+      }
+    }
+
     res.json({
       success: true,
-      message: result.message,
-      verificationToken: result.verificationToken,
+      message: 'Código de verificación enviado',
+      // NO exponer el token en producción
+      verificationToken: process.env.NODE_ENV !== 'production' ? result.verificationToken : undefined,
     });
   } catch (error) {
     next(error);
@@ -236,10 +255,20 @@ router.post('/password-reset/request', async (req: Request, res: Response, next:
     const { email } = passwordResetRequestSchema.parse(req.body);
     const result = await authService.requestPasswordReset(email);
 
+    // Enviar mail de recuperación
+    if (result.resetToken) {
+      try {
+        await sendPasswordResetEmail(email, result.resetToken);
+      } catch (emailError) {
+        console.error('[Auth] Error enviando mail de reset:', emailError);
+      }
+    }
+
     res.json({
       success: true,
-      message: result.message,
-      resetToken: result.resetToken,
+      message: 'Si el email existe, recibirás instrucciones en tu correo.',
+      // Solo en desarrollo:
+      resetToken: process.env.NODE_ENV !== 'production' ? result.resetToken : undefined,
     });
   } catch (error) {
     next(error);

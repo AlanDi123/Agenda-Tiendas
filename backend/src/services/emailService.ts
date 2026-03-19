@@ -344,8 +344,124 @@ export async function sendFamilyEventNotification(
   );
 }
 
+/**
+ * Envía el mail de verificación con el token al usuario recién registrado.
+ * Usa Resend API directamente (sin SMTP).
+ */
+export async function sendVerificationEmail(
+  email: string,
+  verificationToken: string
+): Promise<void> {
+  if (!RESEND_API_KEY) {
+    console.warn('[EmailService] RESEND_API_KEY no configurada — mail de verificación NO enviado a:', email);
+    console.log('[EmailService] Token de verificación (DEV):', verificationToken);
+    return;
+  }
+
+  const verifyUrl = `${process.env.APP_BASE_URL || 'https://agenda-tienda.vercel.app'}/verify?token=${verificationToken}`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#f5f5f5; margin:0; padding:20px; }
+          .container { max-width:500px; margin:0 auto; background:white; border-radius:16px; overflow:hidden; box-shadow:0 2px 20px rgba(0,0,0,0.08); }
+          .header { background:#1565C0; padding:28px 24px; text-align:center; }
+          .header h1 { color:white; margin:0; font-size:22px; }
+          .header p { color:rgba(255,255,255,0.8); margin:8px 0 0; font-size:14px; }
+          .body { padding:28px 24px; }
+          .btn { display:block; background:#FFC107; color:#333; text-align:center; padding:14px 24px; border-radius:10px; font-weight:700; font-size:16px; text-decoration:none; margin:20px 0; }
+          .token-box { background:#f5f5f5; border:2px dashed #ddd; border-radius:8px; padding:14px; text-align:center; margin:16px 0; font-family:monospace; font-size:13px; word-break:break-all; color:#555; }
+          .warning { background:#fff3cd; border-left:4px solid #FFC107; padding:12px 16px; margin:16px 0; border-radius:0 8px 8px 0; font-size:13px; }
+          .footer { text-align:center; padding:16px 24px; color:#999; font-size:12px; border-top:1px solid #f0f0f0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🏠 Dommuss Agenda</h1>
+            <p>Verificá tu dirección de email</p>
+          </div>
+          <div class="body">
+            <p>¡Hola! Gracias por registrarte en <strong>Dommuss Agenda</strong>.</p>
+            <p>Para activar tu cuenta, hacé clic en el botón de abajo:</p>
+            <a href="${verifyUrl}" class="btn">✅ Verificar mi email</a>
+            <p style="font-size:13px;color:#666;">O copiá este token en la pantalla de verificación:</p>
+            <div class="token-box">${verificationToken}</div>
+            <div class="warning">
+              <strong>⚠️ Este enlace expira en 24 horas.</strong><br>
+              Si no creaste una cuenta en Dommuss, ignorá este mail.
+            </div>
+          </div>
+          <div class="footer">
+            © ${new Date().getFullYear()} Dommuss Agenda — Este es un mail automático.
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `Verificá tu email en Dommuss Agenda.\n\nToken de verificación: ${verificationToken}\n\nO ingresá a: ${verifyUrl}\n\nEste enlace expira en 24 horas.`;
+
+  await sendViaResend(
+    email,
+    'Verificá tu email — Dommuss Agenda',
+    html,
+    text
+  );
+}
+
+/**
+ * Envía mail de recuperación de contraseña
+ */
+export async function sendPasswordResetEmail(
+  email: string,
+  resetToken: string
+): Promise<void> {
+  if (!RESEND_API_KEY) {
+    console.warn('[EmailService] RESEND_API_KEY no configurada — mail de reset NO enviado');
+    console.log('[EmailService] Reset token (DEV):', resetToken);
+    return;
+  }
+
+  const resetUrl = `${process.env.APP_BASE_URL || 'https://agenda-tienda.vercel.app'}/reset-password?token=${resetToken}`;
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:500px;margin:0 auto;">
+      <div style="background:#1565C0;color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;">
+        <h2 style="margin:0;">🔑 Recuperar contraseña</h2>
+        <p style="margin:8px 0 0;opacity:.8;font-size:14px;">Dommuss Agenda</p>
+      </div>
+      <div style="background:#f9f9f9;padding:24px;border-radius:0 0 12px 12px;">
+        <p>Recibimos una solicitud para restablecer tu contraseña.</p>
+        <a href="${resetUrl}" style="display:block;background:#1565C0;color:white;text-align:center;padding:14px;border-radius:8px;font-weight:700;text-decoration:none;margin:20px 0;">
+          Restablecer contraseña
+        </a>
+        <p style="font-size:12px;color:#888;">Token: <code>${resetToken}</code></p>
+        <p style="font-size:13px;color:#666;background:#fff3cd;padding:12px;border-radius:6px;">
+          ⚠️ Este enlace expira en 1 hora. Si no solicitaste el cambio, ignorá este mail.
+        </p>
+        <p style="font-size:12px;color:#999;text-align:center;margin-top:16px;">© ${new Date().getFullYear()} Dommuss Agenda</p>
+      </div>
+    </div>
+  `;
+
+  const text = `Restablecé tu contraseña en: ${resetUrl}\n\nToken: ${resetToken}\n\nEste enlace expira en 1 hora.`;
+
+  await sendViaResend(
+    email,
+    'Recuperar contraseña — Dommuss Agenda',
+    html,
+    text
+  );
+}
+
 export default {
   sendVerificationCode,
   verifyCode,
   invalidateUserTokens,
+  sendFamilyEventNotification,
+  sendVerificationEmail,
+  sendPasswordResetEmail,
 };
