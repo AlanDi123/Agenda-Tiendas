@@ -31,3 +31,8 @@ android/**/build/
 android/app/keystore.jks
 android/app/keystore.properties
 
+# Environment variables
+.env
+.env.local
+.env.production
+
