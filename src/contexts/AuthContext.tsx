@@ -289,6 +289,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('No environment loaded');
     }
 
+    // Verificar que el email no esté ya en esta familia
+    const emailNorm = email.trim().toLowerCase();
+    if (emailNorm) {
+      const exists = currentEnv.profiles.some(
+        p => p.email.trim().toLowerCase() === emailNorm
+      );
+      if (exists) {
+        throw new Error('Este email ya pertenece a un integrante de esta familia');
+      }
+    }
+
     const profile: Profile = {
       id: generateId(),
       name,
@@ -320,6 +331,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = useCallback(async (profile: Profile) => {
     if (!environment) throw new Error('No environment loaded');
+
+    // Propagar cambio de color a todos los eventos asignados a este perfil
+    const { getAllEvents, saveEvent } = await import('../services/database');
+    const oldProfile = environment.profiles.find(p => p.id === profile.id);
+    if (oldProfile && oldProfile.avatarColor !== profile.avatarColor) {
+      const allEvents = await getAllEvents();
+      for (const event of allEvents) {
+        if (event.assignedProfileIds.includes(profile.id)) {
+          await saveEvent({ ...event, color: profile.avatarColor, updatedAt: new Date() });
+        }
+      }
+    }
 
     const updatedEnv = {
       ...environment,

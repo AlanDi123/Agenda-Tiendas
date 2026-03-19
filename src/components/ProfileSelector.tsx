@@ -84,30 +84,39 @@ export function ProfileSelector({
 interface AddProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (name: string, permissions: 'admin' | 'readonly') => void;
+  onAdd: (name: string, permissions: 'admin' | 'readonly', color: string) => void;
 }
 
 export function AddProfileModal({ isOpen, onClose, onAdd }: AddProfileModalProps) {
   const [name, setName] = useState('');
   const [permissions, setPermissions] = useState<'admin' | 'readonly'>('readonly');
+  const [color, setColor] = useState('#1976d2');
   const [error, setError] = useState('');
-  
+
+  const COLORS = [
+    '#1976d2','#e53935','#43a047','#fb8c00',
+    '#8e24aa','#00897b','#f4511e','#039be5',
+    '#6d4c41','#546e7a',
+  ];
+
   const handleSubmit = () => {
     if (!name.trim()) {
       setError('El nombre es obligatorio');
       return;
     }
-    
+
     setError('');
-    onAdd(name.trim(), permissions);
+    onAdd(name.trim(), permissions, color);
     setName('');
     setPermissions('readonly');
+    setColor('#1976d2');
     onClose();
   };
-  
+
   const handleClose = () => {
     setName('');
     setPermissions('readonly');
+    setColor('#1976d2');
     setError('');
     onClose();
   };
@@ -124,11 +133,27 @@ export function AddProfileModal({ isOpen, onClose, onAdd }: AddProfileModalProps
           <Avatar
             name={name || 'Nombre'}
             initials={name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??'}
-            color="#1976d2"
+            color={color}
             size="xl"
           />
         </div>
-        
+
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center', margin:'8px 0' }}>
+          {COLORS.map(c => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              style={{
+                width:28, height:28, borderRadius:'50%', background:c, border:'none',
+                outline: color === c ? '3px solid #fff' : 'none',
+                boxShadow: color === c ? `0 0 0 5px ${c}` : 'none',
+                cursor:'pointer'
+              }}
+            />
+          ))}
+        </div>
+
         <div className="add-profile-input">
           <label className="input-label">Nombre</label>
           <input
