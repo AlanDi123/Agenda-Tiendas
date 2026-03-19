@@ -60,6 +60,16 @@ app.use(cors({
   exposedHeaders: ['X-Request-Id', 'X-RateLimit-Remaining'],
 }));
 
+// Handle OPTIONS preflight requests explicitly
+app.options('*', cors());
+
+// ============================================
+// BODY PARSING — DEBE IR ANTES DE RATE LIMIT Y ROUTES
+// ============================================
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
 // ============================================
 // RATE LIMITING
 // ============================================
@@ -69,7 +79,6 @@ const apiLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  // Vercel pasa la IP real en x-forwarded-for
   keyGenerator: (req) =>
     (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
     req.ip || 'unknown',
@@ -87,13 +96,6 @@ const webhookLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 1000,
 });
-
-// ============================================
-// BODY PARSING
-// ============================================
-
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ============================================
 // LOGGING
