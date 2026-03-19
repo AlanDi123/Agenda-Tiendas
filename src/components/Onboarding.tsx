@@ -31,7 +31,6 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
   const [showPin, setShowPin] = useState(false);
   const [profiles, setProfiles] = useState<Array<{ name: string; permissions: 'admin' | 'readonly' }>>([]);
   const [newProfileName, setNewProfileName] = useState('');
-  const [newProfilePermissions] = useState<'admin' | 'readonly'>('admin');
   const [selectedPlan, setSelectedPlan] = useState<'FREE' | 'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY'>('FREE');
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
@@ -39,9 +38,8 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
 
   const handleAddProfile = () => {
     if (!newProfileName.trim()) return;
-    setProfiles(prev => [...prev, { name: newProfileName.trim(), permissions: newProfilePermissions }]);
+    setProfiles(prev => [...prev, { name: newProfileName.trim(), permissions: 'admin' as const }]);
     setNewProfileName('');
-    setNewProfilePermissions('admin');
   };
 
   const removeProfile = (index: number) => setProfiles(prev => prev.filter((_, i) => i !== index));
