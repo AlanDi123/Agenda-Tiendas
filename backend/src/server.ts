@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
+import { corsMiddleware } from './middleware/cors';
 import { subscriptionRoutes } from './routes/subscriptions';
 import { webhookRoutes } from './routes/webhooks';
 import { discountRoutes } from './routes/discounts';
@@ -24,41 +25,10 @@ dotenv.config();
 const app = express();
 const API_VERSION = 'v1';
 
-const allowedOrigins = [
-  'https://agenda-tienda.vercel.app',
-  'https://agenda-tiendas.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
-console.log('[Server] CORS allowed origins:', allowedOrigins);
-
 // ============================================
-// VERCEL CORS FIX (Middleware Nativo) - DEBE IR PRIMERO
+// CORS MIDDLEWARE - DEBE IR PRIMERO (antes de cualquier otro middleware)
 // ============================================
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  // Si el origen de la petición está en nuestra lista, lo devolvemos dinámicamente
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    // Fallback seguro (importante para apps móviles o llamadas de sistema)
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
-  }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Webhook-Signature, X-Device, X-App-Version, x-deploy-secret');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-  // Vercel preflight interceptor: Si es OPTIONS, cortamos aquí y devolvemos 200 OK
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-  
-  next();
-});
+app.use(corsMiddleware);
 
 // ============================================
 // SECURITY MIDDLEWARE
