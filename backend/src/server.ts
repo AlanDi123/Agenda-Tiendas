@@ -4,7 +4,6 @@
  */
 
 import express from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
@@ -23,19 +22,8 @@ import { requestLogger } from './middleware/requestLogger';
 dotenv.config();
 
 const app = express();
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'https://agenda-tienda.vercel.app';
 const API_VERSION = 'v1';
 
-// ============================================
-// SECURITY MIDDLEWARE
-// ============================================
-
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false,
-}));
-
-// CORS — acepta solo tus dominios legítimos
 const allowedOrigins = [
   'https://agenda-tienda.vercel.app',
   'https://agenda-tiendas.vercel.app',
@@ -45,52 +33,44 @@ const allowedOrigins = [
 
 console.log('[Server] CORS allowed origins:', allowedOrigins);
 
-// 1. Manejador manual de OPTIONS (Crucial para Vercel Serverless)
-// Vercel intercepta las peticiones preflight, esto asegura que siempre tengan respuesta
-app.options('*', (req, res) => {
-  const requestOrigin = req.headers.origin;
-  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
-    res.header('Access-Control-Allow-Origin', requestOrigin);
+// ============================================
+// VERCEL CORS FIX (Middleware Nativo) - DEBE IR PRIMERO
+// ============================================
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Si el origen de la petición está en nuestra lista, lo devolvemos dinámicamente
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
   } else {
-    // Fallback seguro
-    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+    // Fallback seguro (importante para apps móviles o llamadas de sistema)
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
   }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Webhook-Signature, X-Device, X-App-Version, x-deploy-secret');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(204);
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Webhook-Signature, X-Device, X-App-Version, x-deploy-secret');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  // Vercel preflight interceptor: Si es OPTIONS, cortamos aquí y devolvemos 200 OK
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
+  next();
 });
 
-// 2. Middleware principal de CORS
-app.use(cors({
-  origin: (origin, callback) => {
-    // Permitir requests sin origin (mobile apps Capacitor, Postman)
-    if (!origin) return callback(null, true);
-    
-    // Permitir si está en la lista blanca
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    console.warn('[CORS] Blocked origin:', origin);
-    // FIX CLAVE: En Vercel, arrojar un error aquí rompe el proceso. 
-    // Devolver "false" bloquea la petición silenciosamente y de forma segura.
-    callback(null, false);
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Content-Type', 'Authorization',
-    'X-Webhook-Signature', 'X-Device',
-    'X-App-Version', 'x-deploy-secret',
-  ],
-  credentials: true,
-  exposedHeaders: ['X-Request-Id', 'X-RateLimit-Remaining'],
+// ============================================
+// SECURITY MIDDLEWARE
+// ============================================
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
 }));
 
 // ============================================
 // BODY PARSING — DEBE IR ANTES DE RATE LIMIT Y ROUTES
 // ============================================
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
