@@ -1,5 +1,12 @@
-// Enhanced Logging Service
-// Captures unhandled exceptions, background failures, and enables export
+/**
+ * logger.ts — Logger seguro para Capacitor + React
+ * 
+ * FIX aplicado: el logger anterior interceptaba console.error y luego
+ * lo llamaba internamente → recursión infinita → stack overflow.
+ * 
+ * Solución: guardar referencias NATIVAS antes de cualquier override,
+ * y NUNCA patchear console.* — usar addEventListener directamente.
+ */
 
 export interface LogEntry {
   id: string;
@@ -13,9 +20,30 @@ export interface LogEntry {
   sessionId: string;
 }
 
+type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+
+const IS_DEV    = import.meta.env.DEV
 const LOG_KEY = 'dommuss_app_logs';
 const MAX_LOGS = 100;
 const SESSION_KEY = 'dommuss_session_id';
+
+// ─────────────────────────────────────────────────────────────────
+// PASO CRÍTICO: guardar referencias NATIVAS *antes* de cualquier
+// override. Esto rompe el bucle de raíz.
+// ─────────────────────────────────────────────────────────────────
+const _native = {
+  log:   console.log.bind(console),
+  info:  console.info.bind(console),
+  warn:  console.warn.bind(console),
+  error: console.error.bind(console),
+} as const
+
+const PREFIX: Record<LogLevel, string> = {
+  debug: '🔍 [DEBUG]',
+  info:  'ℹ️  [INFO] ',
+  warn:  '⚠️  [WARN] ',
+  error: '❌ [ERROR]',
+}
 
 // Generate or retrieve session ID
 function getSessionId(): string {
@@ -69,7 +97,7 @@ function saveLog(log: LogEntry): void {
   try {
     const logs = AppLogger.getLogs();
     logs.unshift(log);
-    
+
     // Trim to max logs
     while (logs.length > MAX_LOGS) {
       logs.pop();
@@ -78,20 +106,47 @@ function saveLog(log: LogEntry): void {
     localStorage.setItem(LOG_KEY, JSON.stringify(logs));
   } catch (e) {
     // Storage might be full, try to clear old logs
-    console.error('Error saving log, storage might be full:', e);
+    _native.error('Error saving log, storage might be full:', e);
     try {
       const logs = AppLogger.getLogs();
       logs.splice(0, Math.floor(logs.length / 2)); // Remove oldest half
       logs.unshift(log);
       localStorage.setItem(LOG_KEY, JSON.stringify(logs));
     } catch (e2) {
-      console.error('Failed to save log after cleanup:', e2);
+      _native.error('Failed to save log after cleanup:', e2);
     }
   }
 }
 
+class AppLoggerClass {
+  private readonly tag: string
+
+  constructor(context: string) {
+    this.tag = context
+  }
+
+  private _emit(level: LogLevel, args: unknown[]): void {
+    if (level === 'debug' && !IS_DEV) return
+
+    const label = `${PREFIX[level]} ${this.tag}:`
+
+    // ✅ SIEMPRE usar _native — NUNCA console.xxx directo
+    switch (level) {
+      case 'debug': _native.log(label, ...args);   break
+      case 'info':  _native.info(label, ...args);  break
+      case 'warn':  _native.warn(label, ...args);  break
+      case 'error': _native.error(label, ...args); break
+    }
+  }
+
+  debug(...args: unknown[]): void { this._emit('debug', args) }
+  info (...args: unknown[]): void { this._emit('info',  args) }
+  warn (...args: unknown[]): void { this._emit('warn',  args) }
+  error(...args: unknown[]): void { this._emit('error', args) }
+}
+
 export const AppLogger = {
-  // Core logging method
+  // Core logging method — usa _native directamente
   log: (
     level: LogEntry['level'],
     message: string,
@@ -101,23 +156,25 @@ export const AppLogger = {
   ): void => {
     const logEntry = createLogEntry(level, message, error, context, metadata);
     saveLog(logEntry);
-    
-    // Also log to console with context
-    const consoleMethod = console[level] || console.log;
-    consoleMethod(`[${level.toUpperCase()}] ${context || 'App'}: ${message}`, error || '');
+
+    // Also log to console with context — usa _native, NO console[level]
+    const nativeMethod = level === 'error' ? _native.error : 
+                         level === 'warn' ? _native.warn : 
+                         level === 'info' ? _native.info : _native.log;
+    nativeMethod(`[${level.toUpperCase()}] ${context || 'App'}: ${message}`, error || '');
   },
 
   // Convenience methods
-  error: (message: string, error?: any, context?: string): void => 
+  error: (message: string, error?: any, context?: string): void =>
     AppLogger.log('error', message, error, context),
-  
-  warn: (message: string, error?: any, context?: string): void => 
+
+  warn: (message: string, error?: any, context?: string): void =>
     AppLogger.log('warn', message, error, context),
-  
-  info: (message: string, metadata?: Record<string, any>, context?: string): void => 
+
+  info: (message: string, metadata?: Record<string, any>, context?: string): void =>
     AppLogger.log('info', message, undefined, context, metadata),
-  
-  debug: (message: string, metadata?: Record<string, any>, context?: string): void => 
+
+  debug: (message: string, metadata?: Record<string, any>, context?: string): void =>
     AppLogger.log('debug', message, undefined, context, metadata),
 
   // Get logs from storage
@@ -144,9 +201,9 @@ export const AppLogger = {
   clearLogs: (): void => {
     try {
       localStorage.removeItem(LOG_KEY);
-      console.info('Logs cleared');
+      _native.info('Logs cleared');
     } catch (e) {
-      console.error('Error clearing logs:', e);
+      _native.error('Error clearing logs:', e);
     }
   },
 
@@ -156,7 +213,7 @@ export const AppLogger = {
       const logs = AppLogger.getLogs();
       return JSON.stringify(logs, null, 2);
     } catch (e) {
-      console.error('Error exporting logs:', e);
+      _native.error('Error exporting logs:', e);
       return '[]';
     }
   },
@@ -176,7 +233,7 @@ export const AppLogger = {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error('Error exporting logs to file:', e);
+      _native.error('Error exporting logs to file:', e);
     }
   },
 
@@ -211,24 +268,28 @@ export const AppLogger = {
   searchLogs: (query: string): LogEntry[] => {
     const lowerQuery = query.toLowerCase();
     return AppLogger.getLogs().filter(
-      log => 
+      log =>
         log.message.toLowerCase().includes(lowerQuery) ||
         log.context?.toLowerCase().includes(lowerQuery) ||
         log.stack?.toLowerCase().includes(lowerQuery)
     );
   },
 
-  // Initialize global error handlers
+  // Initialize global error handlers — usa AppLoggerClass para logs internos
   initGlobalHandlers: (): void => {
+    const globalLogger = new AppLoggerClass('GlobalError');
+
     // Unhandled promise rejections
     window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
-      const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
-      AppLogger.log('error', 'Unhandled Promise Rejection', error, 'GlobalHandler');
+      globalLogger.error(
+        'Unhandled Promise Rejection',
+        event.reason instanceof Error ? event.reason : new Error(String(event.reason))
+      );
     });
 
     // Global error handler
     window.addEventListener('error', (event: ErrorEvent) => {
-      AppLogger.log('error', 'Global Error', event.error, 'GlobalHandler', {
+      globalLogger.error('Global Error', event.error, {
         filename: event.filename,
         lineno: event.lineno,
         colno: event.colno,
@@ -240,7 +301,7 @@ export const AppLogger = {
     const originalFetch = window.fetch;
     window.fetch = function(...args) {
       return originalFetch.apply(this, args).catch((error) => {
-        AppLogger.log('error', 'Network Error', error, 'Network', {
+        globalLogger.error('Network Error', error, {
           url: args[0] instanceof Request ? args[0].url : String(args[0]),
           method: args[1]?.method || 'GET',
         });
@@ -248,7 +309,7 @@ export const AppLogger = {
       });
     };
 
-    console.info('Global error handlers initialized');
+    _native.info('Global error handlers initialized');
   },
 
   // Log app lifecycle events
