@@ -22,7 +22,7 @@ import {
   resetPassword as resetPasswordService,
   upgradeToPremium as upgradeService,
 } from '../services/authService';
-import { hasPremiumAccess as _hasPremiumAccess, getUserPlan, getUserSubscription as _getUserSubscription, initializeDiscountCodes } from '../services/subscriptionService';
+import { getUserPlan, initializeDiscountCodes } from '../services/subscriptionService';
 import { generateId, getInitials, generateAvatarColor, generateFamilyCode } from '../utils/helpers';
 
 interface AuthContextType {
@@ -188,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCurrentUser({ ...currentUser, emailVerified: true });
     }
     return success;
-  }, [currentUser]);
+  }, []);
 
   const handleResendVerificationEmail = useCallback(async (email: string) => {
     return resendVerificationEmail(email);
@@ -282,22 +282,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     recoveryEmail?: string,
     avatarColor?: string
   ): Promise<Profile> => {
-    let currentEnv = environment;
-    let attempts = 0;
-    while (!currentEnv && attempts < 10) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      currentEnv = environment;
-      attempts++;
-    }
-
-    if (!currentEnv) {
+    if (!environment) {
       throw new Error('No environment loaded');
     }
 
     // Verificar que el email no esté ya en esta familia
     const emailNorm = email.trim().toLowerCase();
     if (emailNorm) {
-      const exists = currentEnv.profiles.some(
+      const exists = environment.profiles.some(
         p => p.email.trim().toLowerCase() === emailNorm
       );
       if (exists) {
@@ -318,8 +310,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const updatedEnv = {
-      ...currentEnv,
-      profiles: [...currentEnv.profiles, profile],
+      ...environment,
+      profiles: [...environment.profiles, profile],
       activeProfileId: profile.id,
     };
 

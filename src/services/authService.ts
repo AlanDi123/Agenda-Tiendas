@@ -160,13 +160,19 @@ export async function getCurrentUser(): Promise<User | null> {
         clearAuthToken();
         return null;
       }
-      // Reintentar con el nuevo token directamente, SIN llamar getCurrentUser()
+      
+      // Reintentar con el nuevo token directamente
       const newToken = getAuthToken();
-      if (!newToken) return null;
+      if (!newToken) {
+        clearAuthToken();
+        return null;
+      }
+      
       try {
         const retryRes = await fetch(`${API_URL}/api/v1/auth/me`, {
           headers: { Authorization: `Bearer ${newToken}` },
         });
+        
         if (retryRes.ok) {
           const retryData = await retryRes.json();
           if (retryData.success && retryData.data) {
@@ -182,8 +188,15 @@ export async function getCurrentUser(): Promise<User | null> {
             saveCurrentUser(user);
             return user;
           }
+        } else if (retryRes.status === 401) {
+          // Token sigue siendo inválido
+          clearAuthToken();
+          return null;
         }
-      } catch { /* ignorar */ }
+      } catch (error) {
+        console.error('[AuthService] Error en retry:', error);
+      }
+      
       clearAuthToken();
       return null;
     }

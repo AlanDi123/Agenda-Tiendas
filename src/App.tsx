@@ -241,6 +241,13 @@ function AppContent() {
     }
   }, [isAuthenticated, loadEvents]);
 
+  // Set active profile if not set but environment has profiles
+  useEffect(() => {
+    if (!activeProfile && environment && environment.profiles.length > 0) {
+      setActiveProfile(environment.profiles[0].id);
+    }
+  }, [environment, activeProfile, setActiveProfile]);
+
   // Navigation handlers
   const handleViewChange = useCallback((view: CalendarView) => {
     setCurrentView(view);
@@ -323,9 +330,14 @@ function AppContent() {
   }, []);
 
   // Check premium before allowing advanced features
-  const requirePremium = useCallback((_feature: string, callback: () => void) => {
+  const requirePremium = useCallback((feature: string, callback: () => void) => {
     if (!isPremium) {
-      setShowPaymentModal(true);
+      try {
+        setShowPaymentModal(true);
+      } catch (error) {
+        console.error(`[Premium] Error showing payment modal for feature "${feature}":`, error);
+        alert('Error al mostrar opciones de pago. Por favor intenta más tarde.');
+      }
     } else {
       callback();
     }
@@ -712,10 +724,6 @@ function AppContent() {
   }
 
   if (!activeProfile) {
-    if (environment.profiles.length > 0) {
-      setActiveProfile(environment.profiles[0].id);
-      return null;
-    }
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
 
@@ -904,15 +912,19 @@ function AppContent() {
       <ReloadPrompt />
 
       {/* Payment Modal */}
-      <PaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => {
-          setShowPaymentModal(false);
-        }}
-        onSuccess={() => {
-          setShowPaymentModal(false);
-        }}
-      />
+      {showPaymentModal && (
+        <ErrorBoundary>
+          <PaymentModal
+            isOpen={showPaymentModal}
+            onClose={() => {
+              setShowPaymentModal(false);
+            }}
+            onSuccess={() => {
+              setShowPaymentModal(false);
+            }}
+          />
+        </ErrorBoundary>
+      )}
     </div>
   );
 }

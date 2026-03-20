@@ -219,6 +219,17 @@ export async function registerUser(data: {
 }> {
   const { email, password, role = 'USER' } = data;
 
+  // Validar email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw createError('Email format is invalid', 400, 'INVALID_EMAIL');
+  }
+
+  // Validar password length
+  if (password.length < 8) {
+    throw createError('Password must be at least 8 characters', 400, 'PASSWORD_TOO_SHORT');
+  }
+
   // Check if user already exists
   const existingUsers = await db.select({ id: users.id })
     .from(users)
