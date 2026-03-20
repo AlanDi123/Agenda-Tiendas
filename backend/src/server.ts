@@ -45,18 +45,37 @@ const allowedOrigins = [
 
 console.log('[Server] CORS allowed origins:', allowedOrigins);
 
+// 1. Manejador manual de OPTIONS (Crucial para Vercel Serverless)
+// Vercel intercepta las peticiones preflight, esto asegura que siempre tengan respuesta
+app.options('*', (req, res) => {
+  const requestOrigin = req.headers.origin;
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    res.header('Access-Control-Allow-Origin', requestOrigin);
+  } else {
+    // Fallback seguro
+    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Webhook-Signature, X-Device, X-App-Version, x-deploy-secret');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(204);
+});
+
+// 2. Middleware principal de CORS
 app.use(cors({
   origin: (origin, callback) => {
     // Permitir requests sin origin (mobile apps Capacitor, Postman)
     if (!origin) return callback(null, true);
     
-    // Validación estricta: Solo dominios en la lista (eliminamos el origin.endsWith inseguro)
+    // Permitir si está en la lista blanca
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     
     console.warn('[CORS] Blocked origin:', origin);
-    callback(new Error(`CORS: origin ${origin} no permitido`));
+    // FIX CLAVE: En Vercel, arrojar un error aquí rompe el proceso. 
+    // Devolver "false" bloquea la petición silenciosamente y de forma segura.
+    callback(null, false);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
