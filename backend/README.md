@@ -2,6 +2,20 @@
 
 Production-safe backend for Dommuss Agenda SaaS with complete agenda module, authentication, and subscription management.
 
+## Despliegue unificado en Vercel (recomendado)
+
+El API se despliega **junto al frontend** desde la **raíz del monorepo**: un solo proyecto Vercel, un solo panel de variables de entorno.
+
+1. Conectá el repositorio en Vercel con **Root Directory** = raíz del repo (no `backend/`).
+2. Build Command por defecto: `npm run build:vercel` (definido en [`vercel.json`](../vercel.json) en la raíz).
+3. Las rutas `/api/*` las atiende la función serverless [`api/server.ts`](../api/server.ts), que carga `backend/dist/server.js` tras `npm run build` en el workspace `backend`.
+4. Copiá todas las variables de entorno del backend al mismo proyecto Vercel (`DATABASE_URL`, `JWT_SECRET`, `MERCADO_PAGO_*`, `APP_BASE_URL`, etc.).
+5. Webhooks: `https://<tu-dominio-vercel>/api/webhooks/...` (misma URL base que la app web).
+
+El archivo `backend/vercel.json` fue retirado para evitar duplicar configuración; la fuente de verdad es el `vercel.json` de la raíz.
+
+Para desarrollo local del API seguís usando `cd backend && npm run dev` (puerto 3001); el frontend con `npm run dev` proxifica `/api` a ese puerto (Vite).
+
 ## 🔒 Security Principles
 
 1. **Frontend NEVER decides subscription validity** - Only backend responses are trusted

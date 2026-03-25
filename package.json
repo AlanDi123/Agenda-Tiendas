@@ -3,9 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "backend"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:vercel": "npm run build && npm run build --workspace=dommuss-agenda-backend",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -27,6 +31,7 @@
     "vite-plugin-pwa": "^0.21.2"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "5.7.0",
     "@capgo/capacitor-updater": "lts-v5",

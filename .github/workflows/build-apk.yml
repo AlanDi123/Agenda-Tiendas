@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # ── 4. Build del frontend (inyectando la URL del backend real) ────────
+      # ── 4. Build del frontend (Capacitor: URL pública del API; con Vercel unificado = mismo host que la web, ej. https://agenda-tienda.vercel.app)
       - name: Build Web App
         run: npm run build
         env:

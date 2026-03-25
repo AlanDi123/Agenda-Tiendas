@@ -170,7 +170,7 @@ export async function getAvailablePlans(): Promise<Array<{
       .where(eq(plans.active, true))
       .orderBy(plans.priceUsd);
 
-    return foundPlans.map((plan) => ({
+    return foundPlans.map((plan: (typeof foundPlans)[number]) => ({
       ...plan,
       features: JSON.parse(plan.features),
     }));

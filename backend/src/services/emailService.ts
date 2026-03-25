@@ -257,6 +257,30 @@ export async function sendPasswordResetEmail(
 }
 
 // ─── Mail de código de familia ────────────────────────────────────────────────
+/** Notificación de cambio de evento a otros miembros (best-effort, no bloquea la app). */
+export async function sendFamilyEventNotification(
+  emails: string[],
+  actorName: string,
+  action: string,
+  eventTitle: string,
+  startDate?: Date
+): Promise<void> {
+  const when = startDate ? startDate.toLocaleString('es-AR') : '';
+  const actionLabel =
+    action === 'create' ? 'Nuevo evento' : action === 'update' ? 'Evento actualizado' : 'Evento eliminado';
+  const text = `${actionLabel}: "${eventTitle}"${when ? ` (${when})` : ''}\n— ${actorName} (Dommuss Agenda)`;
+  await Promise.all(
+    emails.map((to) =>
+      sendEmail({
+        to,
+        subject: `${actionLabel}: ${eventTitle} — Dommuss`,
+        html: `<p>${text.replace(/\n/g, '<br/>')}</p>`,
+        text,
+      }).catch(() => {})
+    )
+  );
+}
+
 export async function sendFamilyCode(
   email: string,
   familyName: string,
@@ -295,7 +319,7 @@ export async function invalidateUserTokens(userId: string): Promise<void> {
   await db.update(emailVerifications)
     .set({ verified: true, verifiedAt: new Date() })
     .where(eq(emailVerifications.userId, userId))
-    .catch(err => console.error('[EmailService] invalidateUserTokens error:', err));
+    .catch((err: unknown) => console.error('[EmailService] invalidateUserTokens error:', err));
 }
 
 export default {
@@ -304,5 +328,6 @@ export default {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendFamilyCode,
+  sendFamilyEventNotification,
   invalidateUserTokens,
 };
