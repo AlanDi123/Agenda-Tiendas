@@ -90,36 +90,54 @@ export async function createUser(
 // ============================================
 
 export async function loginUser(email: string, password: string): Promise<User | null> {
-  const response = await fetch(`${API_URL}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email.toLowerCase(), password }),
-  });
+  try {
+    const response = await fetch(`${API_URL}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.toLowerCase(), password }),
+    });
 
-  const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Email o contraseña incorrectos');
+      }
+      if (response.status >= 500) {
+        throw new Error('Error del servidor. Intente más tarde.');
+      }
+      throw new Error('Error al iniciar sesión');
+    }
 
-  if (!response.ok || !data.success) {
-    throw new Error('Email o contraseña incorrectos');
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.message || 'Email o contraseña incorrectos');
+    }
+
+    // Save JWT tokens
+    saveAuthToken(data.data.accessToken);
+    if (data.data.refreshToken) {
+      localStorage.setItem('refreshToken', data.data.refreshToken);
+    }
+
+    const user: User = {
+      id: data.data.user.id,
+      email: data.data.user.email,
+      passwordHash: '',
+      emailVerified: data.data.user.emailVerified ?? false,
+      planStatus: data.data.user.planType === 'FREE' ? 'FREE' : 'PREMIUM',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    saveCurrentUser(user);
+    return user;
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      // Network error / offline
+      throw new Error('Sin conexión. Verifique su internet.');
+    }
+    throw error;
   }
-
-  // Save JWT tokens
-  saveAuthToken(data.data.accessToken);
-  if (data.data.refreshToken) {
-    localStorage.setItem('refreshToken', data.data.refreshToken);
-  }
-
-  const user: User = {
-    id: data.data.user.id,
-    email: data.data.user.email,
-    passwordHash: '',
-    emailVerified: data.data.user.emailVerified ?? false,
-    planStatus: data.data.user.planType === 'FREE' ? 'FREE' : 'PREMIUM',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  saveCurrentUser(user);
-  return user;
 }
 
 // ============================================
