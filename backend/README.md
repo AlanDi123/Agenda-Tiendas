@@ -41,7 +41,7 @@ PASSWORD_SALT="your-unique-salt-min-32-chars"
 
 # API Configuration
 PORT=3001
-CORS_ORIGIN=https://agenda-tienda.vercel.app
+CORS_ORIGINS=https://agenda-tienda.vercel.app,https://agenda-tiendas.vercel.app
 NODE_ENV=production
 
 # Payment Gateway Webhook Secrets
@@ -331,6 +331,21 @@ curl -X POST http://localhost:3001/api/v1/discounts/apply \
   }'
 ```
 
+## Verificar CORS en producción
+
+Tras desplegar, comprobar que el preflight devuelve `Access-Control-Allow-Origin` para el dominio del frontend:
+
+```bash
+curl -sS -D - -o /dev/null -X OPTIONS "https://TU-BACKEND.vercel.app/api/v1/auth/login" \
+  -H "Origin: https://TU-FRONTEND.vercel.app" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type"
+```
+
+Deberías ver `access-control-allow-origin: https://TU-FRONTEND.vercel.app` (o el origen reflejado). Si la función devuelve 500, revisá logs en Vercel y variables (`DATABASE_URL`, etc.); sin respuesta correcta el navegador mostrará error CORS aunque el problema sea otro.
+
+En el dashboard de Vercel del **backend**: no dejes `CORS_ORIGINS` vacío; si no necesitás restringir, podés borrar la variable y usar solo la lista por defecto del código.
+
 ## 🔧 Configuration
 
 | Variable | Default | Description |
@@ -338,7 +353,8 @@ curl -X POST http://localhost:3001/api/v1/discounts/apply \
 | `PORT` | 3001 | Server port |
 | `GRACE_PERIOD_HOURS` | 72 | Hours before expired |
 | `NODE_ENV` | development | Environment |
-| `CORS_ORIGIN` | http://localhost:5173 | Allowed CORS origin |
+| `CORS_ORIGINS` | (see defaults in code) | Extra allowed origins, comma-separated; merged with built-in list (incl. `agenda-tienda` / `agenda-tiendas` on Vercel). Do not set to empty. |
+| `CORS_ORIGIN` | — | Optional single origin (same as one entry in `CORS_ORIGINS`; documented for compatibility) |
 
 ## 📄 License
 

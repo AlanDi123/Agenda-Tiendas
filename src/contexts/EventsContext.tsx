@@ -11,6 +11,7 @@ import { expandRecurringEvents } from '../services/recurrence';
 import { generateId } from '../utils/helpers';
 import { AppLogger } from '../services/logger';
 import { useEventAlarms } from '../hooks/useEventAlarms';
+import { apiFetch } from '../config/api';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -73,19 +74,17 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     // Toast local para el usuario actual
     addToast(labels[action], action === 'delete' ? 'warning' : 'info');
 
-    // Notificar al backend para push a otros miembros de la familia
-    const API_URL = import.meta.env.VITE_API_URL || '';
     const token = localStorage.getItem('authToken');
-    if (API_URL && token) {
-      fetch(`${API_URL}/api/v1/notifications/family`, {
+    if (token) {
+      apiFetch('/api/v1/notifications/family', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
+        auth: true,
+        json: {
           action,
           eventTitle: event.title,
           eventId: event.id,
           startDate: event.startDate,
-        }),
+        },
       }).catch(() => {}); // Ignorar errores — no bloquear la UX
     }
   }, [addToast]);

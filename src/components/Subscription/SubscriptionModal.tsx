@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Button } from '../Button';
 import { Modal } from '../Modal';
-import { redirectToCheckout } from '../../services/paymentGatewayService';
+import {
+  redirectToCheckout,
+  validateDiscountCode,
+} from '../../services/paymentGatewayService';
 import './SubscriptionModal.css';
 
 interface PlanOption {
@@ -70,25 +73,16 @@ export function SubscriptionModal({ isOpen, onClose, onSuccess }: SubscriptionMo
     setIsProcessing(true);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/v1/discounts/validate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code: discountCode.trim() }),
-      });
-      
-      const result = await response.json();
-      
-      if (result.success && result.isValid) {
+      const result = await validateDiscountCode(discountCode.trim());
+
+      if (result.isValid) {
         setAppliedDiscount(discountCode.trim().toUpperCase());
         setDiscountError(null);
       } else {
         setAppliedDiscount(null);
         setDiscountError(result.message || 'Código inválido');
       }
-    } catch (err) {
+    } catch {
       setDiscountError('Error al validar código');
     } finally {
       setIsProcessing(false);

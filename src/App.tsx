@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EventsProvider, useEvents } from './contexts/EventsContext';
 import { TopAppBar } from './components/TopAppBar';
@@ -6,30 +6,73 @@ import { BottomNav } from './components/BottomNav';
 import { MonthView } from './components/MonthView';
 import { WeekView } from './components/WeekView';
 import { DayView } from './components/DayView';
-import { TurnosGrid } from './components/TurnosGrid';
-import { EventForm } from './components/EventForm';
-import { EventDetail } from './components/EventDetail';
-import { ProfileSelector, AddProfileModal } from './components/ProfileSelector';
-import { Onboarding } from './components/Onboarding';
 import { ConfirmDialog } from './components/Modal';
-import { UserAuthModal } from './components/UserAuth';
-import { UserSettingsModal } from './components/UserSettings';
 import { SplashScreen } from './components/SplashScreen';
 import { ToastContainer } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReloadPrompt } from './components/ReloadPrompt';
-import { ListsView } from './components/ListsView';
-import { MenuView } from './components/MenuView';
-import { ContactsView } from './components/ContactsView';
-import { NotesView } from './components/NotesView';
-import { Login } from './components/Auth/Login';
-import { Register } from './components/Auth/Register';
-import { VerifyEmail } from './components/Auth/VerifyEmail';
-import { PasswordReset } from './components/Auth/PasswordReset';
-import { NewPassword } from './components/Auth/NewPassword';
-import { PaymentModal } from './components/Payment/PaymentModal';
-import { EmailVerificationBanner } from './components/EmailVerificationBanner';
-import { UpdateModal } from './components/UpdateModal';
+import { RouteLoadingFallback } from './components/RouteLoadingFallback';
+
+const TurnosGrid = lazy(() =>
+  import('./components/TurnosGrid').then((m) => ({ default: m.TurnosGrid }))
+);
+const EventForm = lazy(() =>
+  import('./components/EventForm').then((m) => ({ default: m.EventForm }))
+);
+const EventDetail = lazy(() =>
+  import('./components/EventDetail').then((m) => ({ default: m.EventDetail }))
+);
+const ProfileSelector = lazy(() =>
+  import('./components/ProfileSelector').then((m) => ({ default: m.ProfileSelector }))
+);
+const AddProfileModal = lazy(() =>
+  import('./components/ProfileSelector').then((m) => ({ default: m.AddProfileModal }))
+);
+const Onboarding = lazy(() =>
+  import('./components/Onboarding').then((m) => ({ default: m.Onboarding }))
+);
+const UserAuthModal = lazy(() =>
+  import('./components/UserAuth').then((m) => ({ default: m.UserAuthModal }))
+);
+const UserSettingsModal = lazy(() =>
+  import('./components/UserSettings').then((m) => ({ default: m.UserSettingsModal }))
+);
+const ListsView = lazy(() =>
+  import('./components/ListsView').then((m) => ({ default: m.ListsView }))
+);
+const MenuView = lazy(() =>
+  import('./components/MenuView').then((m) => ({ default: m.MenuView }))
+);
+const ContactsView = lazy(() =>
+  import('./components/ContactsView').then((m) => ({ default: m.ContactsView }))
+);
+const NotesView = lazy(() =>
+  import('./components/NotesView').then((m) => ({ default: m.NotesView }))
+);
+const Login = lazy(() => import('./components/Auth/Login').then((m) => ({ default: m.Login })));
+const Register = lazy(() =>
+  import('./components/Auth/Register').then((m) => ({ default: m.Register }))
+);
+const VerifyEmail = lazy(() =>
+  import('./components/Auth/VerifyEmail').then((m) => ({ default: m.VerifyEmail }))
+);
+const PasswordReset = lazy(() =>
+  import('./components/Auth/PasswordReset').then((m) => ({ default: m.PasswordReset }))
+);
+const NewPassword = lazy(() =>
+  import('./components/Auth/NewPassword').then((m) => ({ default: m.NewPassword }))
+);
+const PaymentModal = lazy(() =>
+  import('./components/Payment/PaymentModal').then((m) => ({ default: m.PaymentModal }))
+);
+const EmailVerificationBanner = lazy(() =>
+  import('./components/EmailVerificationBanner').then((m) => ({
+    default: m.EmailVerificationBanner,
+  }))
+);
+const UpdateModal = lazy(() =>
+  import('./components/UpdateModal').then((m) => ({ default: m.UpdateModal }))
+);
 import { useTouchGestures } from './hooks/useTouchGestures';
 import { useAppUpdates } from './hooks/useAppUpdates';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -601,12 +644,16 @@ function AppContent() {
     return (
       <>
         <SplashScreen />
-        <UpdateModal
-          isOpen={true}
-          update={updateInfo}
-          onClose={() => { if (!isMandatory) dismissUpdate(); }}
-          onDismiss={() => dismissUpdate()}
-        />
+        <Suspense fallback={null}>
+          <UpdateModal
+            isOpen={true}
+            update={updateInfo}
+            onClose={() => {
+              if (!isMandatory) dismissUpdate();
+            }}
+            onDismiss={() => dismissUpdate()}
+          />
+        </Suspense>
       </>
     );
   }
@@ -619,78 +666,91 @@ function AppContent() {
   // Show auth flow
   if (authState === 'login') {
     return (
-      <Login
-        onSwitchToRegister={() => setAuthState('register')}
-        onSwitchToReset={() => setAuthState('password-reset')}
-        onLoginSuccess={handleLoginSuccess}
-      />
+      <Suspense fallback={<RouteLoadingFallback label="Cargando acceso…" />}>
+        <Login
+          onSwitchToRegister={() => setAuthState('register')}
+          onSwitchToReset={() => setAuthState('password-reset')}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      </Suspense>
     );
   }
 
   if (authState === 'register') {
     return (
-      <Register
-        onSwitchToLogin={() => setAuthState('login')}
-        onRegisterSuccess={handleRegisterSuccess}
-      />
+      <Suspense fallback={<RouteLoadingFallback label="Cargando registro…" />}>
+        <Register
+          onSwitchToLogin={() => setAuthState('login')}
+          onRegisterSuccess={handleRegisterSuccess}
+        />
+      </Suspense>
     );
   }
 
   if (authState === 'verify-email' && currentUser) {
     return (
-      <VerifyEmail
-        email={currentUser.email}
-        token={pendingToken}
-        onVerificationComplete={handleVerificationComplete}
-        onSkip={() => setAuthState('authenticated')}
-      />
+      <Suspense fallback={<RouteLoadingFallback label="Cargando verificación…" />}>
+        <VerifyEmail
+          email={currentUser.email}
+          token={pendingToken}
+          onVerificationComplete={handleVerificationComplete}
+          onSkip={() => setAuthState('authenticated')}
+        />
+      </Suspense>
     );
   }
 
   if (authState === 'password-reset') {
     return (
-      <PasswordReset
-        onSwitchToLogin={() => setAuthState('login')}
-        onSwitchToNewPassword={() => {
-          setAuthState('new-password');
-        }}
-      />
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <PasswordReset
+          onSwitchToLogin={() => setAuthState('login')}
+          onSwitchToNewPassword={() => {
+            setAuthState('new-password');
+          }}
+        />
+      </Suspense>
     );
   }
 
   if (authState === 'new-password') {
     return (
-      <NewPassword
-        onSuccess={handlePasswordResetSuccess}
-        onBack={() => setAuthState('password-reset')}
-      />
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <NewPassword
+          onSuccess={handlePasswordResetSuccess}
+          onBack={() => setAuthState('password-reset')}
+        />
+      </Suspense>
     );
   }
 
   // Check if we have environment and profile
   if (!environment) {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
+    return (
+      <Suspense fallback={<RouteLoadingFallback label="Preparando tu espacio…" />}>
+        <Onboarding onComplete={handleOnboardingComplete} />
+      </Suspense>
+    );
   }
 
   // Pantalla de espera mientras MP procesa el pago
   if (waitingForPayment) {
     return (
-      <div style={{
-        position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', background: 'var(--color-background)',
-        gap: 24, padding: 32, textAlign: 'center',
-      }}>
-        <div style={{ fontSize: 64 }}>🔄</div>
-        <h2 style={{ margin: 0, color: 'var(--color-text-primary)' }}>
-          Completá el pago
-        </h2>
-        <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: 15 }}>
-          Serás redirigido a Mercado Pago para confirmar tu suscripción <strong>{pendingPlanType === 'PREMIUM_YEARLY' ? 'Anual' : 'Mensual'}</strong>.
-          <br/><br/>
+      <div className="payment-wait-screen">
+        <div className="payment-wait-screen__icon" aria-hidden>
+          🔄
+        </div>
+        <h2 className="payment-wait-screen__title">Completá el pago</h2>
+        <p className="payment-wait-screen__text">
+          Serás redirigido a Mercado Pago para confirmar tu suscripción{' '}
+          <strong>{pendingPlanType === 'PREMIUM_YEARLY' ? 'Anual' : 'Mensual'}</strong>.
+          <br />
+          <br />
           Una vez confirmado el pago, tu cuenta quedará activa automáticamente.
         </p>
         <button
           type="button"
+          className="payment-wait-screen__primary"
           onClick={async () => {
             const { getSubscriptionStatus } = await import('./services/paymentGatewayService');
             const status = await getSubscriptionStatus();
@@ -701,21 +761,16 @@ function AppContent() {
               alert('El pago aún no fue confirmado. Si ya pagaste, esperá unos minutos y volvé a intentar.');
             }
           }}
-          style={{
-            background: 'var(--color-primary)', color: 'white', border: 'none',
-            borderRadius: 12, padding: '14px 28px', fontSize: 15, fontWeight: 600,
-            cursor: 'pointer',
-          }}
         >
           Ya pagué — Verificar
         </button>
         <button
           type="button"
+          className="payment-wait-screen__secondary"
           onClick={() => {
             setWaitingForPayment(false);
             setPendingPlanType(null);
           }}
-          style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 14 }}
         >
           Continuar gratis por ahora
         </button>
@@ -724,11 +779,19 @@ function AppContent() {
   }
 
   if (!activeProfile) {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
+    return (
+      <Suspense fallback={<RouteLoadingFallback label="Preparando tu espacio…" />}>
+        <Onboarding onComplete={handleOnboardingComplete} />
+      </Suspense>
+    );
   }
 
   if (environment.profiles.length === 0) {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
+    return (
+      <Suspense fallback={<RouteLoadingFallback label="Preparando tu espacio…" />}>
+        <Onboarding onComplete={handleOnboardingComplete} />
+      </Suspense>
+    );
   }
 
   const isReadOnly = activeProfile.permissions === 'readonly';
@@ -757,7 +820,11 @@ function AppContent() {
       />
 
       {/* Email Verification Banner */}
-      {!isEmailVerified && <EmailVerificationBanner />}
+      {!isEmailVerified && (
+        <Suspense fallback={null}>
+          <EmailVerificationBanner />
+        </Suspense>
+      )}
 
       {/* Offline Banner */}
       {!isOnline && (
@@ -791,7 +858,7 @@ function AppContent() {
         )}
 
         <div className="app-scroll-container">
-          {renderView()}
+          <Suspense fallback={<RouteLoadingFallback />}>{renderView()}</Suspense>
         </div>
       </main>
 
@@ -815,67 +882,69 @@ function AppContent() {
         onViewChange={handleViewChange}
       />
 
-      {/* Event Form Modal */}
-      <EventForm
-        isOpen={showEventForm}
-        onClose={() => {
-          setShowEventForm(false);
-          setSelectedEvent(null);
-        }}
-        onSave={selectedEvent ? handleUpdateEvent : handleCreateEvent}
-        profiles={environment.profiles}
-        initialDate={viewDate}
-      />
+      <Suspense fallback={null}>
+        {/* Event Form Modal */}
+        <EventForm
+          isOpen={showEventForm}
+          onClose={() => {
+            setShowEventForm(false);
+            setSelectedEvent(null);
+          }}
+          onSave={selectedEvent ? handleUpdateEvent : handleCreateEvent}
+          profiles={environment.profiles}
+          initialDate={viewDate}
+        />
 
-      {/* Event Detail Modal */}
-      <EventDetail
-        isOpen={showEventDetail}
-        event={selectedEvent}
-        profiles={environment.profiles}
-        onEdit={handleEditEvent}
-        onDelete={handleDeleteClick}
-        onClose={() => {
-          setShowEventDetail(false);
-          setSelectedEvent(null);
-        }}
-      />
+        {/* Event Detail Modal */}
+        <EventDetail
+          isOpen={showEventDetail}
+          event={selectedEvent}
+          profiles={environment.profiles}
+          onEdit={handleEditEvent}
+          onDelete={handleDeleteClick}
+          onClose={() => {
+            setShowEventDetail(false);
+            setSelectedEvent(null);
+          }}
+        />
 
-      {/* Profile Selector Modal */}
-      <ProfileSelector
-        isOpen={showProfileSelector}
-        profiles={environment.profiles}
-        activeProfileId={activeProfile.id}
-        onSelectProfile={setActiveProfile}
-        onAddProfile={() => setShowAddProfile(true)}
-        onClose={() => setShowProfileSelector(false)}
-      />
+        {/* Profile Selector Modal */}
+        <ProfileSelector
+          isOpen={showProfileSelector}
+          profiles={environment.profiles}
+          activeProfileId={activeProfile.id}
+          onSelectProfile={setActiveProfile}
+          onAddProfile={() => setShowAddProfile(true)}
+          onClose={() => setShowProfileSelector(false)}
+        />
 
-      {/* Add Profile Modal */}
-      <AddProfileModal
-        isOpen={showAddProfile}
-        onClose={() => setShowAddProfile(false)}
-        onAdd={handleAddProfile}
-      />
+        {/* Add Profile Modal */}
+        <AddProfileModal
+          isOpen={showAddProfile}
+          onClose={() => setShowAddProfile(false)}
+          onAdd={handleAddProfile}
+        />
 
-      {/* User Auth Modal */}
-      <UserAuthModal
-        isOpen={showUserAuth}
-        onClose={() => {
-          setShowUserAuth(false);
-          setPendingEnvironmentId('');
-        }}
-        onAuthComplete={handleUserAuthComplete}
-        existingProfiles={environment?.profiles || []}
-      />
+        {/* User Auth Modal */}
+        <UserAuthModal
+          isOpen={showUserAuth}
+          onClose={() => {
+            setShowUserAuth(false);
+            setPendingEnvironmentId('');
+          }}
+          onAuthComplete={handleUserAuthComplete}
+          existingProfiles={environment?.profiles || []}
+        />
 
-      {/* User Settings Modal */}
-      <UserSettingsModal
-        isOpen={showUserSettings}
-        profile={activeProfile}
-        onClose={() => setShowUserSettings(false)}
-        onUpdateProfile={handleUpdateProfile}
-        onLogout={handleLogout}
-      />
+        {/* User Settings Modal */}
+        <UserSettingsModal
+          isOpen={showUserSettings}
+          profile={activeProfile}
+          onClose={() => setShowUserSettings(false)}
+          onUpdateProfile={handleUpdateProfile}
+          onLogout={handleLogout}
+        />
+      </Suspense>
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
@@ -914,15 +983,17 @@ function AppContent() {
       {/* Payment Modal */}
       {showPaymentModal && (
         <ErrorBoundary>
-          <PaymentModal
-            isOpen={showPaymentModal}
-            onClose={() => {
-              setShowPaymentModal(false);
-            }}
-            onSuccess={() => {
-              setShowPaymentModal(false);
-            }}
-          />
+          <Suspense fallback={null}>
+            <PaymentModal
+              isOpen={showPaymentModal}
+              onClose={() => {
+                setShowPaymentModal(false);
+              }}
+              onSuccess={() => {
+                setShowPaymentModal(false);
+              }}
+            />
+          </Suspense>
         </ErrorBoundary>
       )}
     </div>

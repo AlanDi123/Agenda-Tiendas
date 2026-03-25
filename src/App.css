@@ -299,6 +299,67 @@
   }
 }
 
+/* Pantalla de redirección a pago (estilo Dommuss / tokens del tema) */
+.payment-wait-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  text-align: center;
+  background: var(--color-background);
+}
+
+.payment-wait-screen__icon {
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.payment-wait-screen__title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.payment-wait-screen__text {
+  margin: 0;
+  max-width: 22rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.payment-wait-screen__primary {
+  margin-top: 0.25rem;
+  padding: 0.875rem 1.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-primary);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.payment-wait-screen__primary:active {
+  opacity: 0.92;
+}
+
+.payment-wait-screen__secondary {
+  background: none;
+  border: none;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .app-view-enter {

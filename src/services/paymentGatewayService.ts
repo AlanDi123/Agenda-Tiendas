@@ -4,20 +4,10 @@
  */
 
 import type { PaymentSession, PaymentMethodType } from '../types/payment';
+import { apiFetch } from '../config/api';
 
-// API URL configuration - fallback para nativo/PWA
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://agenda-tiendas.vercel.app';
-
-// Debug log para verificar configuración
-if (typeof window !== 'undefined') {
-  console.log('[PaymentGateway] API_BASE_URL configurada a:', API_BASE_URL);
-}
-
-/**
- * Get authentication token from storage
- */
-function getAuthToken(): string | null {
-  return localStorage.getItem('authToken');
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  console.info('[PaymentGateway] API base (VITE_API_URL o default producción)');
 }
 
 /**
@@ -27,23 +17,20 @@ export async function redirectToCheckout(
   planType: string,
   discountCode?: string
 ): Promise<void> {
-  const token = getAuthToken();
+  const token = localStorage.getItem('authToken');
 
   if (!token) {
     throw new Error('Usuario no autenticado. Por favor inicia sesión.');
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/subscriptions/checkout`, {
+    const response = await apiFetch('/api/v1/subscriptions/checkout', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+      auth: true,
+      json: {
         planType,
         discountCode,
-      }),
+      },
     });
 
     if (!response.ok) {
@@ -68,7 +55,7 @@ export async function redirectToCheckout(
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error('Sin conexión. Verifique su internet.');
     }
-    console.error('[PaymentGateway] Error redirecting to checkout:', error);
+    if (import.meta.env.DEV) console.error('[PaymentGateway] Error redirecting to checkout:', error);
     throw error;
   }
 }
@@ -82,7 +69,7 @@ export async function getSubscriptionStatus(): Promise<{
   expiresAt?: string;
   isLifetime: boolean;
 }> {
-  const token = getAuthToken();
+  const token = localStorage.getItem('authToken');
 
   if (!token) {
     return {
@@ -93,11 +80,9 @@ export async function getSubscriptionStatus(): Promise<{
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/subscriptions/status`, {
+    const response = await apiFetch('/api/v1/subscriptions/status', {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      auth: true,
     });
 
     if (!response.ok) {
@@ -146,27 +131,29 @@ export async function validateDiscountCode(code: string): Promise<{
   };
   message?: string;
 }> {
-  const token = getAuthToken();
-  
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/discounts/validate`, {
+    const response = await apiFetch('/api/v1/discounts/validate', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
-      },
-      body: JSON.stringify({ code }),
+      auth: true,
+      json: { code },
     });
-    
-    const result = await response.json();
-    
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        isValid: false,
+        message: result.message || (response.status === 401 ? 'Iniciá sesión para validar el código' : 'Error al validar código'),
+      };
+    }
+
     return {
       isValid: result.isValid || false,
       discount: result.discount,
       message: result.message,
     };
   } catch (error) {
-    console.error('[PaymentGateway] Error validating discount code:', error);
+    if (import.meta.env.DEV) console.error('[PaymentGateway] Error validating discount code:', error);
     return {
       isValid: false,
       message: 'Error al validar código',
@@ -181,7 +168,7 @@ export async function checkPaymentStatus(paymentId?: string): Promise<{
   status: string;
   message: string;
 }> {
-  const token = getAuthToken();
+  const token = localStorage.getItem('authToken');
 
   if (!token) {
     return {
@@ -191,15 +178,13 @@ export async function checkPaymentStatus(paymentId?: string): Promise<{
   }
 
   try {
-    const url = paymentId
-      ? `${API_BASE_URL}/api/v1/payments/status/${paymentId}`
-      : `${API_BASE_URL}/api/v1/payments/status`;
+    const path = paymentId
+      ? `/api/v1/payments/status/${paymentId}`
+      : '/api/v1/payments/status';
 
-    const response = await fetch(url, {
+    const response = await apiFetch(path, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      auth: true,
     });
 
     const result = await response.json();
@@ -209,7 +194,7 @@ export async function checkPaymentStatus(paymentId?: string): Promise<{
       message: result.message || 'Estado desconocido',
     };
   } catch (error) {
-    console.error('[PaymentGateway] Error checking payment status:', error);
+    if (import.meta.env.DEV) console.error('[PaymentGateway] Error checking payment status:', error);
     return {
       status: 'error',
       message: 'Error al verificar estado del pago',
@@ -229,22 +214,19 @@ export async function createGatewayPayment(
   gatewayPaymentId?: string;
   error?: string;
 }> {
-  const token = getAuthToken();
+  const token = localStorage.getItem('authToken');
   if (!token) {
     return { success: false, error: 'Usuario no autenticado. Por favor inicia sesión.' };
   }
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/subscriptions/checkout`, {
+    const response = await apiFetch('/api/v1/subscriptions/checkout', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+      auth: true,
+      json: {
         sessionId: session.id,
         planType: session.planType,
         discountCode: session.discountCode,
-      }),
+      },
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
@@ -260,7 +242,7 @@ export async function createGatewayPayment(
     }
     return { success: false, error: 'Error al obtener URL de pago' };
   } catch (error) {
-    console.error('[PaymentGateway] createGatewayPayment error:', error);
+    if (import.meta.env.DEV) console.error('[PaymentGateway] createGatewayPayment error:', error);
     return { success: false, error: 'Error de red al procesar el pago' };
   }
 }

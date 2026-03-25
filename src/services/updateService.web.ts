@@ -102,7 +102,7 @@ export async function isUpdateDismissed(_version: string): Promise<boolean> {
 export async function initializeUpdateChecker(
   _onUpdateAvailable?: (_update: UpdateCheckResult) => void
 ): Promise<void> {
-  console.log('[UpdateService.web] Update checker not initialized on web platform');
+  // No-op on web — PWA service worker maneja actualizaciones
 }
 
 /**
@@ -110,7 +110,7 @@ export async function initializeUpdateChecker(
  * No-op on web
  */
 export async function clearUpdatePreferences(): Promise<void> {
-  console.log('[UpdateService.web] Clear update preferences (no-op on web)');
+  // No-op on web
 }
 
 /**

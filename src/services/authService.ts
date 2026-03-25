@@ -3,13 +3,10 @@
 // Local IndexedDB is only used for environment/profile storage (offline-first calendar data)
 
 import type { User } from '../types/auth';
+import { apiFetch } from '../config/api';
 
-// API URL configuration - fallback para nativo/PWA
-const API_URL = import.meta.env.VITE_API_URL || 'https://agenda-tiendas.vercel.app';
-
-// Debug log para verificar configuración
-if (typeof window !== 'undefined') {
-  console.log('[AuthService] API_URL configurada a:', API_URL);
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  console.info('[AuthService] API base:', import.meta.env.VITE_API_URL || '(default producción)');
 }
 
 // Lock global para evitar múltiples llamadas simultáneas de refresh
@@ -55,10 +52,9 @@ export async function createUser(
   password: string
 ): Promise<User & { verificationToken: string }> {
   try {
-    const response = await fetch(`${API_URL}/api/v1/auth/register`, {
+    const response = await apiFetch('/api/v1/auth/register', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.toLowerCase(), password }),
+      json: { email: email.toLowerCase(), password },
     });
 
     if (!response.ok) {
@@ -107,10 +103,9 @@ export async function createUser(
 
 export async function loginUser(email: string, password: string): Promise<User | null> {
   try {
-    const response = await fetch(`${API_URL}/api/v1/auth/login`, {
+    const response = await apiFetch('/api/v1/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.toLowerCase(), password }),
+      json: { email: email.toLowerCase(), password },
     });
 
     if (!response.ok) {
@@ -168,9 +163,7 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!token) return null;
 
   try {
-    const response = await fetch(`${API_URL}/api/v1/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await apiFetch('/api/v1/auth/me', { auth: true });
 
     if (response.ok) {
       const data = await response.json();
@@ -207,9 +200,7 @@ export async function getCurrentUser(): Promise<User | null> {
       }
 
       try {
-        const retryRes = await fetch(`${API_URL}/api/v1/auth/me`, {
-          headers: { Authorization: `Bearer ${newToken}` },
-        });
+        const retryRes = await apiFetch('/api/v1/auth/me', { auth: true });
 
         if (retryRes.ok) {
           const retryData = await retryRes.json();
@@ -259,13 +250,10 @@ export async function logoutUser(): Promise<void> {
   if (token) {
     try {
       const refreshToken = localStorage.getItem('refreshToken');
-      await fetch(`${API_URL}/api/v1/auth/logout`, {
+      await apiFetch('/api/v1/auth/logout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ refreshToken }),
+        auth: true,
+        json: { refreshToken },
       });
     } catch {
       // Ignore network errors on logout
@@ -287,10 +275,9 @@ async function refreshAccessToken(): Promise<boolean> {
 
   refreshPromise = (async () => {
     try {
-      const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+      const response = await apiFetch('/api/v1/auth/refresh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        json: { refreshToken },
       });
 
       if (response.ok) {
@@ -317,10 +304,9 @@ async function refreshAccessToken(): Promise<boolean> {
 
 export async function verifyEmail(token: string): Promise<boolean> {
   try {
-    const response = await fetch(`${API_URL}/api/v1/auth/verify-email`, {
+    const response = await apiFetch('/api/v1/auth/verify-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
+      json: { token },
     });
 
     if (!response.ok) {
@@ -353,10 +339,9 @@ export async function verifyEmail(token: string): Promise<boolean> {
 
 export async function resendVerificationEmail(email: string): Promise<boolean> {
   try {
-    const response = await fetch(`${API_URL}/api/v1/auth/resend-verification`, {
+    const response = await apiFetch('/api/v1/auth/resend-verification', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.toLowerCase() }),
+      json: { email: email.toLowerCase() },
     });
 
     if (!response.ok) {
@@ -381,10 +366,9 @@ export async function resendVerificationEmail(email: string): Promise<boolean> {
 
 export async function requestPasswordReset(email: string): Promise<boolean> {
   try {
-    await fetch(`${API_URL}/api/v1/auth/password-reset/request`, {
+    await apiFetch('/api/v1/auth/password-reset/request', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.toLowerCase() }),
+      json: { email: email.toLowerCase() },
     });
   } catch {
     // Fail silently to not reveal if email exists
@@ -394,10 +378,9 @@ export async function requestPasswordReset(email: string): Promise<boolean> {
 
 export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
   try {
-    const response = await fetch(`${API_URL}/api/v1/auth/password-reset/confirm`, {
+    const response = await apiFetch('/api/v1/auth/password-reset/confirm', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, newPassword }),
+      json: { token, newPassword },
     });
 
     if (!response.ok) {
