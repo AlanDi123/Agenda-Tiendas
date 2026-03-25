@@ -23,11 +23,11 @@ export async function redirectToCheckout(
   discountCode?: string
 ): Promise<void> {
   const token = getAuthToken();
-  
+
   if (!token) {
     throw new Error('Usuario no autenticado. Por favor inicia sesión.');
   }
-  
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/subscriptions/checkout`, {
       method: 'POST',
@@ -40,21 +40,29 @@ export async function redirectToCheckout(
         discountCode,
       }),
     });
-    
+
     if (!response.ok) {
-      const error = await response.json();
+      if (response.status === 401) {
+        throw new Error('Sesión expirada. Por favor inicia sesión nuevamente.');
+      }
+      if (response.status >= 500) {
+        throw new Error('Error del servidor. Intente más tarde.');
+      }
+      const error = await response.json().catch(() => ({}));
       throw new Error(error.message || 'Error al crear preferencia de pago');
     }
-    
+
     const result = await response.json();
-    
+
     if (result.success && result.data?.initPoint) {
-      // Redirect to Mercado Pago checkout
       window.location.href = result.data.initPoint;
     } else {
       throw new Error('Error al obtener URL de pago');
     }
   } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('Sin conexión. Verifique su internet.');
+    }
     console.error('[PaymentGateway] Error redirecting to checkout:', error);
     throw error;
   }
@@ -70,7 +78,7 @@ export async function getSubscriptionStatus(): Promise<{
   isLifetime: boolean;
 }> {
   const token = getAuthToken();
-  
+
   if (!token) {
     return {
       isActive: false,
@@ -78,7 +86,7 @@ export async function getSubscriptionStatus(): Promise<{
       isLifetime: false,
     };
   }
-  
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/subscriptions/status`, {
       method: 'GET',
@@ -86,7 +94,7 @@ export async function getSubscriptionStatus(): Promise<{
         'Authorization': `Bearer ${token}`,
       },
     });
-    
+
     if (!response.ok) {
       return {
         isActive: false,
@@ -94,9 +102,9 @@ export async function getSubscriptionStatus(): Promise<{
         isLifetime: false,
       };
     }
-    
+
     const result = await response.json();
-    
+
     if (result.success) {
       return {
         isActive: result.data.isActive,
@@ -105,14 +113,14 @@ export async function getSubscriptionStatus(): Promise<{
         isLifetime: result.data.isLifetime,
       };
     }
-    
+
     return {
       isActive: false,
       planType: 'FREE',
       isLifetime: false,
     };
-  } catch (error) {
-    console.error('[PaymentGateway] Error getting subscription status:', error);
+  } catch {
+    // Network error - return offline state
     return {
       isActive: false,
       planType: 'FREE',

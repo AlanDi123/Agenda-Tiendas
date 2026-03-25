@@ -53,36 +53,51 @@ export async function createUser(
   email: string,
   password: string
 ): Promise<User & { verificationToken: string }> {
-  const response = await fetch(`${API_URL}/api/v1/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email.toLowerCase(), password }),
-  });
+  try {
+    const response = await fetch(`${API_URL}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.toLowerCase(), password }),
+    });
 
-  const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 409) {
+        throw new Error('El email ya está registrado');
+      }
+      if (response.status >= 500) {
+        throw new Error('Error del servidor. Intente más tarde.');
+      }
+      throw new Error('Error al registrarse');
+    }
 
-  if (!response.ok || !data.success) {
-    const msg = data.message || data.error || 'Error al registrarse';
-    if (response.status === 409) throw new Error('El email ya está registrado');
-    throw new Error(msg);
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.message || 'Error al registrarse');
+    }
+
+    const user: User = {
+      id: data.data.user.id,
+      email: data.data.user.email,
+      passwordHash: '',
+      emailVerified: data.data.user.emailVerified ?? false,
+      planStatus: 'FREE',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    saveCurrentUser(user);
+
+    return {
+      ...user,
+      verificationToken: data.data.verificationToken || '',
+    };
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('Sin conexión. Verifique su internet.');
+    }
+    throw error;
   }
-
-  const user: User = {
-    id: data.data.user.id,
-    email: data.data.user.email,
-    passwordHash: '',
-    emailVerified: data.data.user.emailVerified ?? false,
-    planStatus: 'FREE',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  saveCurrentUser(user);
-
-  return {
-    ...user,
-    verificationToken: data.data.verificationToken || '',
-  };
 }
 
 // ============================================
@@ -151,7 +166,6 @@ export async function getCurrentUser(): Promise<User | null> {
   const token = getAuthToken();
   if (!token) return null;
 
-  // Try to get fresh data from backend
   try {
     const response = await fetch(`${API_URL}/api/v1/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -170,12 +184,11 @@ export async function getCurrentUser(): Promise<User | null> {
           updatedAt: new Date(data.data.updatedAt || Date.now()),
         };
         saveCurrentUser(user);
-        retryCount = 0; // Reset
+        retryCount = 0;
         return user;
       }
     }
 
-    // Token expirado — intentar refresh UNA sola vez sin recursión
     if (response.status === 401 && retryCount < MAX_RETRIES) {
       retryCount++;
       const refreshed = await refreshAccessToken();
@@ -185,7 +198,6 @@ export async function getCurrentUser(): Promise<User | null> {
         return null;
       }
 
-      // Reintentar con el nuevo token directamente
       const newToken = getAuthToken();
       if (!newToken) {
         clearAuthToken();
@@ -219,18 +231,17 @@ export async function getCurrentUser(): Promise<User | null> {
           clearAuthToken();
           return null;
         }
-      } catch (error) {
-        console.error('[AuthService] Error en retry:', error);
+      } catch {
         retryCount = 0;
       }
-    } else if (response.status === 401) {
-      // Si ya reintentamos, salir sin recursión
+    }
+
+    if (response.status === 401) {
       clearAuthToken();
       retryCount = 0;
       return null;
     }
   } catch {
-    // Network offline — fall back to cached user
     return loadCurrentUser();
   }
 
@@ -271,7 +282,6 @@ async function refreshAccessToken(): Promise<boolean> {
   const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) return false;
 
-  // Si ya hay una petición de refresh en curso, esperamos a que termine
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
@@ -289,12 +299,12 @@ async function refreshAccessToken(): Promise<boolean> {
           return true;
         }
       }
+      return false;
     } catch {
-      // Error de red
+      return false;
     } finally {
-      refreshPromise = null; // Liberamos el cerrojo
+      refreshPromise = null;
     }
-    return false;
   })();
 
   return refreshPromise;
@@ -305,42 +315,63 @@ async function refreshAccessToken(): Promise<boolean> {
 // ============================================
 
 export async function verifyEmail(token: string): Promise<boolean> {
-  const response = await fetch(`${API_URL}/api/v1/auth/verify-email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token }),
-  });
+  try {
+    const response = await fetch(`${API_URL}/api/v1/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
 
-  const data = await response.json();
+    if (!response.ok) {
+      if (response.status >= 500) {
+        throw new Error('Error del servidor. Intente más tarde.');
+      }
+      throw new Error('Token inválido o expirado');
+    }
 
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || 'Token inválido o expirado');
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.message || 'Token inválido o expirado');
+    }
+
+    const cached = loadCurrentUser();
+    if (cached) {
+      cached.emailVerified = true;
+      saveCurrentUser(cached);
+    }
+
+    return true;
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('Sin conexión. Verifique su internet.');
+    }
+    throw error;
   }
-
-  // Update cached user
-  const cached = loadCurrentUser();
-  if (cached) {
-    cached.emailVerified = true;
-    saveCurrentUser(cached);
-  }
-
-  return true;
 }
 
 export async function resendVerificationEmail(email: string): Promise<boolean> {
-  const response = await fetch(`${API_URL}/api/v1/auth/resend-verification`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email.toLowerCase() }),
-  });
+  try {
+    const response = await fetch(`${API_URL}/api/v1/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.toLowerCase() }),
+    });
 
-  const data = await response.json();
+    if (!response.ok) {
+      if (response.status >= 500) {
+        throw new Error('Error del servidor. Intente más tarde.');
+      }
+      throw new Error('Error al reenviar verificación');
+    }
 
-  if (!response.ok) {
-    throw new Error(data.message || 'Error al reenviar verificación');
+    return true;
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('Sin conexión. Verifique su internet.');
+    }
+    throw error;
   }
-
-  return true;
 }
 
 // ============================================
@@ -348,30 +379,46 @@ export async function resendVerificationEmail(email: string): Promise<boolean> {
 // ============================================
 
 export async function requestPasswordReset(email: string): Promise<boolean> {
-  await fetch(`${API_URL}/api/v1/auth/password-reset/request`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email.toLowerCase() }),
-  });
-
-  // Always return true (don't reveal if email exists)
+  try {
+    await fetch(`${API_URL}/api/v1/auth/password-reset/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.toLowerCase() }),
+    });
+  } catch {
+    // Fail silently to not reveal if email exists
+  }
   return true;
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
-  const response = await fetch(`${API_URL}/api/v1/auth/password-reset/confirm`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, newPassword }),
-  });
+  try {
+    const response = await fetch(`${API_URL}/api/v1/auth/password-reset/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    });
 
-  const data = await response.json();
+    if (!response.ok) {
+      if (response.status >= 500) {
+        throw new Error('Error del servidor. Intente más tarde.');
+      }
+      throw new Error('Token inválido o expirado');
+    }
 
-  if (!response.ok || !data.success) {
-    throw new Error(data.message || 'Token inválido o expirado');
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.message || 'Token inválido o expirado');
+    }
+
+    return true;
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('Sin conexión. Verifique su internet.');
+    }
+    throw error;
   }
-
-  return true;
 }
 
 // ============================================
