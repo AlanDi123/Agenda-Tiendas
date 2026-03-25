@@ -40,17 +40,33 @@ export async function redirectToCheckout(
       if (response.status >= 500) {
         throw new Error('Error del servidor. Intente más tarde.');
       }
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || 'Error al crear preferencia de pago');
+      const error = await response.json().catch(() => ({} as Record<string, unknown>));
+      const details = (error as { details?: string | string[] }).details;
+      const detailStr = Array.isArray(details)
+        ? details.join(', ')
+        : typeof details === 'string'
+          ? details
+          : '';
+      throw new Error(
+        (error as { message?: string }).message ||
+          detailStr ||
+          'Error al crear preferencia de pago'
+      );
     }
 
     const result = await response.json();
 
     if (result.success && result.data?.initPoint) {
       window.location.href = result.data.initPoint;
-    } else {
-      throw new Error('Error al obtener URL de pago');
+      return;
     }
+
+    if (result.success && result.data?.isLifetime) {
+      window.location.replace(`${window.location.origin}/payment/success`);
+      return;
+    }
+
+    throw new Error('Error al obtener URL de pago');
   } catch (error) {
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error('Sin conexión. Verifique su internet.');

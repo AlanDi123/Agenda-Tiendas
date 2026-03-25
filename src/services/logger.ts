@@ -24,7 +24,7 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 const IS_DEV    = import.meta.env.DEV
 const LOG_KEY = 'dommuss_app_logs';
-const MAX_LOGS = 100;
+const MAX_LOGS = 300;
 const SESSION_KEY = 'dommuss_session_id';
 
 // ─────────────────────────────────────────────────────────────────
@@ -55,14 +55,28 @@ function getSessionId(): string {
   return sessionId;
 }
 
-// Get user ID from storage
+// Get user ID / email from storage (auth guarda `currentUser` como JSON)
 function getUserId(): string | undefined {
   try {
-    const session = localStorage.getItem('currentUserEmail');
-    return session || undefined;
+    const raw = localStorage.getItem('currentUser');
+    if (raw) {
+      const u = JSON.parse(raw) as { id?: string; email?: string };
+      if (u?.id) return u.id;
+      if (u?.email) return u.email;
+    }
+    return localStorage.getItem('currentUserEmail') || undefined;
   } catch {
     return undefined;
   }
+}
+
+function getRuntimeContext(): Record<string, unknown> {
+  const cap = typeof window !== 'undefined' ? (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor : undefined;
+  return {
+    isCapacitor: !!cap?.isNativePlatform?.(),
+    language: typeof navigator !== 'undefined' ? navigator.language : undefined,
+    timeZone: typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined,
+  };
 }
 
 // Create log entry
@@ -82,6 +96,7 @@ function createLogEntry(
     stack: error instanceof Error ? error.stack : undefined,
     metadata: {
       ...metadata,
+      ...getRuntimeContext(),
       userAgent: navigator.userAgent,
       url: window.location.href,
       online: navigator.onLine,
@@ -273,6 +288,14 @@ export const AppLogger = {
         log.context?.toLowerCase().includes(lowerQuery) ||
         log.stack?.toLowerCase().includes(lowerQuery)
     );
+  },
+
+  /** Registro explícito para auditoría (acciones sensibles, pagos, admin). */
+  audit: (action: string, metadata?: Record<string, unknown>): void => {
+    AppLogger.log('info', `AUDIT: ${action}`, undefined, 'Audit', {
+      ...getRuntimeContext(),
+      ...metadata,
+    });
   },
 
   // Initialize global error handlers — usa AppLoggerClass para logs internos
