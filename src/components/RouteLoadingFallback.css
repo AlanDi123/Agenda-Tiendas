@@ -1,0 +1,31 @@
+.route-loading-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 180px;
+  padding: 2rem 1rem;
+  color: var(--color-text-secondary, #5c6b7a);
+}
+
+.route-loading-fallback__spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid color-mix(in srgb, var(--color-primary, #2d3e50) 22%, transparent);
+  border-top-color: var(--color-primary, #2d3e50);
+  border-radius: 50%;
+  animation: route-loading-spin 0.75s linear infinite;
+}
+
+.route-loading-fallback__label {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+@keyframes route-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
