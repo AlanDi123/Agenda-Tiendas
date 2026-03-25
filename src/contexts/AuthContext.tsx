@@ -80,23 +80,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Load current user on mount
   useEffect(() => {
+    let isMounted = true;
     const initAuth = async () => {
       try {
-        // Initialize discount codes
         await initializeDiscountCodes();
-
+        
         const user = await getCurrentUser();
+        if (!isMounted) return;
         setCurrentUser(user);
 
-        // Load subscription status
         if (user) {
           const plan = await getUserPlan(user.id);
+          if (!isMounted) return;
           setUserPlan(plan);
 
-          // Load environment for this user if exists
           const envId = await getUserSession(user.email);
+          if (!isMounted) return;
           if (envId) {
             const env = await getEnvironment(envId);
+            if (!isMounted) return;
             if (env) {
               setEnvironment(env);
               if (env.activeProfileId) {
@@ -108,11 +110,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     initAuth();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Load dark mode

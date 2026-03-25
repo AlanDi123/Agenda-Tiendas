@@ -126,6 +126,9 @@ export async function loginUser(email: string, password: string): Promise<User |
 // CURRENT USER
 // ============================================
 
+const MAX_RETRIES = 1;
+let retryCount = 0;
+
 export async function getCurrentUser(): Promise<User | null> {
   const token = getAuthToken();
   if (!token) return null;
@@ -149,30 +152,34 @@ export async function getCurrentUser(): Promise<User | null> {
           updatedAt: new Date(data.data.updatedAt || Date.now()),
         };
         saveCurrentUser(user);
+        retryCount = 0; // Reset
         return user;
       }
     }
 
     // Token expirado — intentar refresh UNA sola vez sin recursión
-    if (response.status === 401) {
+    if (response.status === 401 && retryCount < MAX_RETRIES) {
+      retryCount++;
       const refreshed = await refreshAccessToken();
       if (!refreshed) {
         clearAuthToken();
+        retryCount = 0;
         return null;
       }
-      
+
       // Reintentar con el nuevo token directamente
       const newToken = getAuthToken();
       if (!newToken) {
         clearAuthToken();
+        retryCount = 0;
         return null;
       }
-      
+
       try {
         const retryRes = await fetch(`${API_URL}/api/v1/auth/me`, {
           headers: { Authorization: `Bearer ${newToken}` },
         });
-        
+
         if (retryRes.ok) {
           const retryData = await retryRes.json();
           if (retryData.success && retryData.data) {
@@ -186,18 +193,22 @@ export async function getCurrentUser(): Promise<User | null> {
               updatedAt: new Date(retryData.data.updatedAt || Date.now()),
             };
             saveCurrentUser(user);
+            retryCount = 0;
             return user;
           }
-        } else if (retryRes.status === 401) {
-          // Token sigue siendo inválido
+        } else {
+          retryCount = 0;
           clearAuthToken();
           return null;
         }
       } catch (error) {
         console.error('[AuthService] Error en retry:', error);
+        retryCount = 0;
       }
-      
+    } else if (response.status === 401) {
+      // Si ya reintentamos, salir sin recursión
       clearAuthToken();
+      retryCount = 0;
       return null;
     }
   } catch {
