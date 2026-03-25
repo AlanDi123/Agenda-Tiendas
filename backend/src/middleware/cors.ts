@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 
-const ALLOWED_ORIGINS = [
+// URLs permitidas - desde variable de entorno o default
+const ALLOWED_ORIGINS = process.env.CORS_ORIGINS?.split(',') || [
   'https://agenda-tienda.vercel.app',   // frontend Vercel (sin "s")
   'https://agenda-tiendas.vercel.app',  // backend Vercel (con "s")
-  'capacitor://localhost',              // WebView Android/iOS ← faltaba
+  'capacitor://localhost',              // WebView Android/iOS
   'ionic://localhost',                  // fallback Ionic
   'http://localhost',                   // Capacitor local sin puerto
   'http://localhost:5173',              // Vite dev

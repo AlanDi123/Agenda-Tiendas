@@ -8,6 +8,11 @@ import type { PaymentSession, PaymentMethodType } from '../types/payment';
 // API URL configuration - fallback para nativo/PWA
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://agenda-tiendas.vercel.app';
 
+// Debug log para verificar configuración
+if (typeof window !== 'undefined') {
+  console.log('[PaymentGateway] API_BASE_URL configurada a:', API_BASE_URL);
+}
+
 /**
  * Get authentication token from storage
  */

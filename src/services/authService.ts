@@ -7,8 +7,9 @@ import type { User } from '../types/auth';
 // API URL configuration - fallback para nativo/PWA
 const API_URL = import.meta.env.VITE_API_URL || 'https://agenda-tiendas.vercel.app';
 
-if (!API_URL) {
-  console.error('[AuthService] VITE_API_URL no está configurada. Usando URL por defecto.');
+// Debug log para verificar configuración
+if (typeof window !== 'undefined') {
+  console.log('[AuthService] API_URL configurada a:', API_URL);
 }
 
 // Lock global para evitar múltiples llamadas simultáneas de refresh
