@@ -1,14 +1,29 @@
-/**
- * Base URL del backend API (Vite / Capacitor).
- * Siempre termina sin barra final.
- */
-const PRODUCTION_API = 'https://agenda-tiendas.vercel.app';
+import { Capacitor } from '@capacitor/core';
 
+/**
+ * URL pública del despliegue unificado (Vercel: un solo proyecto web + API en /api).
+ * Capacitor/WebView debe usar esta base absoluta para llamar a /api/v1/...
+ */
+const PRODUCTION_APP_URL = 'https://agenda-tienda.vercel.app';
+
+/**
+ * Base URL del backend API.
+ * - Web/PWA: vacío → fetch a `/api/...` mismo origen (Vercel rewrites + proxy Vite en dev).
+ * - Capacitor: `VITE_API_URL` o PRODUCTION_APP_URL.
+ */
 export function getApiBaseUrl(): string {
-  const raw = import.meta.env.VITE_API_URL as string | undefined;
-  const trimmed = raw?.trim();
-  if (trimmed) return trimmed.replace(/\/$/, '');
-  return PRODUCTION_API;
+  const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim().replace(/\/$/, '');
+
+  if (Capacitor.isNativePlatform()) {
+    if (envUrl) return envUrl;
+    return PRODUCTION_APP_URL;
+  }
+
+  if (import.meta.env.VITE_API_DIRECT === 'true' && envUrl) {
+    return envUrl;
+  }
+
+  return '';
 }
 
 export type ApiFetchOptions = RequestInit & {

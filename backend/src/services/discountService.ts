@@ -288,7 +288,7 @@ export async function getUserDiscountUsages(userId: string): Promise<Array<{
       .where(eq(discountUsages.userId, userId))
       .orderBy(sql`${discountUsages.createdAt} DESC`);
 
-    return usages.map((u) => ({
+    return usages.map((u: (typeof usages)[number]) => ({
       code: u.code,
       createdAt: u.createdAt,
       paymentId: u.paymentId,

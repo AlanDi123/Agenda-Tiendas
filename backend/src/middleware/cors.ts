@@ -61,5 +61,5 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction) 
     return res.status(403).json({ error: 'Forbidden', message: 'Origin not allowed' });
   }
 
-  next();
+  return next();
 }

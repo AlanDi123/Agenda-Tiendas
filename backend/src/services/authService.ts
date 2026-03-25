@@ -275,7 +275,7 @@ export async function registerUser(data: {
     .from(users)
     .where(eq(users.id, userId))
     .limit(1)
-    .then((rows) => rows[0]);
+    .then((rows: { id: string; email: string; role: string; emailVerified: boolean }[]) => rows[0]);
 
   if (!user) {
     throw createError('Failed to create user', 500, 'CREATE_USER_FAILED');
@@ -453,7 +453,7 @@ export async function resendVerificationEmail(email: string): Promise<{
     .from(users)
     .where(eq(users.id, user.id))
     .limit(1)
-    .then(rows => rows[0]);
+    .then((rows: { emailVerified: boolean }[]) => rows[0]);
 
   if (userWithStatus?.emailVerified) {
     return {

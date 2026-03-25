@@ -106,12 +106,12 @@ router.post('/checkout', authMiddleware, async (req: Request, res: Response, nex
       throw createError(result.message || 'Error creating checkout', 400, 'CHECKOUT_ERROR');
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: result,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

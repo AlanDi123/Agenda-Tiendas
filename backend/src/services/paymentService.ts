@@ -9,7 +9,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { eq, and, desc } from 'drizzle-orm';
 import db from '../db';
 import { payments, subscriptions, users, plans, discountCodes, webhookEvents, paymentLogs } from '../db/schema';
-import { getUsdToArsRate } from './currencyService';
 
 // ============================================
 // CONFIGURATION

@@ -32,7 +32,9 @@ router.post('/family', authMiddleware, async (req: Request, res: Response, next:
         action,
         eventTitle,
         startDate ? new Date(startDate) : undefined
-      ).catch(err => console.error('[Notifications] Error sending family notification:', err));
+      ).catch((err: unknown) =>
+        console.error('[Notifications] Error sending family notification:', err)
+      );
     }
 
     res.json({ success: true, notified: emails.length });
