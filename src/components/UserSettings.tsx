@@ -8,6 +8,7 @@ import { LogViewer } from './LogViewer';
 import { SubscriptionStatus } from './Subscription/SubscriptionStatus';
 import { SubscriptionModal } from './Subscription/SubscriptionModal';
 import { useAuth } from '../contexts/AuthContext';
+import { apiFetch } from '../config/api';
 import './UserSettings.css';
 
 interface UserSettingsModalProps {
@@ -38,6 +39,7 @@ export function UserSettingsModal({
   const [showLogViewer, setShowLogViewer] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [isTestingResend, setIsTestingResend] = useState(false);
 
   const colors = [
     '#1E88E5', '#43A047', '#FB8C00', '#8E24AA',
@@ -94,6 +96,29 @@ export function UserSettingsModal({
     setConfirmPin('');
     onClose();
   };
+
+  const handleTestResend = useCallback(async () => {
+    if (isTestingResend) return;
+    setError('');
+    setSuccess('');
+    setIsTestingResend(true);
+    try {
+      const resp = await apiFetch('/api/v1/app/test-resend', {
+        method: 'POST',
+        auth: true,
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.success) {
+        throw new Error(data?.message || 'No se pudo enviar el test');
+      }
+      setSuccess('Test de email enviado. Revisá tu bandeja de entrada.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Error al enviar test: ${msg}`);
+    } finally {
+      setIsTestingResend(false);
+    }
+  }, [isTestingResend]);
 
   if (!profile) return null;
 
@@ -273,6 +298,18 @@ export function UserSettingsModal({
                 onClick={handleRecoveryEmailChange}
               >
                 Guardar email
+              </Button>
+            </div>
+
+            <div className="user-settings-section">
+              <h4 className="user-settings-section-title">Probar Resend</h4>
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={handleTestResend}
+                disabled={isTestingResend}
+              >
+                {isTestingResend ? 'Enviando…' : 'Enviar test a mi mail'}
               </Button>
             </div>
           </div>
