@@ -48,11 +48,12 @@ async function sendEmail(opts: {
     );
   }
 
-  // En producción no usar el from de testing, porque Resend puede rechazarlo o suprimirlo.
+  // En producción conviene usar dominio verificado.
+  // No bloqueamos el envío para permitir testing/controlado mientras se configura DNS.
   const usingResendDevFrom = FROM_ADDRESS.includes('@resend.dev');
   if (process.env.NODE_ENV === 'production' && usingResendDevFrom) {
-    throw new Error(
-      '[EmailService] SMTP_FROM no configurado o no verificado en Resend. Definí SMTP_FROM con un from verificado (dominio verificado en https://resend.com/domains).'
+    console.warn(
+      '[EmailService] SMTP_FROM usa dominio de testing (@resend.dev) en producción. Configurá SMTP_FROM con dominio verificado en Resend para máxima entregabilidad.'
     );
   }
 
@@ -67,6 +68,11 @@ async function sendEmail(opts: {
   if (error) {
     console.error('[EmailService] Error de Resend:', JSON.stringify(error));
     const extra = 'name' in error && error.name ? ` (${error.name})` : '';
+    if (String(error.message || '').toLowerCase().includes('testing emails')) {
+      throw new Error(
+        'Resend está en modo testing: verificá dominio y definí SMTP_FROM con remitente verificado para enviar a terceros.'
+      );
+    }
     throw new Error(`Resend error: ${error.message}${extra}`);
   }
 

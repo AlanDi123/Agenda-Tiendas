@@ -118,7 +118,7 @@ export function UserSettingsModal({
       });
       const data = await resp.json().catch(() => null);
       if (!resp.ok || !data?.success) {
-        throw new Error(data?.message || 'No se pudo enviar el test');
+        throw new Error(data?.message || `No se pudo enviar el test (HTTP ${resp.status})`);
       }
       setSuccess('Test de email enviado. Revisá tu bandeja de entrada.');
     } catch (err) {

@@ -357,10 +357,9 @@ export async function resendVerificationEmail(email: string): Promise<boolean> {
 
     if (!response.ok) {
       const data = await response.json().catch(() => null);
-      if (response.status >= 500) {
-        throw new Error('Error del servidor. Intente más tarde.');
-      }
-      throw new Error(data?.message || 'Error al reenviar verificación');
+      throw new Error(data?.message || (response.status >= 500
+        ? 'Error del servidor. Intente más tarde.'
+        : 'Error al reenviar verificación'));
     }
 
     return true;

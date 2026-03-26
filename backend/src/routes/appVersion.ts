@@ -177,7 +177,12 @@ router.post('/test-resend', authMiddleware, async (req: Request, res: Response, 
       throw createError('No user email', 400, 'NO_USER_EMAIL');
     }
 
-    await sendTestEmail({ to: user.email });
+    try {
+      await sendTestEmail({ to: user.email });
+    } catch (emailError) {
+      const message = emailError instanceof Error ? emailError.message : 'Error enviando email de test';
+      throw createError(message, 502, 'EMAIL_SEND_FAILED');
+    }
     res.json({ success: true, message: 'Test email enviado' });
   } catch (error) {
     next(error);

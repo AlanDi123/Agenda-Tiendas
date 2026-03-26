@@ -114,7 +114,12 @@ router.post('/resend-verification', async (req: Request, res: Response, next: Ne
 
     // Enviar el nuevo token por Resend
     if (result.verificationToken) {
-      await sendVerificationEmail(email, result.verificationToken);
+      try {
+        await sendVerificationEmail(email, result.verificationToken);
+      } catch (emailError) {
+        const message = emailError instanceof Error ? emailError.message : 'Error enviando email';
+        throw createError(message, 502, 'EMAIL_SEND_FAILED');
+      }
     }
 
     res.json({
