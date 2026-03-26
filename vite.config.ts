@@ -24,7 +24,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      injectRegister: 'inline',
+      // No inyectar el registro inline: VitePWA hoy genera un register sin catch,
+      // y eso dispara "Unhandled Promise Rejection" si /sw.js falla.
+      injectRegister: false,
       includeAssets: ['logo-192.png', 'logo-512.png'],
       manifest: {
         name: 'Dommuss Agenda - Organización Familiar',

@@ -29,17 +29,26 @@ function groupOverlappingEvents(events: ExpandedEvent[]): ExpandedEvent[][] {
   const groups: ExpandedEvent[][] = [];
   const processed = new Set<string>();
 
-  for (const event of events) {
-    if (processed.has(event.id)) continue;
+  const sorted = [...events].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 
-    const group: ExpandedEvent[] = [event];
-    processed.add(event.id);
+  for (const seed of sorted) {
+    if (processed.has(seed.id)) continue;
 
-    for (const other of events) {
-      if (processed.has(other.id)) continue;
-      if (eventsOverlap(event, other)) {
-        group.push(other);
-        processed.add(other.id);
+    const group: ExpandedEvent[] = [seed];
+    processed.add(seed.id);
+
+    // Expandimos el grupo mientras encontremos eventos que solapan con CUALQUIERA del grupo,
+    // no solo con el primer "seed".
+    let expanded = true;
+    while (expanded) {
+      expanded = false;
+      for (const other of sorted) {
+        if (processed.has(other.id)) continue;
+        if (group.some((member) => eventsOverlap(member, other))) {
+          group.push(other);
+          processed.add(other.id);
+          expanded = true;
+        }
       }
     }
 

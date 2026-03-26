@@ -98,7 +98,7 @@ export function MonthView({
 
               {dayEvents.length > 0 && (
                 <div className="month-day-events">
-                  {dayEvents.slice(0, 3).map((event) => (
+                  {dayEvents.slice(0, 2).map((event) => (
                     <div
                       key={event.id}
                       className="month-day-event-bar"
@@ -111,9 +111,9 @@ export function MonthView({
                       <span className="month-day-event-title">{event.title}</span>
                     </div>
                   ))}
-                  {dayEvents.length > 3 && (
+                  {dayEvents.length > 2 && (
                     <span className="month-day-more">
-                      +{dayEvents.length - 3}
+                      +{dayEvents.length - 2}
                     </span>
                   )}
                 </div>

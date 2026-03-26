@@ -43,6 +43,8 @@
   cursor: pointer;
   transition: background-color var(--transition-fast);
   min-height: 80px;
+  /* Evita que las barras de eventos se salgan del casillero y tapen la fila de arriba */
+  overflow: hidden;
 }
 
 .month-day:hover {
@@ -99,8 +101,9 @@
   right: 6px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  max-height: 100px;
+  gap: 1px;
+  /* Con 2 eventos visible (y +N) la caja no debería invadir filas vecinas */
+  max-height: 60px;
   overflow: hidden;
 }
 

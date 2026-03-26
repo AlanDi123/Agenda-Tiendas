@@ -135,7 +135,7 @@ export function groupOverlappingEvents(events: ExpandedEvent[]): ExpandedEvent[]
 
       // Check if this event overlaps with any event in the group
       for (const _ of group) {
-        if (eventsOverlap(event, other)) {
+        if (eventsOverlap(_, other)) {
           group.push(other);
           processed.add(other.id);
           break;

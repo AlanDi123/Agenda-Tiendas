@@ -33,6 +33,20 @@ window.onunhandledrejection = (event) => {
 
 // NO patchear console.error — AppLogger ya lo maneja internamente con referencias nativas
 
+// Registro del ServiceWorker con manejo de errores
+// VitePWA genera un registro inline que puede disparar "Unhandled Promise Rejection"
+// si /sw.js no responde. Para evitarlo, registramos nosotros con .catch().
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js', { scope: '/' })
+      .catch((err) => {
+        // Usar INFO para no ensuciar el registro de errores como si fuera un fallo crítico
+        AppLogger.info('ServiceWorker registration failed', { error: String(err) }, 'ServiceWorker');
+      });
+  });
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

@@ -5,6 +5,8 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .week-view-header {
@@ -82,10 +84,12 @@
 .week-view-grid {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
+  /* Permite scroll vertical y swipe horizontal del grid */
+  touch-action: pan-x pan-y;
 }
 
 .week-view-column {
