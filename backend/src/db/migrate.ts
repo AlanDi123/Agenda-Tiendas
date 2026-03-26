@@ -96,7 +96,7 @@ async function migrate() {
         type plan_type NOT NULL,
         price_usd DECIMAL(10,2) NOT NULL,
         price_ar DECIMAL(15,2),
-        features_json TEXT NOT NULL,
+        features_json JSONB NOT NULL,
         interval TEXT NOT NULL,
         active BOOLEAN NOT NULL DEFAULT true,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -105,6 +105,22 @@ async function migrate() {
 
       CREATE UNIQUE INDEX IF NOT EXISTS plans_type_idx ON plans(type);
       CREATE UNIQUE INDEX IF NOT EXISTS plans_name_idx ON plans(name);
+
+      -- Si la columna existe como TEXT (deploys anteriores), la convertimos a JSONB.
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_name = 'plans' AND column_name = 'features_json'
+        ) THEN
+          BEGIN
+            ALTER TABLE plans
+            ALTER COLUMN features_json TYPE JSONB USING features_json::jsonb;
+          EXCEPTION
+            WHEN others THEN null;
+          END;
+        END IF;
+      END;
     `;
 
     // Create subscriptions table

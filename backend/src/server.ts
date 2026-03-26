@@ -26,6 +26,9 @@ dotenv.config();
 const app = express();
 const API_VERSION = 'v1';
 
+// Vercel/Proxy: needed for correct `req.ip` and secure rate-limit keys.
+app.set('trust proxy', 1);
+
 // ============================================
 // CORS MIDDLEWARE - DEBE IR PRIMERO (antes de cualquier otro middleware)
 // ============================================
@@ -65,22 +68,27 @@ const apiLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) =>
-    (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
-    req.ip || 'unknown',
+  keyGenerator: (req) => req.ip || 'unknown',
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  keyGenerator: (req) =>
-    (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
-    req.ip || 'unknown',
+  keyGenerator: (req) => req.ip || 'unknown',
 });
 
 const webhookLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 1000,
+});
+
+// Sync-heavy routes (offline-first): allow higher burst without disabling rate limiting.
+const syncLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || 'unknown',
 });
 
 // ============================================
@@ -117,7 +125,7 @@ app.use(`/api/${API_VERSION}/subscriptions`, apiLimiter, subscriptionRoutes);
 app.use(`/api/${API_VERSION}/agenda`, apiLimiter, agendaRoutes);
 app.use(`/api/${API_VERSION}/discounts`, authLimiter, discountRoutes);
 app.use(`/api/${API_VERSION}/notifications`, apiLimiter, notificationRoutes);
-app.use(`/api/${API_VERSION}/families`, apiLimiter, familyRoutes);
+app.use(`/api/${API_VERSION}/families`, syncLimiter, familyRoutes);
 app.use(`/api/${API_VERSION}/app`, apiLimiter, appVersionRoutes);
 app.use('/api/webhooks', webhookLimiter, webhookRoutes);
 

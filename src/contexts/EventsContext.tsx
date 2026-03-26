@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { Event, ExpandedEvent } from '../types';
 import {
   saveEvent,
@@ -14,14 +14,7 @@ import { useEventAlarms } from '../hooks/useEventAlarms';
 import { apiFetch } from '../config/api';
 import { useAuth } from './AuthContext';
 import { validateEventTimeRange } from '../domain/eventValidation';
-
-export type ToastType = 'success' | 'error' | 'info' | 'warning';
-
-interface Toast {
-  id: string;
-  message: string;
-  type: ToastType;
-}
+import { useToastActions } from './ToastContext';
 
 interface EventsContextType {
   events: Event[];
@@ -35,38 +28,35 @@ interface EventsContextType {
   setViewDate: (date: Date) => void;
   viewDate: Date;
   notifyFamily: (event: Event, action: 'create' | 'update' | 'delete') => void;
-  addToast: (message: string, type: ToastType) => void;
-  removeToast: (id: string) => void;
-  toasts: Toast[];
 }
 
 const EventsContext = createContext<EventsContextType | undefined>(undefined);
 
 export function EventsProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<Event[]>([]);
-  const [expandedEvents, setExpandedEvents] = useState<ExpandedEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewDate, setViewDate] = useState(new Date());
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const expandedEvents = useMemo<ExpandedEvent[]>(() => {
+    // Expandir 6 semanas antes y después del mes visible para cubrir week/day view
+    const start = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+    start.setDate(start.getDate() - 42);
+    const end = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+    end.setDate(end.getDate() + 42);
+
+    return expandRecurringEvents(
+      events.filter(e => !e.deletedAt),
+      start,
+      end
+    );
+  }, [events, viewDate]);
 
   const { environment } = useAuth();
+  const { addToast } = useToastActions();
 
   // Initialize alarm management
-  const { scheduleAlarm, cancelAlarms, rescheduleAlarms } = useEventAlarms(events);
-
-  const addToast = useCallback((message: string, type: ToastType) => {
-    const id = generateId();
-    setToasts(prev => [...prev, { id, message, type }]);
-    
-    // Auto-remove toast after 5 seconds (silent save pattern)
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 5000);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
+  // Los "tombstones" (events con deletedAt) no deben programar alarmas ni expandirse para la grilla.
+  const activeEventsForAlarms = events.filter(e => !e.deletedAt);
+  const { scheduleAlarm, cancelAlarms, rescheduleAlarms } = useEventAlarms(activeEventsForAlarms);
 
   // Notificación a la familia (simulada + backend push)
   const notifyFamily = useCallback((event: Event, action: 'create' | 'update' | 'delete') => {
@@ -116,16 +106,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('agenda-reload-events', handler);
   }, [loadEvents]);
 
-  // Expandir eventos cuando cambie la vista o los eventos
-  useEffect(() => {
-    // Expandir 6 semanas antes y después del mes visible para cubrir week/day view
-    const start = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
-    start.setDate(start.getDate() - 42);
-    const end = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
-    end.setDate(end.getDate() + 42);
-    const expanded = expandRecurringEvents(events, start, end);
-    setExpandedEvents(expanded);
-  }, [events, viewDate]);
+  // expandedEvents ahora es derivado (useMemo), sin estado adicional.
 
   const createEvent = useCallback(async (
     eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>
@@ -140,6 +121,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       id: generateId(),
       createdAt: new Date(),
       updatedAt: new Date(),
+      version: 1,
     };
 
     try {
@@ -174,9 +156,12 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       if (timeError) {
         throw new Error(timeError);
       }
+      const prev = events.find(e => e.id === event.id);
+      const nextVersion = (prev?.version ?? event.version ?? 0) + 1;
       const updatedEvent = {
         ...event,
         updatedAt: new Date(),
+        version: nextVersion,
       };
 
       await saveEvent(updatedEvent);
@@ -195,7 +180,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       addToast('Error al actualizar evento', 'error');
       throw error;
     }
-  }, [addToast, rescheduleAlarms, notifyFamily]);
+  }, [addToast, rescheduleAlarms, notifyFamily, events]);
 
   const deleteEvent = useCallback(async (
     eventId: string,
@@ -203,6 +188,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   ) => {
     try {
       const event = events.find(e => e.id === eventId);
+      const now = new Date();
+      const deletedEvent: Event | undefined = event
+        ? { ...event, deletedAt: now, updatedAt: now, version: (event.version ?? 0) + 1 }
+        : undefined;
 
       // Cancel alarms first
       if (event) {
@@ -210,10 +199,11 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       }
 
       await deleteEventFromDB(eventId);
-      setEvents(prev => prev.filter(e => e.id !== eventId));
+      // No eliminamos del estado: necesitamos mantener el tombstone para que el sync lo propague.
+      setEvents(prev => prev.map(e => (e.id === eventId ? deletedEvent ?? e : e)));
       
       if (event) {
-        notifyFamily(event, 'delete');
+        notifyFamily(deletedEvent as Event, 'delete');
         AppLogger.logUserAction('delete_event', { eventId, scope });
       }
     } catch (error) {
@@ -240,9 +230,6 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       viewDate,
       setViewDate,
       notifyFamily,
-      addToast,
-      removeToast,
-      toasts,
     }}>
       {children}
     </EventsContext.Provider>

@@ -57,6 +57,8 @@ export interface Event {
   alarms?: EventAlarm[];
   createdAt: Date;
   updatedAt: Date;
+  version?: number;
+  deletedAt?: Date;
   createdBy?: string;
   lastModifiedBy?: string;
   attachments?: string[];

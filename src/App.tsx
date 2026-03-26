@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EventsProvider, useEvents } from './contexts/EventsContext';
+import { ToastProvider, useToastsState, useToastActions } from './contexts/ToastContext';
 import { TopAppBar } from './components/TopAppBar';
 import { BottomNav } from './components/BottomNav';
 import { MonthView } from './components/MonthView';
@@ -121,9 +122,10 @@ function AppContent() {
     deleteEvent,
     viewDate,
     setViewDate,
-    toasts,
-    removeToast,
   } = useEvents();
+
+  const { toasts } = useToastsState();
+  const { removeToast } = useToastActions();
 
   // App updates hook
   const {
@@ -513,6 +515,7 @@ function AppContent() {
       const dayEnd = new Date(dayStart);
       dayEnd.setHours(23, 59, 59, 999);
       const eventsInDay = rawEvents.filter((ev) => {
+        if (ev.deletedAt) return false;
         const d = new Date(ev.startDate);
         return d >= dayStart && d <= dayEnd;
       }).length;
@@ -1172,11 +1175,13 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <EventsProvider>
-        <ErrorBoundary>
-          <AppContent />
-        </ErrorBoundary>
-      </EventsProvider>
+      <ToastProvider>
+        <EventsProvider>
+          <ErrorBoundary>
+            <AppContent />
+          </ErrorBoundary>
+        </EventsProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

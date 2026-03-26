@@ -171,22 +171,58 @@ export async function applyDiscount(
       };
     }
 
-    // Log the usage
-    await db.insert(discountUsages).values({
-      id: uuidv4(),
-      userId,
-      discountCode: normalizedCode,
-      paymentId,
-    });
-
     // Increment total usage for non-lifetime codes
     if (!isMajestadAlan) {
-      await db.update(discountCodes)
+      // Atomic increment with cap to avoid race conditions (last coupon use).
+      const now = new Date();
+      const updated = await db
+        .update(discountCodes)
         .set({
           totalUsed: sql`${discountCodes.totalUsed} + 1`,
-          updatedAt: new Date(),
+          updatedAt: now,
         })
-        .where(eq(discountCodes.code, normalizedCode));
+        .where(
+          and(
+            eq(discountCodes.code, normalizedCode),
+            // If max_uses is NULL => unlimited. Else only increment when total_used < max_uses
+            sql`(${discountCodes.maxUses} IS NULL OR ${discountCodes.totalUsed} < ${discountCodes.maxUses})`
+          )
+        )
+        .returning({ code: discountCodes.code, totalUsed: discountCodes.totalUsed });
+
+      if (!updated || updated.length === 0) {
+        return {
+          success: false,
+          message: 'Código agotado',
+        };
+      }
+    }
+
+    // Log the usage
+    // - For lifetime codes we can ignore conflicts to allow infinite uses.
+    try {
+      if (isMajestadAlan) {
+        await db.insert(discountUsages)
+          .values({
+            id: uuidv4(),
+            userId,
+            discountCode: normalizedCode,
+            paymentId,
+          })
+          .onConflictDoNothing();
+      } else {
+        await db.insert(discountUsages).values({
+          id: uuidv4(),
+          userId,
+          discountCode: normalizedCode,
+          paymentId,
+        });
+      }
+    } catch {
+      return {
+        success: false,
+        message: 'Ya has usado este código',
+      };
     }
 
     // Create audit log for lifetime code bypass

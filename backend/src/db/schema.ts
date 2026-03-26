@@ -3,7 +3,7 @@
  * Compatible with Neon PostgreSQL serverless
  */
 
-import { pgTable, text, timestamp, boolean, integer, decimal, uuid, index, uniqueIndex, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, integer, decimal, uuid, index, uniqueIndex, pgEnum, jsonb } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ============================================
@@ -72,7 +72,7 @@ export const plans = pgTable('plans', {
   type: planTypeEnum('type').notNull(),
   priceUsd: decimal('price_usd', { precision: 10, scale: 2 }).notNull(),
   priceArs: decimal('price_ar', { precision: 15, scale: 2 }),
-  features: text('features_json').notNull(), // JSON array of features
+  features: jsonb('features_json').notNull(), // JSON array of features
   interval: text('interval').notNull(), // 'monthly', 'yearly', 'lifetime'
   active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -365,6 +365,9 @@ export const events = pgTable('events', {
 }, (table) => ({
   environmentIdIdx: index('events_environment_id_idx').on(table.environmentId),
   startDateIdx: index('events_start_date_idx').on(table.startDate),
+  // Índices compuestos para consultas de calendario (rangos por ambiente)
+  envStartDateIdx: index('events_env_start_date_idx').on(table.environmentId, table.startDate),
+  envStartEndDateIdx: index('events_env_start_end_date_idx').on(table.environmentId, table.startDate, table.endDate),
   baseEventIdIdx: index('events_base_event_id_idx').on(table.baseEventId),
 }));
 

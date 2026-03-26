@@ -73,14 +73,14 @@ export async function scheduleAlarmNotification(
       return -1;
     }
 
-    const id = notificationId || Date.now() % 100000;
+    const deterministicId = notificationId ?? createDeterministicNotificationId(event.id, alarm.id);
 
     await LocalNotifications.schedule({
       notifications: [
         {
           title: '🔔 ' + event.title,
           body: getAlarmBody(alarm.minutesBefore, event),
-          id,
+          id: deterministicId,
           channelId: 'event-alarms',
           schedule: {
             at: alarmTime,
@@ -97,12 +97,23 @@ export async function scheduleAlarmNotification(
       ],
     });
 
-    console.log('Scheduled alarm notification:', id, 'at', alarmTime);
-    return id;
+    console.log('Scheduled alarm notification:', deterministicId, 'at', alarmTime);
+    return deterministicId;
   } catch (error) {
     console.error('Error scheduling alarm notification:', error);
     return -1;
   }
+}
+
+// Deterministic notification id to avoid collisions when scheduling multiple alarms.
+function createDeterministicNotificationId(eventId: string, alarmId: string): number {
+  const input = `${eventId}:${alarmId}`;
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 31 + input.charCodeAt(i)) | 0;
+  }
+  // Ensure positive integer within JS safe 32-bit range.
+  return Math.abs(hash) % 2147483647;
 }
 
 // Get alarm notification body text

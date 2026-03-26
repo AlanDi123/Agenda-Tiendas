@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import './ListsView.css';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 interface ListItem {
   id: string;
@@ -25,6 +26,7 @@ function loadItems(): ListItem[] {
 export function ListsView() {
   const [items, setItems] = useState<ListItem[]>(loadItems);
   const [newItemText, setNewItemText] = useState('');
+  const parentRef = useRef<HTMLDivElement | null>(null);
 
   // Persistir en localStorage cada vez que cambia la lista
   useEffect(() => {
@@ -64,6 +66,13 @@ export function ListsView() {
     }
   }, [addItem]);
 
+  const rowVirtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 56,
+    overscan: 6,
+  });
+
   return (
     <div className="lists-view">
       <div className="lists-header">
@@ -79,39 +88,56 @@ export function ListsView() {
             <span className="lists-empty-hint">Agrega items para comenzar</span>
           </div>
         ) : (
-          <ul className="lists-items">
-            {items.map(item => (
-              <li
-                key={item.id}
-                className={`lists-item ${item.checked ? 'checked' : ''}`}
-              >
-                <button
-                  className={`lists-item-checkbox ${item.checked ? 'checked' : ''}`}
-                  onClick={() => toggleItem(item.id)}
-                  aria-label={item.checked ? 'Marcar como pendiente' : 'Marcar como completado'}
-                >
-                  {item.checked && (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-                <span className={`lists-item-text ${item.checked ? 'checked' : ''}`}>
-                  {item.text}
-                </span>
-                <button
-                  className="lists-item-delete"
-                  onClick={() => deleteItem(item.id)}
-                  aria-label="Eliminar item"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div ref={parentRef} style={{ height: '60vh', overflowY: 'auto' }}>
+            <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+              {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                const item = items[virtualRow.index];
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <ul className="lists-items" style={{ margin: 0, padding: 0 }}>
+                      <li
+                        className={`lists-item ${item.checked ? 'checked' : ''}`}
+                      >
+                        <button
+                          className={`lists-item-checkbox ${item.checked ? 'checked' : ''}`}
+                          onClick={() => toggleItem(item.id)}
+                          aria-label={item.checked ? 'Marcar como pendiente' : 'Marcar como completado'}
+                        >
+                          {item.checked && (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </button>
+                        <span className={`lists-item-text ${item.checked ? 'checked' : ''}`}>
+                          {item.text}
+                        </span>
+                        <button
+                          className="lists-item-delete"
+                          onClick={() => deleteItem(item.id)}
+                          aria-label="Eliminar item"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
 

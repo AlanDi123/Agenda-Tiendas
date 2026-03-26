@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import MercadoPagoConfig, { Payment } from 'mercadopago';
 import db from '../db';
 import { webhookEvents, payments, users, subscriptions } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -85,6 +85,23 @@ router.post('/mercadopago', async (req: Request, res: Response) => {
     const planType = metadata?.planType || 'PREMIUM_MONTHLY';
 
     console.log(`[Webhook] Payment ${mpPaymentId} status: ${status}, userId: ${externalRef}`);
+    const now = new Date();
+    const approvedDateRaw = (mpPayment as any)?.date_approved;
+    const approvedDate = approvedDateRaw ? new Date(approvedDateRaw) : now;
+
+    // Idempotencia estricta: si ya otorgamos premium para este paymentId, ignoramos reintentos.
+    if (status === 'approved') {
+      const alreadyProcessed = await db
+        .select({ id: webhookEvents.id })
+        .from(webhookEvents)
+        .where(and(eq(webhookEvents.paymentId, mpPaymentId), eq(webhookEvents.processed, true)))
+        .limit(1);
+
+      if (alreadyProcessed.length > 0) {
+        console.log(`[Webhook] ✅ Duplicado ignorado: paymentId=${mpPaymentId}`);
+        return;
+      }
+    }
 
     // Registrar en webhookEvents
     await db.insert(webhookEvents).values({
@@ -120,26 +137,51 @@ router.post('/mercadopago', async (req: Request, res: Response) => {
       externalPaymentId: mpPaymentId,
     }).onConflictDoNothing();
 
-    // Calcular fecha de expiración según el plan
-    const now = new Date();
+    // Calcular fecha de expiración según el plan (con fecha real del approval)
     let expiresAt: Date | null = null;
     if (planType === 'PREMIUM_MONTHLY') {
-      expiresAt = new Date(now);
+      expiresAt = new Date(approvedDate);
       expiresAt.setMonth(expiresAt.getMonth() + 1);
     } else if (planType === 'PREMIUM_YEARLY') {
-      expiresAt = new Date(now);
+      expiresAt = new Date(approvedDate);
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
     }
 
     // Actualizar suscripción — upsert
-    const existing = await db.select({ id: subscriptions.id })
+    const existing = await db.select({
+      endDate: subscriptions.endDate,
+      planType: subscriptions.planType,
+      isLifetime: subscriptions.isLifetime,
+    })
       .from(subscriptions)
       .where(eq(subscriptions.userId, externalRef))
       .limit(1);
 
+    const existingSub = existing[0];
+    const isLifetime = !!existingSub?.isLifetime;
+
+    // Downgrade-safe: si ya tenía una fecha de expiración más grande, no recortamos.
+    const finalEndDate =
+      !isLifetime && existingSub?.endDate && expiresAt && existingSub.endDate > expiresAt
+        ? existingSub.endDate
+        : expiresAt;
+    const finalPlanType = (() => {
+      if (isLifetime) return existingSub?.planType;
+      if (existingSub?.endDate && expiresAt && existingSub.endDate > expiresAt) {
+        return existingSub.planType;
+      }
+      return planType as any;
+    })();
+
     if (existing.length > 0) {
       await db.update(subscriptions)
-        .set({ status: 'active', planType: planType as any, endDate: expiresAt, updatedAt: now })
+        .set({
+          status: 'active',
+          planType: finalPlanType,
+          endDate: isLifetime ? existingSub?.endDate : finalEndDate,
+          isLifetime,
+          updatedAt: now,
+        })
         .where(eq(subscriptions.userId, externalRef));
     } else {
       await db.insert(subscriptions).values({
@@ -147,7 +189,7 @@ router.post('/mercadopago', async (req: Request, res: Response) => {
         userId: externalRef,
         planType: planType as any,
         status: 'active',
-        startDate: now,
+        startDate: approvedDate,
         endDate: expiresAt,
         isLifetime: false,
         externalPaymentId: mpPaymentId,
@@ -157,7 +199,11 @@ router.post('/mercadopago', async (req: Request, res: Response) => {
 
     // Actualizar planType en la tabla users
     await db.update(users)
-      .set({ planType: planType as any, currentPeriodEnd: expiresAt, updatedAt: now })
+      .set({
+        planType: finalPlanType,
+        currentPeriodEnd: isLifetime ? null : finalEndDate,
+        updatedAt: now,
+      })
       .where(eq(users.id, externalRef));
 
     console.log(`[Webhook] ✅ Suscripción activada: userId=${externalRef}, plan=${planType}, expira=${expiresAt}`);

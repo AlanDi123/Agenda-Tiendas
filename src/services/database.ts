@@ -209,7 +209,16 @@ export async function getEventsByDateRange(start: Date, end: Date): Promise<Even
 
 export async function deleteEvent(id: string): Promise<void> {
   const db = await getDB();
-  await db.delete('events', id);
+  const existing = await db.get('events', id);
+  if (!existing) return;
+  const now = new Date();
+  // Tombstone: no borramos fisicamente para poder sincronizar borrados offline.
+  await db.put('events', {
+    ...existing,
+    deletedAt: now,
+    updatedAt: now,
+    version: (existing.version ?? 0) + 1,
+  });
 }
 
 export async function clearAllEvents(): Promise<void> {
@@ -223,9 +232,10 @@ export async function updateEventsColorForProfile(profileId: string, color: stri
   const allEvents = await db.getAll('events');
   const now = new Date();
   for (const event of allEvents) {
+    if (event.deletedAt) continue; // No tocar tombstones
     if (!event.assignedProfileIds?.includes(profileId)) continue;
     if (event.color === color) continue;
-    await db.put('events', { ...event, color, updatedAt: now });
+    await db.put('events', { ...event, color, updatedAt: now, version: (event.version ?? 0) + 1 });
   }
 }
 

@@ -23,6 +23,7 @@
     "@capacitor/preferences": "5.0.8",
     "@capacitor/splash-screen": "^5.0.8",
     "@capacitor/status-bar": "5.0.8",
+    "@tanstack/react-virtual": "^3.13.23",
     "capacitor-native-biometric": "^4.2.2",
     "date-fns": "^4.1.0",
     "idb": "^8.0.3",

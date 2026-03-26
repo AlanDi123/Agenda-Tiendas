@@ -172,7 +172,12 @@ export async function getAvailablePlans(): Promise<Array<{
 
     return foundPlans.map((plan: (typeof foundPlans)[number]) => ({
       ...plan,
-      features: JSON.parse(plan.features),
+      // Compat: si el driver ya devuelve JSONB como array, no parsear; si viene como string, parsear.
+      features: Array.isArray((plan as any).features)
+        ? (plan as any).features
+        : typeof (plan as any).features === 'string'
+          ? JSON.parse((plan as any).features)
+          : [],
     }));
   } catch (error) {
     console.error('[SubscriptionService] Error getting plans:', error);

@@ -46,44 +46,38 @@ export async function saveFamilySnapshot(params: {
   await ensureTable();
   const familyCode = params.familyCode.trim().toUpperCase();
 
-  const exists = await db.execute(sql.raw(`
-    SELECT id FROM ${TABLE_NAME}
-    WHERE family_code = '${familyCode.replace(/'/g, "''")}'
-    LIMIT 1
-  `));
+  const payloadJson = JSON.stringify(params.payload);
+  const ownerEmail = params.ownerEmail.trim().toLowerCase();
+  const ownerId = params.ownerId.trim();
 
-  const payloadJson = JSON.stringify(params.payload).replace(/'/g, "''");
-  const ownerEmail = params.ownerEmail.toLowerCase().replace(/'/g, "''");
-  const ownerId = params.ownerId.replace(/'/g, "''");
-
-  if ((exists as any).rows?.length > 0) {
-    await db.execute(sql.raw(`
-      UPDATE ${TABLE_NAME}
-      SET owner_id='${ownerId}',
-          owner_email='${ownerEmail}',
-          payload='${payloadJson}'::jsonb,
-          version=version+1,
-          updated_at=NOW()
-      WHERE family_code='${familyCode.replace(/'/g, "''")}'
-    `));
-    return;
-  }
-
-  await db.execute(sql.raw(`
-    INSERT INTO ${TABLE_NAME} (owner_id, owner_email, family_code, payload, version)
-    VALUES ('${ownerId}', '${ownerEmail}', '${familyCode.replace(/'/g, "''")}', '${payloadJson}'::jsonb, 1)
-  `));
+  // Upsert parametrizado: el SQL usa placeholders para evitar inyección
+  await db.execute(
+    sql`
+      INSERT INTO ${sql.raw(TABLE_NAME)} (owner_id, owner_email, family_code, payload, version)
+      VALUES (${ownerId}, ${ownerEmail}, ${familyCode}, ${payloadJson}::jsonb, 1)
+      ON CONFLICT (family_code)
+      DO UPDATE SET
+        owner_id = EXCLUDED.owner_id,
+        owner_email = EXCLUDED.owner_email,
+        payload = EXCLUDED.payload,
+        version = ${sql.raw(TABLE_NAME)}.version + 1,
+        updated_at = NOW()
+    `
+  );
 }
 
 export async function getFamilySnapshotByCode(familyCode: string): Promise<SnapshotPayload> {
   await ensureTable();
-  const normCode = familyCode.trim().toUpperCase().replace(/'/g, "''");
-  const result = await db.execute(sql.raw(`
-    SELECT payload
-    FROM ${TABLE_NAME}
-    WHERE family_code='${normCode}'
-    LIMIT 1
-  `));
+
+  const normCode = familyCode.trim().toUpperCase();
+  const result = await db.execute(
+    sql`
+      SELECT payload
+      FROM ${sql.raw(TABLE_NAME)}
+      WHERE family_code = ${normCode}
+      LIMIT 1
+    `
+  );
 
   const row = (result as any).rows?.[0];
   if (!row?.payload) {

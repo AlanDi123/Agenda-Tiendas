@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { saveContact, getAllContacts, deleteContact } from '../services/database';
 import { generateId, generateAvatarColor, getInitials } from '../utils/helpers';
@@ -6,6 +6,7 @@ import { Avatar } from './Avatar';
 import { Button } from './Button';
 import { Modal } from './Modal';
 import type { SharedContact } from '../types';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 type ContactWithEnv = SharedContact & { environmentId: string };
 
@@ -16,6 +17,7 @@ export function ContactsView() {
   const [editingContact, setEditingContact] = useState<ContactWithEnv | null>(null);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', email: '', notes: '' });
+  const parentRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     if (!environment) return;
@@ -63,11 +65,21 @@ export function ContactsView() {
     setForm({ name: '', phone: '', email: '', notes: '' });
   };
 
-  const filtered = contacts.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.phone?.includes(search) ||
-    c.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    return contacts.filter(
+      c =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.phone?.includes(search) ||
+        c.email?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [contacts, search]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 84,
+    overscan: 6,
+  });
 
   return (
     <div style={{ padding: '16px' }}>
@@ -91,26 +103,75 @@ export function ContactsView() {
           <p>No hay contactos guardados</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map(c => (
-            <div key={c.id} style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-              background: 'var(--color-surface)', borderRadius: 12,
-              border: '1px solid var(--color-border)',
-            }}>
-              <Avatar name={c.name} initials={getInitials(c.name)} color={c.avatarColor} size="md" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 15 }}>{c.name}</div>
-                {c.phone && <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>📱 {c.phone}</div>}
-                {c.email && <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>✉️ {c.email}</div>}
-                {c.notes && <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{c.notes}</div>}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => handleEdit(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 }}>✏️</button>
-                <button onClick={() => handleDelete(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 }}>🗑️</button>
-              </div>
-            </div>
-          ))}
+        <div
+          ref={parentRef}
+          style={{
+            height: '70vh',
+            overflowY: 'auto',
+          }}
+        >
+          <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+            {rowVirtualizer.getVirtualItems().map(virtualRow => {
+              const c = filtered[virtualRow.index];
+              return (
+                <div
+                  key={c.id}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '12px 14px',
+                      background: 'var(--color-surface)',
+                      borderRadius: 12,
+                      border: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <Avatar
+                      name={c.name}
+                      initials={getInitials(c.name)}
+                      color={c.avatarColor}
+                      size="md"
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 15 }}>{c.name}</div>
+                      {c.phone && (
+                        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>📱 {c.phone}</div>
+                      )}
+                      {c.email && (
+                        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>✉️ {c.email}</div>
+                      )}
+                      {c.notes && (
+                        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{c.notes}</div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => handleEdit(c)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 }}
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleDelete(c.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
