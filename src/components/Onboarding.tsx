@@ -7,8 +7,8 @@ import './Onboarding.css';
 
 const PLANS = [
   { id: 'FREE', name: 'Gratis', price: '$0', desc: 'Hasta 3 perfiles · 10 eventos/día' },
-  { id: 'PREMIUM_MONTHLY', name: 'Mensual', price: '$35.000 ARS/mes', desc: 'Sin límites · Todas las features' },
-  { id: 'PREMIUM_YEARLY', name: 'Anual', price: '$336.000 ARS/año', desc: '1er mes gratis · 20% de descuento', popular: true },
+  { id: 'PREMIUM_MONTHLY', name: 'Mensual', price: '$20.000 ARS/mes', desc: 'Sin límites · Todas las features' },
+  { id: 'PREMIUM_YEARLY', name: 'Anual', price: '$220.000 ARS/año', desc: '1 mes gratis', popular: true },
 ];
 
 interface OnboardingProps {

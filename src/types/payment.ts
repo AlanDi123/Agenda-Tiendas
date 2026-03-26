@@ -180,12 +180,12 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Soporte por email',
     ],
     popular: true,
-    priceArs: 35000,
+    priceArs: 20000,
   },
   {
     id: 'PREMIUM_YEARLY',
     name: 'Premium Anual',
-    description: 'Ahorra 2 meses con plan anual',
+    description: 'Ahorra 1 mes con plan anual',
     price: 99.99,
     currency: 'USD',
     interval: 'yearly',
@@ -193,11 +193,11 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     trialDays: 14,
     features: [
       'Todo lo del plan mensual',
-      '2 meses gratis (ahorro 20%)',
+      '1 mes gratis',
       'Soporte prioritario',
       'Actualizaciones anticipadas',
     ],
-    priceArs: 336000,
+    priceArs: 220000,
   },
   {
     id: 'PREMIUM_LIFETIME',

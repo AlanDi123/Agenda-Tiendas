@@ -60,14 +60,14 @@ export interface CheckoutResult {
 // ============================================
 
 const PLAN_PRICES: Record<string, { ars: number; interval: 'monthly' | 'yearly' | 'lifetime' }> = {
-  PREMIUM_MONTHLY: { ars: 35000, interval: 'monthly' },
-  PREMIUM_YEARLY:  { ars: 336000, interval: 'yearly' },
+  PREMIUM_MONTHLY: { ars: 20000, interval: 'monthly' },
+  PREMIUM_YEARLY:  { ars: 220000, interval: 'yearly' },
 };
 
 function getPlanDescription(planType: string): string {
   const descriptions: Record<string, string> = {
     PREMIUM_MONTHLY: 'Suscripción Mensual Premium',
-    PREMIUM_YEARLY: 'Suscripción Anual Premium (2 meses gratis)',
+    PREMIUM_YEARLY: 'Suscripción Anual Premium (1 mes gratis)',
     PREMIUM_LIFETIME: 'Acceso de por vida',
   };
   return descriptions[planType] || 'Suscripción Premium';

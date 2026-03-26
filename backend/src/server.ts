@@ -17,6 +17,7 @@ import { agendaRoutes } from './routes/agenda';
 import { authRoutes } from './routes/auth';
 import { appVersionRoutes } from './routes/appVersion';
 import { notificationRoutes } from './routes/notifications';
+import { familyRoutes } from './routes/families';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 
@@ -116,6 +117,7 @@ app.use(`/api/${API_VERSION}/subscriptions`, apiLimiter, subscriptionRoutes);
 app.use(`/api/${API_VERSION}/agenda`, apiLimiter, agendaRoutes);
 app.use(`/api/${API_VERSION}/discounts`, authLimiter, discountRoutes);
 app.use(`/api/${API_VERSION}/notifications`, apiLimiter, notificationRoutes);
+app.use(`/api/${API_VERSION}/families`, apiLimiter, familyRoutes);
 app.use(`/api/${API_VERSION}/app`, apiLimiter, appVersionRoutes);
 app.use('/api/webhooks', webhookLimiter, webhookRoutes);
 

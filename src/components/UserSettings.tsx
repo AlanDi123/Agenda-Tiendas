@@ -8,6 +8,7 @@ import { LogViewer } from './LogViewer';
 import { SubscriptionStatus } from './Subscription/SubscriptionStatus';
 import { SubscriptionModal } from './Subscription/SubscriptionModal';
 import { useAuth } from '../contexts/AuthContext';
+import { useEvents } from '../contexts/EventsContext';
 import { apiFetch } from '../config/api';
 import './UserSettings.css';
 
@@ -29,6 +30,7 @@ export function UserSettingsModal({
   onCloseFamily,
 }: UserSettingsModalProps) {
   const { isPremium } = useAuth();
+  const { events } = useEvents();
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'subscription'>('profile');
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -122,6 +124,17 @@ export function UserSettingsModal({
 
   if (!profile) return null;
 
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+  const profileTodayEvents = events.filter((e) =>
+    e.assignedProfileIds.includes(profile.id) &&
+    new Date(e.startDate) >= todayStart &&
+    new Date(e.startDate) <= todayEnd
+  ).length;
+  const freeLimitPerDay = 10;
+  const remainingToday = isPremium ? null : Math.max(0, freeLimitPerDay - profileTodayEvents);
+
   return (
     <Modal
       isOpen={isOpen}
@@ -189,6 +202,11 @@ export function UserSettingsModal({
         {activeTab === 'subscription' && (
           <div className="user-settings-content">
             <div className="user-settings-section">
+              {!isPremium && (
+                <p className="user-settings-section-subtext" style={{ marginBottom: 8 }}>
+                  Eventos restantes hoy: <strong>{remainingToday}</strong> / {freeLimitPerDay}
+                </p>
+              )}
               <h4 className="user-settings-section-title">Tu Plan</h4>
               
               <div className="subscription-summary-card">

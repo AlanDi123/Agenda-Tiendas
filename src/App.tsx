@@ -81,7 +81,8 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
 import type { CalendarView, ExpandedEvent, Event, DeleteScope, Profile } from './types';
 import { formatMonthYear } from './utils/helpers';
-import { saveUserSession, getEnvironment } from './services/database';
+import { saveUserSession, getEnvironment, saveEnvironment, clearAllEvents, saveEvent } from './services/database';
+import { queueCloudFamilySync, loadFamilySnapshotByCode } from './services/cloudFamilySync';
 import './styles/global.css';
 import './styles/animations.css';
 import './App.css';
@@ -111,6 +112,7 @@ function AppContent() {
   } = useAuth();
 
   const {
+    events: rawEvents,
     expandedEvents,
     loadEvents,
     createEvent,
@@ -285,6 +287,12 @@ function AppContent() {
       loadEvents();
     }
   }, [isAuthenticated, loadEvents]);
+
+  // Sync near real-time de familia+eventos a nube (debounced)
+  useEffect(() => {
+    if (!isAuthenticated || !environment || !isOnline) return;
+    queueCloudFamilySync(environment, rawEvents);
+  }, [isAuthenticated, environment, rawEvents, isOnline]);
 
   // Set active profile if not set but environment has profiles
   useEffect(() => {
@@ -512,7 +520,22 @@ function AppContent() {
     familyCode?: string;
   }) => {
     try {
-      const { environmentName, pin, profiles: profileList, planType } = data;
+      const { environmentName, pin, profiles: profileList, planType, familyCode } = data;
+
+      // JOIN existente por código de familia (recuperación nube)
+      if (!environmentName.trim() && familyCode) {
+        const snapshot = await loadFamilySnapshotByCode(familyCode);
+        await saveEnvironment(snapshot.environment);
+        await clearAllEvents();
+        for (const ev of snapshot.events) {
+          await saveEvent(ev);
+        }
+        await loadEnvironment(snapshot.environment.id);
+        if (currentUser) {
+          await saveUserSession(currentUser.email, snapshot.environment.id);
+        }
+        return;
+      }
 
       let createdFamilyCode: string | null = null;
       let createdEnvironmentName: string | null = null;
@@ -563,7 +586,7 @@ function AppContent() {
     } catch (error) {
       console.error('Error during onboarding:', error);
     }
-  }, [createEnvironment, addProfile, environment, currentUser]);
+  }, [createEnvironment, addProfile, environment, currentUser, loadEnvironment]);
 
   const handleUserAuthComplete = useCallback(async (userData: {
     name: string;
