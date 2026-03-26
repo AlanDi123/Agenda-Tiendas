@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Button';
 import { Input } from '../Input';
-import { canUseBiometric, isBiometricEnabled, loginWithBiometricPrompt, saveBiometricCredentials, setBiometricEnabled as persistBiometricEnabled } from '../../services/biometricAuth';
+import {
+  canUseBiometric,
+  hasBiometricCredentials,
+  isBiometricEnabled,
+  loginWithBiometricPrompt,
+  saveBiometricCredentials,
+  setBiometricEnabled as persistBiometricEnabled,
+} from '../../services/biometricAuth';
 import type { User } from '../../types/auth';
 import './Auth.css';
 import AppLogo from '../../assets/logo/logo_principal.png';
@@ -21,6 +28,7 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
   const [isLoading, setIsLoading] = useState(false);
   const [rememberSession, setRememberSession] = useState(true);
   const [canBiometric, setCanBiometric] = useState(false);
+  const [hasBioCreds, setHasBioCreds] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(isBiometricEnabled());
 
   useEffect(() => {
@@ -28,18 +36,26 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
   }, []);
 
   useEffect(() => {
+    if (!canBiometric) {
+      setHasBioCreds(false);
+      return;
+    }
+    hasBiometricCredentials().then(setHasBioCreds).catch(() => setHasBioCreds(false));
+  }, [canBiometric]);
+
+  useEffect(() => {
     persistBiometricEnabled(biometricEnabled);
   }, [biometricEnabled]);
 
   useEffect(() => {
     // En mobile, priorizar acceso biométrico cuando está activo.
-    if (!canBiometric || !biometricEnabled || isLoading) return;
+    if (!canBiometric || !biometricEnabled || !hasBioCreds || isLoading) return;
     const tried = sessionStorage.getItem('autoBiometricTried');
     if (tried === 'true') return;
     sessionStorage.setItem('autoBiometricTried', 'true');
     void handleBiometricLogin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canBiometric, biometricEnabled]);
+  }, [canBiometric, biometricEnabled, hasBioCreds]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,8 +64,9 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
 
     try {
       const user = await login(email, password, rememberSession);
-      if (rememberSession && biometricEnabled && canBiometric) {
+      if (biometricEnabled && canBiometric) {
         await saveBiometricCredentials(email, password).catch(() => {});
+        setHasBioCreds(true);
       }
       onLoginSuccess(user?.emailVerified, user || null);
     } catch (err) {
@@ -115,23 +132,23 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
             disabled={isLoading}
           />
 
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+          <label className="auth-option-toggle">
             <input
               type="checkbox"
               checked={rememberSession}
               onChange={(e) => setRememberSession(e.target.checked)}
             />
-            Mantener sesión iniciada en este dispositivo
+            <span>Mantener sesión iniciada</span>
           </label>
 
           {canBiometric && (
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+            <label className="auth-option-toggle">
               <input
                 type="checkbox"
                 checked={biometricEnabled}
                 onChange={(e) => setBiometricEnabled(e.target.checked)}
               />
-              Permitir ingreso biométrico (huella/rostro)
+              <span>Ingreso biométrico</span>
             </label>
           )}
 
@@ -148,7 +165,7 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
             Iniciar Sesión
           </Button>
 
-          {canBiometric && biometricEnabled && (
+          {canBiometric && biometricEnabled && hasBioCreds && (
             <Button
               type="button"
               variant="secondary"

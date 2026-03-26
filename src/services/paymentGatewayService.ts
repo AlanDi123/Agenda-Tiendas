@@ -10,6 +10,11 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
   console.info('[PaymentGateway] API base (VITE_API_URL o default producción)');
 }
 
+function getSessionToken(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+}
+
 /**
  * Create checkout preference and redirect to Mercado Pago
  */
@@ -17,7 +22,7 @@ export async function redirectToCheckout(
   planType: string,
   discountCode?: string
 ): Promise<void> {
-  const token = localStorage.getItem('authToken');
+  const token = getSessionToken();
 
   if (!token) {
     throw new Error('Usuario no autenticado. Por favor inicia sesión.');
@@ -85,7 +90,7 @@ export async function getSubscriptionStatus(): Promise<{
   expiresAt?: string;
   isLifetime: boolean;
 }> {
-  const token = localStorage.getItem('authToken');
+  const token = getSessionToken();
 
   if (!token) {
     return {
@@ -184,7 +189,7 @@ export async function checkPaymentStatus(paymentId?: string): Promise<{
   status: string;
   message: string;
 }> {
-  const token = localStorage.getItem('authToken');
+  const token = getSessionToken();
 
   if (!token) {
     return {
@@ -230,7 +235,7 @@ export async function createGatewayPayment(
   gatewayPaymentId?: string;
   error?: string;
 }> {
-  const token = localStorage.getItem('authToken');
+  const token = getSessionToken();
   if (!token) {
     return { success: false, error: 'Usuario no autenticado. Por favor inicia sesión.' };
   }

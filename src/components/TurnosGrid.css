@@ -30,7 +30,7 @@
 /* Main grid container */
 .turnos-grid {
   position: relative;
-  height: calc(var(--visible-hours, 17) * var(--hour-height, 64px));
+  height: calc(var(--visible-hours, 16) * var(--hour-height, 64px));
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
@@ -158,7 +158,7 @@
 .turnos-event-time {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--event-text-color, #fff);
   margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -177,7 +177,7 @@
 .turnos-event-title {
   font-size: 0.75rem;
   font-weight: 500;
-  color: white;
+  color: var(--event-text-color, #fff);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -201,7 +201,7 @@
 .turnos-event-expanded {
   margin-top: 4px;
   font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--event-text-color, #fff);
   line-height: 1.2;
   text-align: left;
 }

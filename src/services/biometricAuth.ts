@@ -33,6 +33,17 @@ export async function saveBiometricCredentials(email: string, password: string):
   });
 }
 
+export async function hasBiometricCredentials(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) return false;
+  try {
+    const { NativeBiometric } = await import('capacitor-native-biometric');
+    const creds = await NativeBiometric.getCredentials({ server: SERVER_KEY });
+    return !!creds?.username && !!creds?.password;
+  } catch {
+    return false;
+  }
+}
+
 export async function clearBiometricCredentials(): Promise<void> {
   const { NativeBiometric } = await import('capacitor-native-biometric');
   await NativeBiometric.deleteCredentials({

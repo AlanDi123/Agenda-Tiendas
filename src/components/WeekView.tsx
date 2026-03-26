@@ -16,6 +16,18 @@ const START_HOUR = 6; // 6:00 AM
 const END_HOUR = 22; // 10:00 PM
 const VISIBLE_HOURS = END_HOUR - START_HOUR;
 
+function getReadableTextColor(background: string): string {
+  const hex = background.replace('#', '');
+  const normalized = hex.length === 3
+    ? hex.split('').map((c) => c + c).join('')
+    : hex;
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.62 ? '#1c2430' : '#ffffff';
+}
+
 // Check if two events overlap
 function eventsOverlap(e1: ExpandedEvent, e2: ExpandedEvent): boolean {
   const e1Start = e1.startDate.getTime();
@@ -265,6 +277,7 @@ export function WeekView({
                         backgroundColor: event.color,
                         left: `calc(${leftPercent}%)`,
                         width: `calc(${widthPercent}% - 4px)`,
+                      color: getReadableTextColor(event.color || '#1E88E5'),
                       }}
                       onClick={(e) => {
                         e.stopPropagation();

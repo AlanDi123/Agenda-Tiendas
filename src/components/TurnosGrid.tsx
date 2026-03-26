@@ -33,6 +33,18 @@ interface TurnosGridProps {
   onEventClick?: (event: ExpandedEvent) => void;
 }
 
+function getReadableTextColor(background: string): string {
+  const hex = background.replace('#', '');
+  const normalized = hex.length === 3
+    ? hex.split('').map((c) => c + c).join('')
+    : hex;
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.62 ? '#1c2430' : '#ffffff';
+}
+
 export function TurnosGrid({
   currentDate,
   events,
@@ -92,7 +104,7 @@ export function TurnosGrid({
   // Render hour labels
   const hourLabels = useMemo(() => {
     const labels = [];
-    for (let hour = START_HOUR; hour < END_HOUR; hour++) {
+    for (let hour = START_HOUR; hour <= END_HOUR; hour++) {
       labels.push(
         <div
           key={hour}
@@ -159,6 +171,7 @@ export function TurnosGrid({
             const eventColor = event.color || profile?.avatarColor || '#1E88E5';
             const { left, width } = calculateEventLayout(column, totalColumns);
             const overlapType = getOverlapType(event, daysEvents);
+            const textColor = getReadableTextColor(eventColor);
 
             // Skip events completely outside visible hours
             if (position.top >= GRID_HEIGHT || position.top + position.height <= 0) {
@@ -175,6 +188,7 @@ export function TurnosGrid({
                   '--event-height': `${position.height}px`,
                   '--event-left': left,
                   '--event-width': width,
+                  '--event-text-color': textColor,
                 } as React.CSSProperties}
                 onClick={(e) => {
                   e.stopPropagation();

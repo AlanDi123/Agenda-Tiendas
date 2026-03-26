@@ -440,6 +440,7 @@ function AppContent() {
     const newDate = new Date(viewDate);
     newDate.setHours(hours, minutes, 0, 0);
     setViewDate(newDate);
+    setSelectedEvent(null);
     setShowEventForm(true);
   }, [viewDate, setViewDate]);
 
@@ -1044,6 +1045,22 @@ function AppContent() {
           onSave={selectedEvent ? handleUpdateEvent : handleCreateEvent}
           profiles={environment.profiles}
           initialDate={viewDate}
+          event={selectedEvent ? {
+            id: selectedEvent.baseEventId,
+            title: selectedEvent.title,
+            phone: selectedEvent.phone,
+            location: selectedEvent.location,
+            allDay: selectedEvent.allDay,
+            startDate: selectedEvent.startDate,
+            endDate: selectedEvent.endDate,
+            notes: selectedEvent.notes,
+            assignedProfileIds: selectedEvent.assignedProfileIds,
+            color: selectedEvent.color,
+            category: selectedEvent.category,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            alarms: selectedEvent.alarms,
+          } : undefined}
         />
 
         {/* Event Detail Modal */}
