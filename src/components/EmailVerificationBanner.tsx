@@ -4,10 +4,13 @@ import { Button } from './Button';
 import './EmailVerificationBanner.css';
 
 export function EmailVerificationBanner() {
-  const { currentUser, resendVerificationEmail, isEmailVerified } = useAuth();
+  const { currentUser, resendVerificationEmail, isEmailVerified, verifyEmail } = useAuth();
   const [isDismissed, setIsDismissed] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [code, setCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
 
   if (isEmailVerified || isDismissed || !currentUser) return null;
 
@@ -26,6 +29,20 @@ export function EmailVerificationBanner() {
 
   const handleDismiss = () => {
     setIsDismissed(true);
+  };
+
+  const handleVerifyCode = async () => {
+    if (!currentUser || code.trim().length !== 6) return;
+    setIsVerifying(true);
+    try {
+      await verifyEmail(code.trim(), currentUser.email);
+      setShowCodeInput(false);
+      setCode('');
+    } catch (error) {
+      console.error('Error verifying code:', error);
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   return (
@@ -54,11 +71,34 @@ export function EmailVerificationBanner() {
         <Button
           variant="text"
           size="sm"
+          onClick={() => setShowCodeInput((v) => !v)}
+          disabled={isVerifying}
+        >
+          {showCodeInput ? 'Ocultar código' : 'Poner código'}
+        </Button>
+        <Button
+          variant="text"
+          size="sm"
           onClick={handleDismiss}
         >
           ✕
         </Button>
       </div>
+      {showCodeInput && (
+        <div className="evb-actions" style={{ marginTop: 8 }}>
+          <input
+            type="text"
+            value={code}
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="Código de 6 dígitos"
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          />
+          <Button variant="text" size="sm" onClick={handleVerifyCode} loading={isVerifying} disabled={code.length !== 6}>
+            Verificar
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import './Auth.css';
 
 interface RegisterProps {
   onSwitchToLogin: () => void;
-  onRegisterSuccess: (verificationToken: string) => void;
+  onRegisterSuccess: (verificationToken: string, email: string) => void;
 }
 
 export function Register({ onSwitchToLogin, onRegisterSuccess }: RegisterProps) {
@@ -51,7 +51,7 @@ export function Register({ onSwitchToLogin, onRegisterSuccess }: RegisterProps) 
 
     try {
       const result = await register(email, password);
-      onRegisterSuccess(result.verificationToken);
+      onRegisterSuccess(result.verificationToken, email.toLowerCase());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear cuenta');
     } finally {

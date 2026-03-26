@@ -130,6 +130,16 @@
   transform: scale(0.98);
 }
 
+.turnos-event-focused {
+  z-index: 25;
+  min-height: 72px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+}
+
+.turnos-event-dimmed {
+  opacity: 0.3;
+}
+
 /* Overlap type styling */
 .turnos-event-single {
   /* Single event, full width */
@@ -186,6 +196,14 @@
   color: white;
   flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.turnos-event-expanded {
+  margin-top: 4px;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.2;
+  text-align: left;
 }
 
 /* Current time line */

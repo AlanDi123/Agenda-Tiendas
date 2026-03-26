@@ -3,13 +3,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Button';
 import { Input } from '../Input';
 import { canUseBiometric, isBiometricEnabled, loginWithBiometricPrompt, saveBiometricCredentials, setBiometricEnabled as persistBiometricEnabled } from '../../services/biometricAuth';
+import type { User } from '../../types/auth';
 import './Auth.css';
 import AppLogo from '../../assets/logo/logo_principal.png';
 
 interface LoginProps {
   onSwitchToRegister: () => void;
   onSwitchToReset: () => void;
-  onLoginSuccess: () => void;
+  onLoginSuccess: (emailVerified?: boolean, user?: User | null) => void;
 }
 
 export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: LoginProps) {
@@ -46,11 +47,11 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
     setIsLoading(true);
 
     try {
-      await login(email, password, rememberSession);
+      const user = await login(email, password, rememberSession);
       if (rememberSession && biometricEnabled && canBiometric) {
         await saveBiometricCredentials(email, password).catch(() => {});
       }
-      onLoginSuccess();
+      onLoginSuccess(user?.emailVerified, user || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
     } finally {
@@ -65,8 +66,8 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
       const creds = await loginWithBiometricPrompt();
       setEmail(creds.email);
       setPassword(creds.password);
-      await login(creds.email, creds.password, true);
-      onLoginSuccess();
+      const user = await login(creds.email, creds.password, true);
+      onLoginSuccess(user?.emailVerified, user || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo iniciar con biometría');
     } finally {

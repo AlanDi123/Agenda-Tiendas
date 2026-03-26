@@ -136,7 +136,6 @@ function AppContent() {
 
   // Auth flow state
   const [authState, setAuthState] = useState<AuthState>('loading');
-  const [pendingToken, setPendingToken] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // UI State
@@ -158,6 +157,7 @@ function AppContent() {
   const [showUserAuth, setShowUserAuth] = useState(false);
   const [showUserSettings, setShowUserSettings] = useState(false);
   const [pendingEnvironmentId, setPendingEnvironmentId] = useState('');
+  const [pendingVerifyEmail, setPendingVerifyEmail] = useState('');
 
   // Edit scope for recurring events
   const [editScope, setEditScope] = useState<'single' | 'future' | 'all'>('single');
@@ -174,13 +174,18 @@ function AppContent() {
   // Handle auth state changes
   useEffect(() => {
     if (isAuthLoading) return;
-    
+
+    if (isAuthenticated && currentUser && !currentUser.emailVerified) {
+      setAuthState('verify-email');
+      return;
+    }
+
     if (isAuthenticated) {
       setAuthState('authenticated');
     } else {
       setAuthState('login');
     }
-  }, [isAuthenticated, isAuthLoading]);
+  }, [isAuthenticated, isAuthLoading, currentUser]);
 
   // Al volver del checkout de MP, refrescar suscripción
   useEffect(() => {
@@ -332,6 +337,28 @@ function AppContent() {
     if (!isAuthenticated || !environment || !isOnline) return;
     queueCloudFamilySync(environment, rawEvents);
   }, [isAuthenticated, environment, rawEvents, isOnline]);
+
+  // Al cambiar de familia, refrescar eventos desde snapshot cloud para evitar mezclas locales.
+  useEffect(() => {
+    if (!isAuthenticated || !environment?.familyCode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snapshot = await loadFamilySnapshotByCode(environment.familyCode);
+        if (cancelled) return;
+        await clearAllEvents();
+        for (const ev of snapshot.events) {
+          await saveEvent(ev);
+        }
+        await loadEvents();
+      } catch {
+        // Fallback silencioso: si no hay snapshot aún, mantener estado local.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, environment?.familyCode, loadEvents]);
 
   // Set active profile if not set but environment has profiles
   useEffect(() => {
@@ -535,18 +562,22 @@ function AppContent() {
   }, [selectedEvent, deleteScope, deleteEvent]);
 
   // Auth handlers
-  const handleLoginSuccess = useCallback(() => {
-    setAuthState('authenticated');
-  }, []);
-
-  const handleRegisterSuccess = useCallback((token: string) => {
-    if (currentUser) {
-      setPendingToken(token);
+  const handleLoginSuccess = useCallback((emailVerified?: boolean) => {
+    if (emailVerified === false) {
+      if (currentUser?.email) setPendingVerifyEmail(currentUser.email);
       setAuthState('verify-email');
+      return;
     }
+    setAuthState('authenticated');
   }, [currentUser]);
 
+  const handleRegisterSuccess = useCallback((_token: string, email: string) => {
+    setPendingVerifyEmail(email);
+    setAuthState('verify-email');
+  }, []);
+
   const handleVerificationComplete = useCallback(() => {
+    setPendingVerifyEmail('');
     setAuthState('authenticated');
   }, []);
 
@@ -556,6 +587,7 @@ function AppContent() {
 
   const handleLogout = useCallback(async () => {
     await logout();
+    setPendingVerifyEmail('');
     setAuthState('login');
   }, [logout]);
 
@@ -603,7 +635,8 @@ function AppContent() {
           await addProfile(profileData.name, currentUser?.email || '', profileData.permissions);
         }
       } else {
-        const createdEnv = await createEnvironment(environmentName, pin, profileList);
+        await clearAllEvents();
+        const createdEnv = await createEnvironment(environmentName, pin, profileList, familyCode);
         createdFamilyCode = createdEnv.familyCode;
         createdEnvironmentName = createdEnv.name;
       }
@@ -803,12 +836,15 @@ function AppContent() {
     );
   }
 
-  if (authState === 'verify-email' && currentUser) {
+  if (authState === 'verify-email') {
+    const verifyEmailTarget = currentUser?.email || pendingVerifyEmail;
+    if (!verifyEmailTarget) {
+      return <SplashScreen />;
+    }
     return (
       <Suspense fallback={<RouteLoadingFallback label="Cargando verificación…" />}>
         <VerifyEmail
-          email={currentUser.email}
-          token={pendingToken}
+          email={verifyEmailTarget}
           onVerificationComplete={handleVerificationComplete}
         />
       </Suspense>

@@ -56,7 +56,8 @@ interface AuthContextType {
   createEnvironment: (
     name: string,
     pin?: string,
-    initialProfiles?: Array<{ name: string; permissions: 'admin' | 'readonly' }>
+    initialProfiles?: Array<{ name: string; permissions: 'admin' | 'readonly' }>,
+    familyCode?: string
   ) => Promise<Environment>;
   loadEnvironment: (id: string) => Promise<void>;
   addProfile: (name: string, email: string, permissions: 'admin' | 'readonly', pin?: string, recoveryEmail?: string, avatarColor?: string) => Promise<Profile>;
@@ -240,7 +241,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const createEnvironment = useCallback(async (
     name: string,
     pin?: string,
-    initialProfiles?: Array<{ name: string; permissions: 'admin' | 'readonly' }>
+    initialProfiles?: Array<{ name: string; permissions: 'admin' | 'readonly' }>,
+    familyCode?: string
   ): Promise<Environment> => {
     if (currentUser) {
       const created = getCreatedEnvironmentIdsForUser(currentUser.id);
@@ -281,7 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       pin,
       profiles,
       activeProfileId,
-      familyCode: generateFamilyCode(),
+      familyCode: familyCode || generateFamilyCode(),
       planType: 'FREE',
       createdAt: new Date(),
     };

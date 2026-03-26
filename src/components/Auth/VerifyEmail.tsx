@@ -5,12 +5,11 @@ import './Auth.css';
 
 interface VerifyEmailProps {
   email: string;
-  token?: string;
   onVerificationComplete: () => void;
   onSkip?: () => void;
 }
 
-export function VerifyEmail({ email, token, onVerificationComplete, onSkip }: VerifyEmailProps) {
+export function VerifyEmail({ email, onVerificationComplete, onSkip }: VerifyEmailProps) {
   const { verifyEmail, resendVerificationEmail } = useAuth();
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,10 +18,6 @@ export function VerifyEmail({ email, token, onVerificationComplete, onSkip }: Ve
   const [info, setInfo] = useState('');
   const [countdown, setCountdown] = useState(60);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  useEffect(() => {
-    if (token) handleVerify(token);
-  }, [token]);
 
   useEffect(() => {
     if (countdown > 0) {

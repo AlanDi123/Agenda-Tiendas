@@ -230,60 +230,60 @@ export function WeekView({
           });
         }}
       >
-        <div className="week-view-times">
-          {hours.map(hour => (
-            <div key={hour} className="week-view-time">
-              {format(new Date(2024, 0, 1, hour), 'HH:00')}
-            </div>
-          ))}
+        <div className="week-view-grid-content">
+          <div className="week-view-times">
+            {hours.map(hour => (
+              <div key={hour} className="week-view-time">
+                {format(new Date(2024, 0, 1, hour), 'HH:00')}
+              </div>
+            ))}
+          </div>
+
+          {eventsByDay.map(({ date, events: positionedEvents }, dayIndex) => {
+            const isTodayDate = isToday(date);
+
+            return (
+              <div
+                key={dayIndex}
+                className={`week-view-column ${isTodayDate ? 'week-view-column-today' : ''}`}
+              >
+                {hours.map(hour => (
+                  <div key={hour} className="week-view-cell" />
+                ))}
+
+                {positionedEvents.map(({ event, column, totalColumns, position }) => {
+                  const widthPercent = 100 / totalColumns;
+                  const leftPercent = column * widthPercent;
+
+                  return (
+                    <button
+                      key={event.id}
+                      className="week-view-event"
+                      style={{
+                        top: `${position.top}px`,
+                        height: `${position.height}px`,
+                        backgroundColor: event.color,
+                        left: `calc(${leftPercent}%)`,
+                        width: `calc(${widthPercent}% - 4px)`,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEventClick(event);
+                      }}
+                      aria-label={`${event.title}, ${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}`}
+                      title={`${event.title}\n${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}`}
+                    >
+                      <span className="week-view-event-title">{event.title}</span>
+                      <span className="week-view-event-time">
+                        {format(event.startDate, 'HH:mm')} - {format(event.endDate, 'HH:mm')}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
-
-        {eventsByDay.map(({ date, events: positionedEvents }, dayIndex) => {
-          const isTodayDate = isToday(date);
-
-          return (
-            <div
-              key={dayIndex}
-              className={`week-view-column ${isTodayDate ? 'week-view-column-today' : ''}`}
-            >
-              {/* Hour cells */}
-              {hours.map(hour => (
-                <div key={hour} className="week-view-cell" />
-              ))}
-
-              {/* Positioned events */}
-              {positionedEvents.map(({ event, column, totalColumns, position }) => {
-                const widthPercent = 100 / totalColumns;
-                const leftPercent = column * widthPercent;
-
-                return (
-                  <button
-                    key={event.id}
-                    className="week-view-event"
-                    style={{
-                      top: `${position.top}px`,
-                      height: `${position.height}px`,
-                      backgroundColor: event.color,
-                      left: `calc(${leftPercent}%)`,
-                      width: `calc(${widthPercent}% - 4px)`,
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEventClick(event);
-                    }}
-                    aria-label={`${event.title}, ${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}`}
-                    title={`${event.title}\n${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}`}
-                  >
-                    <span className="week-view-event-title">{event.title}</span>
-                    <span className="week-view-event-time">
-                      {format(event.startDate, 'HH:mm')} - {format(event.endDate, 'HH:mm')}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })}
       </div>
     </div>
   );

@@ -41,6 +41,7 @@ export function TurnosGrid({
   onEventClick,
 }: TurnosGridProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [focusedEventId, setFocusedEventId] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Update current time every minute
@@ -167,7 +168,7 @@ export function TurnosGrid({
             return (
               <button
                 key={event.id}
-                className={`turnos-event-card turnos-event-${overlapType}`}
+                className={`turnos-event-card turnos-event-${overlapType} ${focusedEventId === event.id ? 'turnos-event-focused' : ''} ${focusedEventId && focusedEventId !== event.id ? 'turnos-event-dimmed' : ''}`}
                 style={{
                   '--event-color': eventColor,
                   '--event-top': `${position.top}px`,
@@ -177,7 +178,11 @@ export function TurnosGrid({
                 } as React.CSSProperties}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onEventClick?.(event);
+                  if (focusedEventId === event.id) {
+                    onEventClick?.(event);
+                    return;
+                  }
+                  setFocusedEventId(event.id);
                 }}
                 title={`${event.title}\n${format(event.startDate, 'HH:mm')} - ${format(event.endDate, 'HH:mm')}`}
               >
@@ -196,6 +201,13 @@ export function TurnosGrid({
                     </span>
                   )}
                 </div>
+                {focusedEventId === event.id && (
+                  <div className="turnos-event-expanded">
+                    {event.notes ? <div>📝 {event.notes}</div> : null}
+                    {event.location ? <div>📍 {event.location}</div> : null}
+                    <div>Toque de nuevo para abrir acciones</div>
+                  </div>
+                )}
               </button>
             );
           })}
