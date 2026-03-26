@@ -13,7 +13,7 @@ interface WeekViewProps {
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const HOUR_HEIGHT = 64; // pixels per hour
 const START_HOUR = 6; // 6:00 AM
-const END_HOUR = 23; // 11:00 PM
+const END_HOUR = 22; // 10:00 PM
 const VISIBLE_HOURS = END_HOUR - START_HOUR;
 
 // Check if two events overlap
@@ -123,6 +123,7 @@ export function WeekView({
 }: WeekViewProps) {
   const headerScrollRef = useRef<HTMLDivElement | null>(null);
   const gridScrollRef = useRef<HTMLDivElement | null>(null);
+  const syncingScrollRef = useRef<'header' | 'grid' | null>(null);
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const day = currentDate.getDate();
@@ -182,7 +183,19 @@ export function WeekView({
 
   return (
     <div className="week-view">
-      <div className="week-view-header-scroll" ref={headerScrollRef}>
+      <div
+        className="week-view-header-scroll"
+        ref={headerScrollRef}
+        onScroll={() => {
+          if (!headerScrollRef.current || !gridScrollRef.current) return;
+          if (syncingScrollRef.current === 'grid') return;
+          syncingScrollRef.current = 'header';
+          gridScrollRef.current.scrollLeft = headerScrollRef.current.scrollLeft;
+          requestAnimationFrame(() => {
+            syncingScrollRef.current = null;
+          });
+        }}
+      >
         <div className="week-view-header">
           <div className="week-view-times"></div>
           {weekDays.map((day, index) => {
@@ -208,9 +221,13 @@ export function WeekView({
         className="week-view-grid"
         ref={gridScrollRef}
         onScroll={() => {
-          if (headerScrollRef.current && gridScrollRef.current) {
-            headerScrollRef.current.scrollLeft = gridScrollRef.current.scrollLeft;
-          }
+          if (!headerScrollRef.current || !gridScrollRef.current) return;
+          if (syncingScrollRef.current === 'header') return;
+          syncingScrollRef.current = 'grid';
+          headerScrollRef.current.scrollLeft = gridScrollRef.current.scrollLeft;
+          requestAnimationFrame(() => {
+            syncingScrollRef.current = null;
+          });
         }}
       >
         <div className="week-view-times">

@@ -121,6 +121,24 @@
   overflow: hidden;
 }
 
+.day-view-event-card-focused {
+  transform: scale(1.02);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
+  z-index: 3;
+}
+
+.day-view-event-card-dimmed {
+  opacity: 0.35;
+}
+
+.day-view-event-details-extra {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  display: grid;
+  gap: 2px;
+}
+
 .day-view-event-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);

@@ -23,7 +23,7 @@ function resolveEmailAppBaseUrl(): string {
 }
 
 const APP_BASE_URL = resolveEmailAppBaseUrl();
-const CODE_EXPIRY_MIN = parseInt(process.env.VERIFICATION_CODE_EXPIRY_MINUTES || '15');
+const CODE_EXPIRY_MIN = parseInt(process.env.VERIFICATION_CODE_EXPIRY_MINUTES || '5');
 const APP_SCHEME = process.env.APP_DEEP_LINK_SCHEME || 'dommussagenda';
 
 // Inicializar el cliente de Resend
@@ -216,6 +216,14 @@ export async function verifyCode(
     await db.update(emailVerifications)
       .set({ verified: true, verifiedAt: new Date() })
       .where(eq(emailVerifications.id, row.id));
+
+    await db.update(users)
+      .set({
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
 
     const user = await db.select({ email: users.email })
       .from(users).where(eq(users.id, userId)).limit(1);

@@ -7,7 +7,7 @@ interface VerifyEmailProps {
   email: string;
   token?: string;
   onVerificationComplete: () => void;
-  onSkip: () => void;
+  onSkip?: () => void;
 }
 
 export function VerifyEmail({ email, token, onVerificationComplete, onSkip }: VerifyEmailProps) {
@@ -35,7 +35,7 @@ export function VerifyEmail({ email, token, onVerificationComplete, onSkip }: Ve
     setIsLoading(true);
     setError('');
     try {
-      await verifyEmail(verifyToken);
+      await verifyEmail(verifyToken, email);
       setSuccess(true);
       setTimeout(() => onVerificationComplete(), 1500);
     } catch (err) {
@@ -154,9 +154,11 @@ export function VerifyEmail({ email, token, onVerificationComplete, onSkip }: Ve
           <Button variant="text" size="md" fullWidth onClick={handleResend} disabled={countdown > 0 || isLoading}>
             {countdown > 0 ? `Reenviar código en ${countdown}s` : 'Reenviar código'}
           </Button>
-          <Button variant="text" size="md" fullWidth onClick={onSkip} disabled={isLoading}>
-            Omitir por ahora
-          </Button>
+          {onSkip && (
+            <Button variant="text" size="md" fullWidth onClick={onSkip} disabled={isLoading}>
+              Omitir por ahora
+            </Button>
+          )}
         </div>
 
         <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 16 }}>

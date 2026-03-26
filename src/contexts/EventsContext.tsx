@@ -13,6 +13,7 @@ import { AppLogger } from '../services/logger';
 import { useEventAlarms } from '../hooks/useEventAlarms';
 import { apiFetch } from '../config/api';
 import { useAuth } from './AuthContext';
+import { validateEventTimeRange } from '../domain/eventValidation';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -129,6 +130,11 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const createEvent = useCallback(async (
     eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<Event> => {
+    const timeError = validateEventTimeRange(new Date(eventData.startDate), new Date(eventData.endDate), !!eventData.allDay);
+    if (timeError) {
+      throw new Error(timeError);
+    }
+
     const event: Event = {
       ...eventData,
       id: generateId(),
@@ -164,6 +170,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     scope: 'single' | 'future' | 'all'
   ) => {
     try {
+      const timeError = validateEventTimeRange(new Date(event.startDate), new Date(event.endDate), !!event.allDay);
+      if (timeError) {
+        throw new Error(timeError);
+      }
       const updatedEvent = {
         ...event,
         updatedAt: new Date(),

@@ -295,11 +295,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update backend manifest (optional)
+      - name: Update backend manifest
         if: ${{ secrets.BACKEND_MANIFEST_URL != '' && secrets.BACKEND_MANIFEST_KEY != '' }}
         run: |
-          curl -X POST "${{ secrets.BACKEND_MANIFEST_URL }}" \
+          curl --fail --show-error --silent -X POST "${{ secrets.BACKEND_MANIFEST_URL }}" \
             -H "Content-Type: application/json" \
             -H "x-deploy-secret: ${{ secrets.BACKEND_MANIFEST_KEY }}" \
-            -d @./manifest/version-manifest.json \
-            || echo "Failed to update backend manifest"
+            -d @./manifest/version-manifest.json

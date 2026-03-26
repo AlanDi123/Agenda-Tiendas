@@ -7,7 +7,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import * as authService from '../services/authService';
-import { sendVerificationCode, verifyCode, sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
+import { sendVerificationCode, verifyCode, sendPasswordResetEmail } from '../services/emailService';
 import { createError } from '../middleware/errorHandler';
 import { authMiddleware } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
@@ -32,6 +32,11 @@ const loginSchema = z.object({
 
 const verifyEmailSchema = z.object({
   token: z.string(),
+});
+
+const verifyEmailCodePublicSchema = z.object({
+  email: z.string().email(),
+  code: z.string().length(6),
 });
 
 const verifyCodeSchema = z.object({
@@ -64,9 +69,9 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     const data = registerSchema.parse(req.body);
     const result = await authService.registerUser(data);
 
-    // Enviar el mail de verificación por Resend
+    // Enviar código OTP de verificación (5 min)
     try {
-      await sendVerificationEmail(result.user.email, result.verificationToken);
+      await sendVerificationCode(result.user.id, result.user.email);
     } catch (emailError) {
       // No bloquear el registro por fallo del proveedor de correo
       console.error('[Auth] Error enviando mail de verificación:', emailError);
@@ -107,15 +112,30 @@ router.post('/verify-email', async (req: Request, res: Response, next: NextFunct
   }
 });
 
+router.post('/verify-email-code', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, code } = verifyEmailCodePublicSchema.parse(req.body);
+    const user = await authService.getUserByEmail(email.toLowerCase());
+    if (!user) {
+      throw createError('Usuario no encontrado', 404, 'USER_NOT_FOUND');
+    }
+    const result = await verifyCode(user.id, code);
+    if (!result.success) {
+      throw createError(result.message, 400, 'INVALID_CODE');
+    }
+    res.json({ success: true, message: result.message });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/resend-verification', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email } = resendVerificationSchema.parse(req.body);
-    const result = await authService.resendVerificationEmail(email);
-
-    // Enviar el nuevo token por Resend
-    if (result.verificationToken) {
+    const user = await authService.getUserByEmail(email.toLowerCase());
+    if (user && !user.emailVerified) {
       try {
-        await sendVerificationEmail(email, result.verificationToken);
+        await sendVerificationCode(user.id, user.email);
       } catch (emailError) {
         const message = emailError instanceof Error ? emailError.message : 'Error enviando email';
         throw createError(message, 502, 'EMAIL_SEND_FAILED');
@@ -125,8 +145,6 @@ router.post('/resend-verification', async (req: Request, res: Response, next: Ne
     res.json({
       success: true,
       message: 'Código de verificación enviado',
-      // NO exponer el token en producción
-      verificationToken: process.env.NODE_ENV !== 'production' ? result.verificationToken : undefined,
     });
   } catch (error) {
     next(error);

@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { format, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { ExpandedEvent, Profile } from '../types';
@@ -17,12 +18,18 @@ export function DayView({
   profiles,
   onEventClick,
 }: DayViewProps) {
+  const [focusedEventId, setFocusedEventId] = useState<string | null>(null);
   const isTodayDate = isToday(currentDate);
   const formattedDate = format(currentDate, "EEEE, d 'de' MMMM yyyy", { locale: es });
+  const dayKey = format(currentDate, 'yyyy-MM-dd');
+  const dayEvents = useMemo(
+    () => events.filter((e) => format(e.startDate, 'yyyy-MM-dd') === dayKey),
+    [events, dayKey]
+  );
   
   // Agrupar eventos por todo el día y por hora
-  const allDayEvents = events.filter(e => e.allDay);
-  const timedEvents = events.filter(e => !e.allDay).sort(
+  const allDayEvents = dayEvents.filter(e => e.allDay);
+  const timedEvents = dayEvents.filter(e => !e.allDay).sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
   
@@ -34,12 +41,12 @@ export function DayView({
       <div className={`day-view-header ${isTodayDate ? 'day-view-header-today' : ''}`}>
         <h2 className="day-view-date">{capitalizedDate}</h2>
         <p className="day-view-event-count">
-          {events.length} {events.length === 1 ? 'evento' : 'eventos'}
+          {dayEvents.length} {dayEvents.length === 1 ? 'evento' : 'eventos'}
         </p>
       </div>
       
       <div className="day-view-content">
-        {events.length === 0 ? (
+        {dayEvents.length === 0 ? (
           <div className="day-view-empty">
             <div className="day-view-empty-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -67,7 +74,12 @@ export function DayView({
                       key={event.id}
                       event={event}
                       profiles={profiles}
-                      onClick={() => onEventClick(event)}
+                      focused={focusedEventId === event.id}
+                      dimmed={!!focusedEventId && focusedEventId !== event.id}
+                      onClick={() => {
+                        if (focusedEventId === event.id) onEventClick(event);
+                        else setFocusedEventId(event.id);
+                      }}
                     />
                   ))}
                 </div>
@@ -83,7 +95,12 @@ export function DayView({
                       key={event.id}
                       event={event}
                       profiles={profiles}
-                      onClick={() => onEventClick(event)}
+                      focused={focusedEventId === event.id}
+                      dimmed={!!focusedEventId && focusedEventId !== event.id}
+                      onClick={() => {
+                        if (focusedEventId === event.id) onEventClick(event);
+                        else setFocusedEventId(event.id);
+                      }}
                     />
                   ))}
                 </div>
@@ -99,10 +116,12 @@ export function DayView({
 interface EventCardProps {
   event: ExpandedEvent;
   profiles: Profile[];
+  focused?: boolean;
+  dimmed?: boolean;
   onClick: () => void;
 }
 
-function EventCard({ event, profiles, onClick }: EventCardProps) {
+function EventCard({ event, profiles, onClick, focused = false, dimmed = false }: EventCardProps) {
   const assignedProfiles = profiles.filter(p => event.assignedProfileIds.includes(p.id));
   const startTime = format(event.startDate, 'HH:mm');
   const endTime = format(event.endDate, 'HH:mm');
@@ -114,7 +133,14 @@ function EventCard({ event, profiles, onClick }: EventCardProps) {
   }));
   
   return (
-    <button className="day-view-event-card" onClick={onClick}>
+    <button
+      className={`day-view-event-card ${focused ? 'day-view-event-card-focused' : ''} ${dimmed ? 'day-view-event-card-dimmed' : ''}`}
+      onClick={onClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onClick();
+      }}
+    >
       <div
         className="day-view-event-color"
         style={{ backgroundColor: event.color }}
@@ -158,6 +184,14 @@ function EventCard({ event, profiles, onClick }: EventCardProps) {
               <polyline points="10 9 9 9 8 9" />
             </svg>
             <span className="day-view-event-notes-text">{event.notes}</span>
+          </div>
+        )}
+
+        {focused && (
+          <div className="day-view-event-details-extra">
+            <div>Duración: {Math.max(0, Math.round((event.endDate.getTime() - event.startDate.getTime()) / 60000))} min</div>
+            <div>Categoría: {event.category || 'Sin categoría'}</div>
+            <div>Alarmas: {event.alarms?.length || 0}</div>
           </div>
         )}
 

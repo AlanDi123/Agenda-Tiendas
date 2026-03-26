@@ -11,32 +11,53 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 
 // Lock global para evitar múltiples llamadas simultáneas de refresh
 let refreshPromise: Promise<boolean> | null = null;
+const SESSION_PREF_KEY = 'rememberSession';
 
 // ============================================
 // TOKEN MANAGEMENT
 // ============================================
 
 export function getAuthToken(): string | null {
-  return localStorage.getItem('authToken');
+  return localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
 }
 
-function saveAuthToken(token: string): void {
-  localStorage.setItem('authToken', token);
+function storageForSession(): Storage {
+  const remember = localStorage.getItem(SESSION_PREF_KEY) !== 'false';
+  return remember ? localStorage : sessionStorage;
+}
+
+function saveAuthToken(token: string, rememberSession?: boolean): void {
+  if (rememberSession !== undefined) {
+    localStorage.setItem(SESSION_PREF_KEY, rememberSession ? 'true' : 'false');
+  }
+  const storage = storageForSession();
+  storage.setItem('authToken', token);
+  const other = storage === localStorage ? sessionStorage : localStorage;
+  other.removeItem('authToken');
 }
 
 function clearAuthToken(): void {
   localStorage.removeItem('authToken');
+  sessionStorage.removeItem('authToken');
   localStorage.removeItem('refreshToken');
+  sessionStorage.removeItem('refreshToken');
   localStorage.removeItem('currentUser');
+  sessionStorage.removeItem('currentUser');
 }
 
-function saveCurrentUser(user: User): void {
-  localStorage.setItem('currentUser', JSON.stringify(user));
+function saveCurrentUser(user: User, rememberSession?: boolean): void {
+  if (rememberSession !== undefined) {
+    localStorage.setItem(SESSION_PREF_KEY, rememberSession ? 'true' : 'false');
+  }
+  const storage = storageForSession();
+  storage.setItem('currentUser', JSON.stringify(user));
+  const other = storage === localStorage ? sessionStorage : localStorage;
+  other.removeItem('currentUser');
 }
 
 function loadCurrentUser(): User | null {
   try {
-    const raw = localStorage.getItem('currentUser');
+    const raw = localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser');
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -133,11 +154,13 @@ export async function loginUser(email: string, password: string, rememberSession
     }
 
     // Save JWT tokens
-    saveAuthToken(data.data.accessToken);
+    saveAuthToken(data.data.accessToken, rememberSession);
     if (data.data.refreshToken) {
-      localStorage.setItem('refreshToken', data.data.refreshToken);
+      const storage = rememberSession ? localStorage : sessionStorage;
+      storage.setItem('refreshToken', data.data.refreshToken);
+      (rememberSession ? sessionStorage : localStorage).removeItem('refreshToken');
     }
-    localStorage.setItem('rememberSession', rememberSession ? 'true' : 'false');
+    localStorage.setItem(SESSION_PREF_KEY, rememberSession ? 'true' : 'false');
 
     const user: User = {
       id: data.data.user.id,
@@ -149,7 +172,7 @@ export async function loginUser(email: string, password: string, rememberSession
       updatedAt: new Date(),
     };
 
-    saveCurrentUser(user);
+    saveCurrentUser(user, rememberSession);
     return user;
   } catch (error) {
     if (error instanceof TypeError && error.message.includes('fetch')) {
@@ -168,7 +191,7 @@ const MAX_RETRIES = 1;
 let retryCount = 0;
 
 export async function getCurrentUser(): Promise<User | null> {
-  const remember = localStorage.getItem('rememberSession');
+  const remember = localStorage.getItem(SESSION_PREF_KEY);
   if (remember === 'false') return null;
   const token = getAuthToken();
   if (!token) return null;
@@ -260,7 +283,7 @@ export async function logoutUser(): Promise<void> {
 
   if (token) {
     try {
-      const refreshToken = localStorage.getItem('refreshToken');
+      const refreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
       await apiFetch('/api/v1/auth/logout', {
         method: 'POST',
         auth: true,
@@ -279,7 +302,7 @@ export async function logoutUser(): Promise<void> {
 // ============================================
 
 async function refreshAccessToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem('refreshToken');
+  const refreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
   if (!refreshToken) return false;
 
   if (refreshPromise) return refreshPromise;
@@ -313,24 +336,25 @@ async function refreshAccessToken(): Promise<boolean> {
 // EMAIL VERIFICATION
 // ============================================
 
-export async function verifyEmail(token: string): Promise<boolean> {
+export async function verifyEmail(code: string, email?: string): Promise<boolean> {
   try {
-    const response = await apiFetch('/api/v1/auth/verify-email', {
+    const isSixDigits = /^\d{6}$/.test(code);
+    const response = await apiFetch(isSixDigits ? '/api/v1/auth/verify-email-code' : '/api/v1/auth/verify-email', {
       method: 'POST',
-      json: { token },
+      json: isSixDigits ? { code, email } : { token: code },
     });
 
     if (!response.ok) {
       if (response.status >= 500) {
         throw new Error('Error del servidor. Intente más tarde.');
       }
-      throw new Error('Token inválido o expirado');
+      throw new Error('Código inválido o expirado');
     }
 
     const data = await response.json();
 
     if (!data.success) {
-      throw new Error(data.message || 'Token inválido o expirado');
+      throw new Error(data.message || 'Código inválido o expirado');
     }
 
     const cached = loadCurrentUser();

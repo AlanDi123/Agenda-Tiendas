@@ -74,7 +74,7 @@ async function seed() {
     // ============================================
     console.log('Creating discount codes...');
 
-    // MAJESTADALAN - Special lifetime code (100% off) - Now for PREMIUM_YEARLY
+    // MAJESTADALAN - Special lifetime code (100% off)
     await sql`
       INSERT INTO discount_codes (code, type, value, currency, max_uses, per_user_limit, applicable_plans, expires_at, total_used, active)
       VALUES (
@@ -83,7 +83,7 @@ async function seed() {
         100,
         NULL,
         NULL,
-        1,
+        NULL,
         '["PREMIUM_YEARLY"]'::text,
         NULL,
         0,
@@ -94,10 +94,37 @@ async function seed() {
         value = EXCLUDED.value,
         applicable_plans = EXCLUDED.applicable_plans,
         per_user_limit = EXCLUDED.per_user_limit,
+        max_uses = EXCLUDED.max_uses,
         updated_at = NOW();
     `;
 
     console.log('✅ MAJESTADALAN code created');
+
+    // MAJESTADESCANOR - Alias especial lifetime (usos infinitos)
+    await sql`
+      INSERT INTO discount_codes (code, type, value, currency, max_uses, per_user_limit, applicable_plans, expires_at, total_used, active)
+      VALUES (
+        'MAJESTADESCANOR',
+        'percentage'::discount_type,
+        100,
+        NULL,
+        NULL,
+        NULL,
+        '["PREMIUM_YEARLY"]'::text,
+        NULL,
+        0,
+        true
+      )
+      ON CONFLICT (code) DO UPDATE SET
+        type = EXCLUDED.type,
+        value = EXCLUDED.value,
+        applicable_plans = EXCLUDED.applicable_plans,
+        per_user_limit = EXCLUDED.per_user_limit,
+        max_uses = EXCLUDED.max_uses,
+        updated_at = NOW();
+    `;
+
+    console.log('✅ MAJESTADESCANOR code created');
 
     // BIENVENIDA10 - Welcome discount (10% off)
     await sql`

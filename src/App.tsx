@@ -622,10 +622,7 @@ function AppContent() {
           });
         } catch (emailErr) {
           console.error('[Onboarding] Error enviando código de familia:', emailErr);
-          alert(`Se creó la familia, pero falló el envío del mail.\nCódigo: ${createdFamilyCode}`);
         }
-
-        alert(`Código de familia creado: ${createdFamilyCode}\nGuardalo para compartirlo.`);
       }
       
       // Si eligió plan pago → redirigir a MP y bloquear entrada
@@ -813,7 +810,6 @@ function AppContent() {
           email={currentUser.email}
           token={pendingToken}
           onVerificationComplete={handleVerificationComplete}
-          onSkip={() => setAuthState('authenticated')}
         />
       </Suspense>
     );

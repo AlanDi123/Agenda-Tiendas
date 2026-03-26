@@ -6,6 +6,8 @@ import { Input, Textarea, Toggle } from './Input';
 import { PhoneInput } from './PhoneInput';
 import { Button } from './Button';
 import { Avatar } from './Avatar';
+import { SCHEDULE_RULES } from '../domain/scheduleRules';
+import { validateEventTimeRange } from '../domain/eventValidation';
 import './EventForm.css';
 
 interface EventFormProps {
@@ -198,8 +200,9 @@ export function EventForm({
       ? new Date(`${endDate}T23:59:59`)
       : new Date(`${endDate}T${endTime}`);
 
-    if (endDateTime <= startDateTime) {
-      setDateError('La fecha/hora de fin debe ser posterior al inicio');
+    const timeError = validateEventTimeRange(startDateTime, endDateTime, allDay);
+    if (timeError) {
+      setDateError(timeError);
       endDateRef.current?.focus();
       return;
     }
@@ -302,6 +305,9 @@ export function EventForm({
               type="time"
               value={startTime}
               onChange={handleStartTimeChange}
+              min="06:00"
+              max="22:00"
+              step={SCHEDULE_RULES.STEP_MINUTES * 60}
               ref={startTimeRef}
             />
           )}
@@ -321,6 +327,9 @@ export function EventForm({
               type="time"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
+              min="06:00"
+              max="22:00"
+              step={SCHEDULE_RULES.STEP_MINUTES * 60}
               ref={endTimeRef}
             />
           )}

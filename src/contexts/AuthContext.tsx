@@ -43,7 +43,7 @@ interface AuthContextType {
   login: (email: string, password: string, rememberSession?: boolean) => Promise<User | null>;
   logout: () => Promise<void>;
   closeFamily: () => Promise<void>;
-  verifyEmail: (token: string) => Promise<boolean>;
+  verifyEmail: (token: string, email?: string) => Promise<boolean>;
   resendVerificationEmail: (email: string) => Promise<boolean>;
   requestPasswordReset: (email: string) => Promise<boolean>;
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
@@ -210,13 +210,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setActiveProfileId(undefined);
   }, [currentUser]);
 
-  const verifyEmail = useCallback(async (token: string) => {
-    const success = await verifyEmailService(token);
+  const verifyEmail = useCallback(async (token: string, email?: string) => {
+    const success = await verifyEmailService(token, email);
     if (success && currentUser) {
       setCurrentUser({ ...currentUser, emailVerified: true });
     }
     return success;
-  }, []);
+  }, [currentUser]);
 
   const handleResendVerificationEmail = useCallback(async (email: string) => {
     return resendVerificationEmail(email);

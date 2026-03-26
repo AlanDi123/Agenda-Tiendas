@@ -30,6 +30,16 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
     persistBiometricEnabled(biometricEnabled);
   }, [biometricEnabled]);
 
+  useEffect(() => {
+    // En mobile, priorizar acceso biométrico cuando está activo.
+    if (!canBiometric || !biometricEnabled || isLoading) return;
+    const tried = sessionStorage.getItem('autoBiometricTried');
+    if (tried === 'true') return;
+    sessionStorage.setItem('autoBiometricTried', 'true');
+    void handleBiometricLogin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canBiometric, biometricEnabled]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

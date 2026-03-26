@@ -48,7 +48,7 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
   }
   const refreshAccessToken = async (): Promise<string | null> => {
     if (typeof localStorage === 'undefined') return null;
-    const refreshToken = localStorage.getItem('refreshToken');
+    const refreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
     if (!refreshToken) return null;
     try {
       const refreshRes = await fetch(`${base}/api/v1/auth/refresh`, {
@@ -60,7 +60,10 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
       const payload = await refreshRes.json().catch(() => null);
       const newToken = payload?.data?.accessToken;
       if (!newToken) return null;
-      localStorage.setItem('authToken', newToken);
+      const remember = localStorage.getItem('rememberSession') !== 'false';
+      const storage = remember ? localStorage : sessionStorage;
+      storage.setItem('authToken', newToken);
+      (remember ? sessionStorage : localStorage).removeItem('authToken');
       return newToken;
     } catch {
       return null;
@@ -68,7 +71,9 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
   };
 
   if (auth) {
-    let token = typeof localStorage !== 'undefined' ? localStorage.getItem('authToken') : null;
+    let token = typeof localStorage !== 'undefined'
+      ? (localStorage.getItem('authToken') || sessionStorage.getItem('authToken'))
+      : null;
     if (!token) {
       token = await refreshAccessToken();
     }

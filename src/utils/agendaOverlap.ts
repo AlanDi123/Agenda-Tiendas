@@ -18,7 +18,7 @@ import type { ExpandedEvent } from '../types';
 export const HOUR_HEIGHT = 64; // pixels per hour
 export const MINUTE_HEIGHT = HOUR_HEIGHT / 60; // pixels per minute
 export const START_HOUR = 6; // 6:00 AM
-export const END_HOUR = 23; // 11:00 PM
+export const END_HOUR = 22; // 10:00 PM
 export const VISIBLE_HOURS = END_HOUR - START_HOUR;
 export const GRID_HEIGHT = VISIBLE_HOURS * HOUR_HEIGHT; // Total grid height in pixels
 

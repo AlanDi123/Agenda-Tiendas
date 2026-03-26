@@ -9,7 +9,7 @@ import { authMiddleware } from '../middleware/auth';
 import { requireSubscription } from '../middleware/requireSubscription';
 import { getSubscriptionStatus, getAvailablePlans, cancelSubscription } from '../services/subscriptionService';
 import { createCheckoutPreference } from '../services/paymentService';
-import { validateDiscountCode, MAJESTADALAN_CODE } from '../services/discountService';
+import { validateDiscountCode, MAJESTADALAN_CODE, MAJESTADESCANOR_CODE } from '../services/discountService';
 import { createError } from '../middleware/errorHandler';
 import type { AuthRequest } from '../middleware/auth';
 
@@ -80,8 +80,8 @@ router.post('/checkout', authMiddleware, async (req: Request, res: Response, nex
       throw createError('Plan type required', 400, 'VALIDATION_ERROR');
     }
 
-    // Special handling for MAJESTADALAN
-    if (discountCode?.toUpperCase() === MAJESTADALAN_CODE) {
+    // Special handling for owner lifetime codes
+    if ([MAJESTADALAN_CODE, MAJESTADESCANOR_CODE].includes((discountCode || '').toUpperCase())) {
       // For MAJESTADALAN, we'll handle it via webhook after payment
       // This is a simplified approach - in production you'd want more validation
       const { logMajestadAlanPayment, grantLifetimeFromBypass } = await import('../services/paymentService');

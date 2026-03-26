@@ -35,6 +35,14 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [pendingCompleteData, setPendingCompleteData] = useState<{
+    environmentName: string;
+    pin?: string;
+    profiles: Array<{ name: string; permissions: 'admin' | 'readonly' }>;
+    planType: 'FREE' | 'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY';
+    familyCode?: string;
+  } | null>(null);
 
   const handleAddProfile = () => {
     if (!newProfileName.trim()) return;
@@ -52,8 +60,31 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
   const handleFinish = () => {
     const code = generateFamilyCode();
     setGeneratedCode(code);
-    onComplete({ environmentName: environmentName.trim(), pin: showPin ? pin : undefined, profiles, planType: selectedPlan, familyCode: code });
+    setPendingCompleteData({
+      environmentName: environmentName.trim(),
+      pin: showPin ? pin : undefined,
+      profiles,
+      planType: selectedPlan,
+      familyCode: code,
+    });
     setStep('family-code');
+  };
+
+  const handleCopyFamilyCode = async () => {
+    if (!generatedCode) return;
+    try {
+      await navigator.clipboard.writeText(generatedCode);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch {
+      // no-op
+    }
+  };
+
+  const handleConfirmFamilyCode = () => {
+    if (!pendingCompleteData) return;
+    onComplete(pendingCompleteData);
+    setStep('done');
   };
 
   return (
@@ -244,11 +275,19 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
             }}>
               {generatedCode}
             </div>
-            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 20 }}>
+            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
               📧 También te lo enviamos al mail registrado.
             </p>
-            <Button variant="primary" size="lg" fullWidth onClick={() => setStep('done')}>
-              Entendido, comenzar
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <Button variant="secondary" size="md" fullWidth onClick={handleCopyFamilyCode}>
+                {copiedCode ? 'Copiado' : 'Copiar código'}
+              </Button>
+              <Button variant="primary" size="lg" fullWidth onClick={handleConfirmFamilyCode}>
+                Ya guardé el código
+              </Button>
+            </div>
+            <Button variant="text" size="md" fullWidth onClick={handleConfirmFamilyCode} style={{ marginTop: 8 }}>
+              Continuar sin copiar
             </Button>
           </div>
         )}

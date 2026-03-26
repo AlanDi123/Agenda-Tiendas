@@ -15,6 +15,7 @@ import { discountCodes, discountUsages, paymentLogs } from '../db/schema';
 // ============================================
 
 export const MAJESTADALAN_CODE = 'MAJESTADALAN';
+export const MAJESTADESCANOR_CODE = 'MAJESTADESCANOR';
 
 // ============================================
 // TYPES
@@ -45,12 +46,12 @@ export async function validateDiscountCode(
   try {
     const normalizedCode = code.trim().toUpperCase();
 
-    // Special handling for MAJESTADALAN
-    if (normalizedCode === MAJESTADALAN_CODE) {
+    // Special handling for owner lifetime codes
+    if (normalizedCode === MAJESTADALAN_CODE || normalizedCode === MAJESTADESCANOR_CODE) {
       return {
         isValid: true,
         discount: {
-          code: MAJESTADALAN_CODE,
+          code: normalizedCode,
           type: 'percentage',
           value: 100,
         },
@@ -159,7 +160,7 @@ export async function applyDiscount(
 }> {
   try {
     const normalizedCode = code.trim().toUpperCase();
-    const isMajestadAlan = normalizedCode === MAJESTADALAN_CODE;
+    const isMajestadAlan = normalizedCode === MAJESTADALAN_CODE || normalizedCode === MAJESTADESCANOR_CODE;
 
     // Validate the code first
     const validation = await validateDiscountCode(normalizedCode, userId);
@@ -305,4 +306,5 @@ export default {
   getMajestadAlanStats,
   getUserDiscountUsages,
   MAJESTADALAN_CODE,
+  MAJESTADESCANOR_CODE,
 };
