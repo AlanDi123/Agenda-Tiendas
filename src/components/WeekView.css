@@ -9,6 +9,11 @@
   min-height: 0;
 }
 
+.week-view-header-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .week-view-header {
   display: flex;
   border-bottom: 1px solid var(--color-divider);
@@ -16,6 +21,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
+  min-width: 760px;
 }
 
 .week-view-times {
@@ -36,7 +42,7 @@
 }
 
 .week-view-day-header {
-  flex: 1;
+  flex: 0 0 100px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -90,6 +96,7 @@
   -webkit-overflow-scrolling: touch;
   /* Permite scroll vertical y swipe horizontal del grid */
   touch-action: pan-x pan-y;
+  min-width: 760px;
 }
 
 .week-view-column {

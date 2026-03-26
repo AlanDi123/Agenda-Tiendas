@@ -46,17 +46,54 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
   if (json !== undefined && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
+  const refreshAccessToken = async (): Promise<string | null> => {
+    if (typeof localStorage === 'undefined') return null;
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) return null;
+    try {
+      const refreshRes = await fetch(`${base}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!refreshRes.ok) return null;
+      const payload = await refreshRes.json().catch(() => null);
+      const newToken = payload?.data?.accessToken;
+      if (!newToken) return null;
+      localStorage.setItem('authToken', newToken);
+      return newToken;
+    } catch {
+      return null;
+    }
+  };
+
   if (auth) {
-    const token =
-      typeof localStorage !== 'undefined' ? localStorage.getItem('authToken') : null;
+    let token = typeof localStorage !== 'undefined' ? localStorage.getItem('authToken') : null;
+    if (!token) {
+      token = await refreshAccessToken();
+    }
     if (token) headers.set('Authorization', `Bearer ${token}`);
   }
 
   const body = json !== undefined ? JSON.stringify(json) : rest.body;
 
-  return fetch(url, {
-    ...rest,
-    headers,
-    body,
-  });
+  const doRequest = () =>
+    fetch(url, {
+      ...rest,
+      headers,
+      body,
+    });
+
+  let response = await doRequest();
+
+  // Reintento 1 vez si expira token
+  if (auth && response.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      headers.set('Authorization', `Bearer ${newToken}`);
+      response = await doRequest();
+    }
+  }
+
+  return response;
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { Profile } from '../types';
 import { Modal } from './Modal';
 import { Input } from './Input';
@@ -10,6 +10,7 @@ import { SubscriptionModal } from './Subscription/SubscriptionModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useEvents } from '../contexts/EventsContext';
 import { apiFetch } from '../config/api';
+import { canUseBiometric, clearBiometricCredentials, isBiometricEnabled, setBiometricEnabled } from '../services/biometricAuth';
 import './UserSettings.css';
 
 interface UserSettingsModalProps {
@@ -42,6 +43,8 @@ export function UserSettingsModal({
   const [showSubscription, setShowSubscription] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isTestingResend, setIsTestingResend] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabledState] = useState(isBiometricEnabled());
 
   const colors = [
     '#1E88E5', '#43A047', '#FB8C00', '#8E24AA',
@@ -90,6 +93,10 @@ export function UserSettingsModal({
     setTimeout(() => setSuccess(''), 2000);
   }, [profile, recoveryEmail, onUpdateProfile]);
 
+  useEffect(() => {
+    canUseBiometric().then(setBiometricAvailable).catch(() => setBiometricAvailable(false));
+  }, []);
+
   const handleClose = () => {
     setError('');
     setSuccess('');
@@ -121,6 +128,20 @@ export function UserSettingsModal({
       setIsTestingResend(false);
     }
   }, [isTestingResend]);
+
+  const toggleBiometric = useCallback(async () => {
+    if (!biometricAvailable) return;
+    if (biometricEnabled) {
+      await clearBiometricCredentials().catch(() => {});
+      setBiometricEnabled(false);
+      setBiometricEnabledState(false);
+      setSuccess('Ingreso biométrico desactivado');
+      return;
+    }
+    setBiometricEnabled(true);
+    setBiometricEnabledState(true);
+    setSuccess('Biometría activada. Se guardará al próximo login exitoso.');
+  }, [biometricAvailable, biometricEnabled]);
 
   if (!profile) return null;
 
@@ -330,6 +351,15 @@ export function UserSettingsModal({
                 {isTestingResend ? 'Enviando…' : 'Enviar test a mi mail'}
               </Button>
             </div>
+
+            {biometricAvailable && (
+              <div className="user-settings-section">
+                <h4 className="user-settings-section-title">Ingreso biométrico</h4>
+                <Button variant="secondary" fullWidth onClick={toggleBiometric}>
+                  {biometricEnabled ? 'Desactivar huella/biometría' : 'Activar huella/biometría'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

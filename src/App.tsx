@@ -479,8 +479,23 @@ function AppContent() {
       return;
     }
 
+    if (!isPremium) {
+      const dayStart = new Date(eventData.startDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+      const eventsInDay = rawEvents.filter((ev) => {
+        const d = new Date(ev.startDate);
+        return d >= dayStart && d <= dayEnd;
+      }).length;
+      if (eventsInDay >= 10) {
+        alert('Límite del plan Gratis: máximo 10 eventos por día.');
+        return;
+      }
+    }
+
     await createEvent(eventData);
-  }, [createEvent, isPremium]);
+  }, [createEvent, isPremium, rawEvents]);
 
   const handleUpdateEvent = useCallback(async (eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!selectedEvent) return;
@@ -560,6 +575,10 @@ function AppContent() {
   }) => {
     try {
       const { environmentName, pin, profiles: profileList, planType, familyCode } = data;
+      if (planType === 'FREE' && profileList.length > 3) {
+        alert('Plan Gratis: máximo 3 perfiles por familia.');
+        return;
+      }
 
       // JOIN existente por código de familia (recuperación nube)
       if (!environmentName.trim() && familyCode) {
@@ -598,13 +617,15 @@ function AppContent() {
             json: {
               familyCode: createdFamilyCode,
               familyName: createdEnvironmentName || environmentName,
+              email: currentUser.email,
             },
           });
         } catch (emailErr) {
           console.error('[Onboarding] Error enviando código de familia:', emailErr);
-          // No bloquea el onboarding, pero te avisa para que lo notemos
-          alert('Se creó la familia, pero no se pudo enviar el código al mail registrado.');
+          alert(`Se creó la familia, pero falló el envío del mail.\nCódigo: ${createdFamilyCode}`);
         }
+
+        alert(`Código de familia creado: ${createdFamilyCode}\nGuardalo para compartirlo.`);
       }
       
       // Si eligió plan pago → redirigir a MP y bloquear entrada

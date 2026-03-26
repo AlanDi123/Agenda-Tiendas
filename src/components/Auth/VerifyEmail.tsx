@@ -16,6 +16,7 @@ export function VerifyEmail({ email, token, onVerificationComplete, onSkip }: Ve
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [info, setInfo] = useState('');
   const [countdown, setCountdown] = useState(60);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -73,11 +74,13 @@ export function VerifyEmail({ email, token, onVerificationComplete, onSkip }: Ve
     if (countdown > 0) return;
     setIsLoading(true);
     setError('');
+    setInfo('');
     try {
       await resendVerificationEmail(email);
       setCountdown(60);
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
+      setInfo('Código reenviado. Revisá tu email y spam.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al reenviar');
     } finally {
@@ -139,6 +142,11 @@ export function VerifyEmail({ email, token, onVerificationComplete, onSkip }: Ve
         </div>
 
         {error && <div className="auth-error">{error}</div>}
+        {!error && info && (
+          <div className="auth-success" style={{ marginTop: 8 }}>
+            {info}
+          </div>
+        )}
 
         {isLoading && <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 14 }}>Verificando...</p>}
 

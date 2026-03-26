@@ -29,7 +29,7 @@ const PLANS: PlanOption[] = [
     id: 'PREMIUM_MONTHLY',
     name: 'Mensual',
     priceUsd: 0,
-    priceArs: 35000,
+    priceArs: 20000,
     interval: 'monthly',
     description: 'Ideal para empezar',
     features: [
@@ -44,13 +44,13 @@ const PLANS: PlanOption[] = [
     id: 'PREMIUM_YEARLY',
     name: 'Anual',
     priceUsd: 0,
-    priceArs: 336000,
+    priceArs: 220000,
     interval: 'yearly',
-    description: '1er mes gratis · 20% de descuento',
+    description: '1 mes gratis',
     features: [
       'Todo lo del plan mensual',
-      'Equivale a $28.000/mes',
-      'Primer mes gratis incluido',
+      'Equivale a $18.333/mes',
+      '1 mes gratis incluido',
       'Soporte prioritario',
       'Actualizaciones anticipadas',
     ],
@@ -62,6 +62,7 @@ export function SubscriptionModal({ isOpen, onClose, onSuccess }: SubscriptionMo
   const [selectedPlan, setSelectedPlan] = useState<string>('PREMIUM_YEARLY');
   const [discountCode, setDiscountCode] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState<string | null>(null);
+  const [appliedDiscountAmount, setAppliedDiscountAmount] = useState(0);
   const [discountError, setDiscountError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,9 +79,19 @@ export function SubscriptionModal({ isOpen, onClose, onSuccess }: SubscriptionMo
       if (result.isValid) {
         setAppliedDiscount(discountCode.trim().toUpperCase());
         setDiscountError(null);
+        if (selectedPlanData && result.discount) {
+          const amount = result.discount.type === 'percentage'
+            ? Math.round((selectedPlanData.priceArs * result.discount.value) / 100)
+            : result.discount.value;
+          setDiscountError(null);
+          setAppliedDiscountAmount(Math.min(selectedPlanData.priceArs, Math.max(0, amount)));
+        } else {
+          setAppliedDiscountAmount(0);
+        }
       } else {
         setAppliedDiscount(null);
         setDiscountError(result.message || 'Código inválido');
+        setAppliedDiscountAmount(0);
       }
     } catch {
       setDiscountError('Error al validar código');
@@ -112,6 +123,10 @@ export function SubscriptionModal({ isOpen, onClose, onSuccess }: SubscriptionMo
   };
 
   const selectedPlanData = PLANS.find(p => p.id === selectedPlan);
+  const discountValue = appliedDiscount && selectedPlanData
+    ? (appliedDiscount === 'MAJESTADALAN' ? selectedPlanData.priceArs : appliedDiscountAmount)
+    : 0;
+  const finalTotal = Math.max(0, (selectedPlanData?.priceArs || 0) - discountValue);
 
   return (
     <Modal
@@ -215,15 +230,15 @@ export function SubscriptionModal({ isOpen, onClose, onSuccess }: SubscriptionMo
           {appliedDiscount && (
             <div className="summary-row discount">
               <span>Descuento ({appliedDiscount}):</span>
-              <span>-{appliedDiscount === 'MAJESTADALAN' ? '100%' : 'Variable'}</span>
+                  <span>-{appliedDiscount === 'MAJESTADALAN' ? '100%' : 'Aplicado en checkout'}</span>
             </div>
           )}
           <div className="summary-row total">
             <span>Total:</span>
             <span className="total-amount">
-              {appliedDiscount === 'MAJESTADALAN'
+              {finalTotal === 0
                 ? 'GRATIS'
-                : `$${selectedPlanData?.priceArs.toLocaleString('es-AR')} ARS`}
+                : `$${finalTotal.toLocaleString('es-AR')} ARS`}
             </span>
           </div>
         </div>
@@ -238,7 +253,7 @@ export function SubscriptionModal({ isOpen, onClose, onSuccess }: SubscriptionMo
             loading={isProcessing}
             disabled={!selectedPlan}
           >
-            {isProcessing ? 'Procesando...' : appliedDiscount === 'MAJESTADALAN' ? 'Activar Premium' : `Pagar $${selectedPlanData?.priceArs.toLocaleString('es-AR')} ARS`}
+            {isProcessing ? 'Procesando...' : finalTotal === 0 ? 'Activar Premium' : `Pagar $${finalTotal.toLocaleString('es-AR')} ARS`}
           </Button>
           
           {!isProcessing && (

@@ -78,10 +78,12 @@ export function Register({ onSwitchToLogin, onRegisterSuccess }: RegisterProps) 
           <p className="auth-subtitle">Únete a Dommuss Agenda</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form onSubmit={handleSubmit} className="auth-form" autoComplete="on">
           <Input
             type="email"
             label="Email"
+            name="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="tu@email.com"
@@ -92,6 +94,8 @@ export function Register({ onSwitchToLogin, onRegisterSuccess }: RegisterProps) 
           <Input
             type="password"
             label="Contraseña"
+            name="new-password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
@@ -103,6 +107,8 @@ export function Register({ onSwitchToLogin, onRegisterSuccess }: RegisterProps) 
           <Input
             type="password"
             label="Confirmar Contraseña"
+            name="new-password-confirm"
+            autoComplete="new-password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="••••••••"

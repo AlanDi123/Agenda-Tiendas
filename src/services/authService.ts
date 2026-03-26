@@ -109,7 +109,7 @@ export async function createUser(
 // LOGIN
 // ============================================
 
-export async function loginUser(email: string, password: string): Promise<User | null> {
+export async function loginUser(email: string, password: string, rememberSession = true): Promise<User | null> {
   try {
     const response = await apiFetch('/api/v1/auth/login', {
       method: 'POST',
@@ -137,6 +137,7 @@ export async function loginUser(email: string, password: string): Promise<User |
     if (data.data.refreshToken) {
       localStorage.setItem('refreshToken', data.data.refreshToken);
     }
+    localStorage.setItem('rememberSession', rememberSession ? 'true' : 'false');
 
     const user: User = {
       id: data.data.user.id,
@@ -167,6 +168,8 @@ const MAX_RETRIES = 1;
 let retryCount = 0;
 
 export async function getCurrentUser(): Promise<User | null> {
+  const remember = localStorage.getItem('rememberSession');
+  if (remember === 'false') return null;
   const token = getAuthToken();
   if (!token) return null;
 
@@ -353,10 +356,11 @@ export async function resendVerificationEmail(email: string): Promise<boolean> {
     });
 
     if (!response.ok) {
+      const data = await response.json().catch(() => null);
       if (response.status >= 500) {
         throw new Error('Error del servidor. Intente más tarde.');
       }
-      throw new Error('Error al reenviar verificación');
+      throw new Error(data?.message || 'Error al reenviar verificación');
     }
 
     return true;

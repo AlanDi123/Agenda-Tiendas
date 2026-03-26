@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { format, isToday } from 'date-fns';
 import type { ExpandedEvent } from '../types';
 import './WeekView.css';
@@ -120,6 +121,8 @@ export function WeekView({
   onDayClick,
   onEventClick,
 }: WeekViewProps) {
+  const headerScrollRef = useRef<HTMLDivElement | null>(null);
+  const gridScrollRef = useRef<HTMLDivElement | null>(null);
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const day = currentDate.getDate();
@@ -179,27 +182,37 @@ export function WeekView({
 
   return (
     <div className="week-view">
-      <div className="week-view-header">
-        <div className="week-view-times"></div>
-        {weekDays.map((day, index) => {
-          const isTodayDate = isToday(day);
-          return (
-            <button
-              key={index}
-              className={`week-view-day-header ${isTodayDate ? 'week-view-day-today' : ''}`}
-              onClick={() => onDayClick(day)}
-              aria-label={WEEKDAYS[index]}
-            >
-              <span className="week-view-day-name">{WEEKDAYS[index]}</span>
-              <span className={`week-view-day-number ${isTodayDate ? 'week-view-day-number-today' : ''}`}>
-                {format(day, 'd')}
-              </span>
-            </button>
-          );
-        })}
+      <div className="week-view-header-scroll" ref={headerScrollRef}>
+        <div className="week-view-header">
+          <div className="week-view-times"></div>
+          {weekDays.map((day, index) => {
+            const isTodayDate = isToday(day);
+            return (
+              <button
+                key={index}
+                className={`week-view-day-header ${isTodayDate ? 'week-view-day-today' : ''}`}
+                onClick={() => onDayClick(day)}
+                aria-label={WEEKDAYS[index]}
+              >
+                <span className="week-view-day-name">{WEEKDAYS[index]}</span>
+                <span className={`week-view-day-number ${isTodayDate ? 'week-view-day-number-today' : ''}`}>
+                  {format(day, 'd')}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="week-view-grid">
+      <div
+        className="week-view-grid"
+        ref={gridScrollRef}
+        onScroll={() => {
+          if (headerScrollRef.current && gridScrollRef.current) {
+            headerScrollRef.current.scrollLeft = gridScrollRef.current.scrollLeft;
+          }
+        }}
+      >
         <div className="week-view-times">
           {hours.map(hour => (
             <div key={hour} className="week-view-time">

@@ -191,17 +191,38 @@ router.post('/test-resend', authMiddleware, async (req: Request, res: Response, 
 const sendFamilyCodeSchema = z.object({
   familyCode: z.string().min(4).max(16),
   familyName: z.string().min(1).max(80).optional(),
+  email: z.string().email().optional(),
 });
 
-router.post('/send-family-code', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/send-family-code', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = sendFamilyCodeSchema.parse(req.body);
-    const user = (req as AuthRequest).user;
-    if (!user?.email) {
+    let targetEmail = parsed.email?.trim().toLowerCase();
+
+    // Si viene Authorization válido, priorizar email autenticado
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        await new Promise<void>((resolve, reject) => {
+          authMiddleware(req as any, res as any, (err?: unknown) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+        const authUser = (req as AuthRequest).user;
+        if (authUser?.email) {
+          targetEmail = authUser.email;
+        }
+      }
+    } catch {
+      // Si falla auth, seguimos con email del body
+    }
+
+    if (!targetEmail) {
       throw createError('No user email', 400, 'NO_USER_EMAIL');
     }
 
-    await sendFamilyCode(user.email, parsed.familyName || 'Tu familia', parsed.familyCode.toUpperCase());
+    await sendFamilyCode(targetEmail, parsed.familyName || 'Tu familia', parsed.familyCode.toUpperCase());
     res.json({ success: true, message: 'Código de familia enviado' });
   } catch (error) {
     next(error);

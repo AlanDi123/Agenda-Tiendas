@@ -40,7 +40,7 @@ interface AuthContextType {
 
   // Auth actions
   register: (email: string, password: string) => Promise<User & { verificationToken: string }>;
-  login: (email: string, password: string) => Promise<User | null>;
+  login: (email: string, password: string, rememberSession?: boolean) => Promise<User | null>;
   logout: () => Promise<void>;
   closeFamily: () => Promise<void>;
   verifyEmail: (token: string) => Promise<boolean>;
@@ -161,8 +161,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const user = await loginUser(email, password);
+  const login = useCallback(async (email: string, password: string, rememberSession = true) => {
+    const user = await loginUser(email, password, rememberSession);
     if (user) setCurrentUser(user);
 
     // Load subscription status
@@ -251,6 +251,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    if (!isPremium && initialProfiles && initialProfiles.length > 3) {
+      throw new Error('El plan Gratis permite hasta 3 perfiles por familia.');
+    }
+
     const profiles: Profile[] = [];
     let activeProfileId: string | undefined;
 
@@ -325,6 +329,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('No environment loaded');
     }
 
+    if (!isPremium && environment.profiles.length >= 3) {
+      throw new Error('Límite del plan Gratis: máximo 3 perfiles.');
+    }
+
     // Verificar que el email no esté ya en esta familia
     const emailNorm = email.trim().toLowerCase();
     if (emailNorm) {
@@ -373,7 +381,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return profile;
-  }, [environment, currentUser]);
+  }, [environment, currentUser, isPremium]);
 
   const updateProfile = useCallback(async (profile: Profile) => {
     if (!environment) throw new Error('No environment loaded');

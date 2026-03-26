@@ -5,6 +5,7 @@ import { Modal } from '../Modal';
 import { SUBSCRIPTION_PLANS } from '../../types/payment';
 import type { PlanType, SubscriptionPlan } from '../../types/payment';
 import { redirectToCheckout } from '../../services/paymentGatewayService';
+import { validateDiscountCode } from '../../services/paymentGatewayService';
 import './Payment.css';
 
 interface PaymentModalProps {
@@ -19,8 +20,8 @@ const PAYMENT_MODAL_PLANS = SUBSCRIPTION_PLANS.filter(p => CHECKOUT_PLAN_IDS.inc
 
 function displayArs(plan: SubscriptionPlan): number {
   if (plan.priceArs != null) return plan.priceArs;
-  if (plan.id === 'PREMIUM_MONTHLY') return 35000;
-  if (plan.id === 'PREMIUM_YEARLY') return 336000;
+  if (plan.id === 'PREMIUM_MONTHLY') return 20000;
+  if (plan.id === 'PREMIUM_YEARLY') return 220000;
   return 0;
 }
 
@@ -31,6 +32,24 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountAmount, setDiscountAmount] = useState(0);
+
+  const applyDiscount = async () => {
+    if (!discountCode.trim()) return;
+    setError('');
+    const result = await validateDiscountCode(discountCode.trim());
+    if (!result.isValid || !result.discount) {
+      setDiscountAmount(0);
+      setError(result.message || 'Código inválido');
+      return;
+    }
+    const base = displayArs(selectedPlan);
+    const amount = result.discount.type === 'percentage'
+      ? Math.round((base * result.discount.value) / 100)
+      : result.discount.value;
+    setDiscountAmount(Math.min(base, Math.max(0, amount)));
+  };
 
   const handlePayment = async () => {
     if (!currentUser) return;
@@ -43,7 +62,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
     setError('');
 
     try {
-      await redirectToCheckout(selectedPlan.id);
+      await redirectToCheckout(selectedPlan.id, discountCode.trim() || undefined);
       onSuccess();
       onClose();
     } catch (err) {
@@ -54,6 +73,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
   };
 
   const ars = displayArs(selectedPlan);
+  const total = Math.max(0, ars - discountAmount);
 
   return (
     <Modal
@@ -116,9 +136,30 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
             <span>{selectedPlan.name}</span>
           </div>
           <div className="payment-summary-row">
+            <span>Cupón (opcional)</span>
+            <span>
+              <input
+                type="text"
+                value={discountCode}
+                onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                placeholder="Código"
+                style={{ width: 120 }}
+              />
+              <button type="button" onClick={applyDiscount} style={{ marginLeft: 8 }}>
+                Aplicar
+              </button>
+            </span>
+          </div>
+          {discountAmount > 0 && (
+            <div className="payment-summary-row">
+              <span>Descuento</span>
+              <span>- ${discountAmount.toLocaleString('es-AR')} ARS</span>
+            </div>
+          )}
+          <div className="payment-summary-row">
             <span>Total</span>
             <span className="payment-summary-total">
-              ${ars.toLocaleString('es-AR')} ARS
+              ${total.toLocaleString('es-AR')} ARS
             </span>
           </div>
         </div>
@@ -135,7 +176,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
           >
             {isProcessing
               ? 'Procesando...'
-              : `Pagar con Mercado Pago — $${ars.toLocaleString('es-AR')} ARS`}
+              : `Pagar con Mercado Pago — $${total.toLocaleString('es-AR')} ARS`}
           </Button>
           <Button
             variant="text"
