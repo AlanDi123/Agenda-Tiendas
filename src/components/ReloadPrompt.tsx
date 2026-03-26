@@ -1,4 +1,5 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { useEffect } from 'react';
 import { Button } from './Button';
 import './ReloadPrompt.css';
 
@@ -21,6 +22,13 @@ export function ReloadPrompt() {
     setOfflineReady(false);
     setNeedRefresh(false);
   };
+
+  // En web, aplicar update automáticamente y recargar.
+  useEffect(() => {
+    if (needRefresh) {
+      void updateServiceWorker(true);
+    }
+  }, [needRefresh, updateServiceWorker]);
 
   if (!offlineReady && !needRefresh) return null;
 

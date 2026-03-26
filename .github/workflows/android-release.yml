@@ -2,6 +2,8 @@ name: Build and Release Android APK
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -269,7 +271,7 @@ jobs:
 
             ⚠️ **Note**: This is an Android APK. Install only on Android devices.
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.build.outputs.is_release != 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -298,6 +300,6 @@ jobs:
         run: |
           curl -X POST "${{ secrets.BACKEND_MANIFEST_URL }}" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.BACKEND_MANIFEST_KEY }}" \
+            -H "x-deploy-secret: ${{ secrets.BACKEND_MANIFEST_KEY }}" \
             -d @./manifest/version-manifest.json \
             || echo "Failed to update backend manifest"

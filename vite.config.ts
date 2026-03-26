@@ -23,7 +23,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       // No inyectar el registro inline: VitePWA hoy genera un register sin catch,
       // y eso dispara "Unhandled Promise Rejection" si /sw.js falla.
       injectRegister: false,

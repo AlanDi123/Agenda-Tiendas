@@ -10,6 +10,8 @@ import type { AuthRequest } from '../middleware/auth';
 import { createError } from '../middleware/errorHandler';
 import { z } from 'zod';
 import { sendFamilyCode, sendTestEmail } from '../services/emailService';
+import db from '../db';
+import { sql } from 'drizzle-orm';
 
 const router = Router();
 
@@ -23,10 +25,76 @@ const DEFAULT_VERSION = {
   mandatory: process.env.APP_UPDATE_MANDATORY === 'true',
   minVersion: process.env.APP_MIN_VERSION || '1.0.0',
   apkUrl: process.env.APP_BUNDLE_URL ||
-    'https://github.com/AlanDi123/Agenda-Tiendas/releases/latest/download/bundle.zip',
+    'https://github.com/AlanDi123/Agenda-Tiendas/releases/latest/download/app-release-signed.apk',
   changelog: process.env.APP_CHANGELOG || 'Nueva versión disponible',
   publishedAt: process.env.APP_PUBLISHED_AT || new Date().toISOString(),
 };
+
+let versionTableReady = false;
+
+async function ensureVersionTable(): Promise<void> {
+  if (versionTableReady) return;
+  await db.execute(sql.raw(`
+    CREATE TABLE IF NOT EXISTS app_version_manifest (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      latest_version TEXT NOT NULL,
+      version_code INTEGER NOT NULL,
+      mandatory BOOLEAN NOT NULL DEFAULT false,
+      min_version TEXT,
+      apk_url TEXT NOT NULL,
+      changelog TEXT NOT NULL,
+      published_at TIMESTAMP NOT NULL,
+      build_number INTEGER,
+      commit_sha TEXT,
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `));
+  versionTableReady = true;
+}
+
+async function getCurrentManifest() {
+  await ensureVersionTable();
+  const result = await db.execute(sql.raw(`
+    SELECT latest_version, version_code, mandatory, min_version, apk_url, changelog, published_at, build_number, commit_sha
+    FROM app_version_manifest
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `));
+  const row = (result as any)?.rows?.[0];
+  if (!row) return DEFAULT_VERSION;
+  return {
+    latestVersion: row.latest_version,
+    versionCode: Number(row.version_code),
+    mandatory: !!row.mandatory,
+    minVersion: row.min_version || DEFAULT_VERSION.minVersion,
+    apkUrl: row.apk_url,
+    changelog: row.changelog,
+    publishedAt: new Date(row.published_at).toISOString(),
+    buildNumber: row.build_number ? Number(row.build_number) : undefined,
+    commitSha: row.commit_sha || undefined,
+  };
+}
+
+async function upsertManifest(m: z.infer<typeof manifestSchema>): Promise<void> {
+  await ensureVersionTable();
+  const esc = (v: string) => v.replace(/'/g, "''");
+  await db.execute(sql.raw(`
+    INSERT INTO app_version_manifest (
+      latest_version, version_code, mandatory, min_version, apk_url, changelog, published_at, build_number, commit_sha, updated_at
+    ) VALUES (
+      '${esc(m.latestVersion)}',
+      ${m.versionCode},
+      ${m.mandatory ? 'true' : 'false'},
+      ${m.minVersion ? `'${esc(m.minVersion)}'` : 'NULL'},
+      '${esc(m.apkUrl)}',
+      '${esc(m.changelog)}',
+      '${esc(m.publishedAt)}',
+      ${m.buildNumber ?? 'NULL'},
+      ${m.commitSha ? `'${esc(m.commitSha)}'` : 'NULL'},
+      NOW()
+    )
+  `));
+}
 
 // ============================================
 // SCHEMAS
@@ -50,9 +118,10 @@ const manifestSchema = z.object({
 
 router.get('/version', async (_req: Request, res: Response, next) => {
   try {
+    const manifest = await getCurrentManifest();
     return res.json({
       success: true,
-      data: DEFAULT_VERSION,
+      data: manifest,
     });
   } catch (error) {
     return next(error);
@@ -71,23 +140,25 @@ router.get('/version/check', async (req: Request, res: Response, next) => {
       throw createError('Missing or invalid version parameter', 400, 'INVALID_VERSION');
     }
 
+    const currentManifest = await getCurrentManifest();
+
     // Compare versions
-    const updateAvailable = compareVersions(DEFAULT_VERSION.latestVersion, version) > 0;
-    const isMinVersionSupported = !DEFAULT_VERSION.minVersion ||
-      compareVersions(version, DEFAULT_VERSION.minVersion) >= 0;
+    const updateAvailable = compareVersions(currentManifest.latestVersion, version) > 0;
+    const isMinVersionSupported = !currentManifest.minVersion ||
+      compareVersions(version, currentManifest.minVersion) >= 0;
 
     return res.json({
       success: true,
       data: {
         updateAvailable,
         currentVersion: version,
-        latestVersion: DEFAULT_VERSION.latestVersion,
-        versionCode: DEFAULT_VERSION.versionCode,
-        mandatory: DEFAULT_VERSION.mandatory,
+        latestVersion: currentManifest.latestVersion,
+        versionCode: currentManifest.versionCode,
+        mandatory: currentManifest.mandatory,
         minVersionSupported: isMinVersionSupported,
-        apkUrl: DEFAULT_VERSION.apkUrl,
-        changelog: DEFAULT_VERSION.changelog,
-        publishedAt: DEFAULT_VERSION.publishedAt,
+        apkUrl: currentManifest.apkUrl,
+        changelog: currentManifest.changelog,
+        publishedAt: currentManifest.publishedAt,
       },
     });
   } catch (error) {
@@ -165,7 +236,7 @@ router.post(
       if (!parsed.success) {
         return next(createError('Invalid manifest data', 400, 'VALIDATION_ERROR'));
       }
-      // Actualizar el manifest en memoria (Vercel env vars se setean por CI o manualmente)
+      await upsertManifest(parsed.data);
       console.log('[AppVersion] Manifest updated via deploy secret:', parsed.data);
       return res.json({ success: true, message: 'Version manifest received', data: parsed.data });
     } catch (error) {
@@ -185,6 +256,7 @@ router.post(
       if (!parsed.success) {
         return next(createError('Invalid manifest data', 400, 'VALIDATION_ERROR'));
       }
+      await upsertManifest(parsed.data);
       return res.json({ success: true, message: 'Version manifest received', data: parsed.data });
     } catch (error) {
       return next(error);

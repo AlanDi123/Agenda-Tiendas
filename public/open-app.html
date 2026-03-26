@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Abrir Dommuss Agenda</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #f7f9fc;
+        color: #1f2937;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+      }
+      .card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        padding: 20px;
+        max-width: 420px;
+        width: calc(100% - 32px);
+      }
+      h1 { margin: 0 0 8px; font-size: 1.2rem; }
+      p { margin: 0 0 10px; color: #4b5563; }
+      a { color: #1565c0; text-decoration: none; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Abriendo Dommuss Agenda…</h1>
+      <p>Si no se abre automáticamente, continuá en la versión web.</p>
+      <p><a id="fallbackLink" href="/">Abrir en web</a></p>
+    </div>
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        const deep = params.get('deep') || 'dommussagenda://open';
+        const web = params.get('web') || 'https://agenda-tienda.vercel.app';
+        const fallbackLink = document.getElementById('fallbackLink');
+        if (fallbackLink) fallbackLink.href = web;
+
+        // Intentar abrir app nativa primero.
+        window.location.href = deep;
+
+        // Fallback a web si la app no está instalada / no abrió.
+        setTimeout(() => {
+          window.location.replace(web);
+        }, 1400);
+      })();
+    </script>
+  </body>
+  </html>
+

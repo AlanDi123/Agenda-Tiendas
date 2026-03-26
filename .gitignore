@@ -36,3 +36,4 @@ android/app/keystore.properties
 .env.local
 .env.production
 
+.vercel

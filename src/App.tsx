@@ -104,6 +104,7 @@ function AppContent() {
     addProfile,
     updateProfile,
     setActiveProfile,
+    verifyEmail,
     logout,
     closeFamily,
     darkMode,
@@ -129,6 +130,7 @@ function AppContent() {
     updateInfo,
     hasUpdate,
     isMandatory,
+    initialized: updatesInitialized,
     dismissUpdate,
   } = useAppUpdates();
 
@@ -226,6 +228,43 @@ function AppContent() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Deep links: abrir app por enlaces de mail y resolver token si viene
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const handleDeepLink = async (url?: string) => {
+      if (!url) return;
+      try {
+        const parsed = new URL(url);
+        const directToken = parsed.searchParams.get('token');
+        const target = parsed.searchParams.get('target');
+        const targetUrl = target ? new URL(target) : null;
+        const targetToken = targetUrl?.searchParams.get('token');
+        const token = directToken || targetToken;
+        if (token) {
+          await verifyEmail(token);
+        }
+      } catch {
+        // ignore malformed urls
+      }
+    };
+
+    let listener: Awaited<ReturnType<typeof CapacitorApp.addListener>> | null = null;
+    CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      void handleDeepLink(url);
+    }).then((l) => {
+      listener = l;
+    });
+
+    CapacitorApp.getLaunchUrl()
+      .then((launch) => void handleDeepLink(launch?.url))
+      .catch(() => {});
+
+    return () => {
+      listener?.remove();
+    };
+  }, [verifyEmail]);
 
   // Android back button handler
   useEffect(() => {
@@ -710,6 +749,11 @@ function AppContent() {
         </Suspense>
       </>
     );
+  }
+
+  // Bloquear avance hasta terminar el chequeo inicial de updates
+  if (!updatesInitialized) {
+    return <SplashScreen />;
   }
 
   // Show splash screen — también mientras auth sigue cargando

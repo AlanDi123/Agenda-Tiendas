@@ -24,6 +24,7 @@ function resolveEmailAppBaseUrl(): string {
 
 const APP_BASE_URL = resolveEmailAppBaseUrl();
 const CODE_EXPIRY_MIN = parseInt(process.env.VERIFICATION_CODE_EXPIRY_MINUTES || '15');
+const APP_SCHEME = process.env.APP_DEEP_LINK_SCHEME || 'dommussagenda';
 
 // Inicializar el cliente de Resend
 const resend = new Resend(RESEND_API_KEY);
@@ -70,6 +71,12 @@ async function sendEmail(opts: {
   }
 
   console.log('[EmailService] ✉️  Mail enviado, id:', data?.id, '→', opts.to);
+}
+
+function buildMobileFirstOpenUrl(webUrl: string): string {
+  const normalizedWeb = webUrl.replace(/ /g, '%20');
+  const deep = `${APP_SCHEME}://open?target=${encodeURIComponent(normalizedWeb)}`;
+  return `${APP_BASE_URL}/open-app.html?deep=${encodeURIComponent(deep)}&web=${encodeURIComponent(normalizedWeb)}`;
 }
 
 /**
@@ -220,6 +227,7 @@ export async function sendVerificationEmail(
   verificationToken: string
 ): Promise<void> {
   const verifyUrl = `${APP_BASE_URL}/verify?token=${verificationToken}`;
+  const openUrl = buildMobileFirstOpenUrl(verifyUrl);
 
   const html = `
     <!DOCTYPE html><html><head><style>
@@ -237,7 +245,7 @@ export async function sendVerificationEmail(
         <div class="hdr"><h1>🏠 Dommuss Agenda</h1><p>Activá tu cuenta</p></div>
         <div class="body">
           <p>¡Gracias por registrarte! Hacé clic abajo para verificar tu email:</p>
-          <a href="${verifyUrl}" class="btn">✅ Verificar mi email</a>
+          <a href="${openUrl}" class="btn">✅ Verificar mi email</a>
           <p style="font-size:13px;color:#666">O copiá este token manualmente:</p>
           <div class="token">${verificationToken}</div>
           <div class="warn">⚠️ Este enlace expira en 24 horas.</div>
@@ -250,7 +258,7 @@ export async function sendVerificationEmail(
     to: email,
     subject: 'Verificá tu email — Dommuss Agenda',
     html,
-    text: `Verificá tu cuenta en: ${verifyUrl}\n\nToken: ${verificationToken}\n\nExpira en 24 horas.`,
+    text: `Abrir en app/web: ${openUrl}\nVerificación directa web: ${verifyUrl}\n\nToken: ${verificationToken}\n\nExpira en 24 horas.`,
   });
 }
 
@@ -260,6 +268,7 @@ export async function sendPasswordResetEmail(
   resetToken: string
 ): Promise<void> {
   const resetUrl = `${APP_BASE_URL}/reset-password?token=${resetToken}`;
+  const openUrl = buildMobileFirstOpenUrl(resetUrl);
 
   const html = `
     <!DOCTYPE html><html><head><style>
@@ -276,7 +285,7 @@ export async function sendPasswordResetEmail(
         <div class="hdr"><h1>🔑 Recuperar contraseña</h1></div>
         <div class="body">
           <p>Recibimos una solicitud para restablecer tu contraseña.</p>
-          <a href="${resetUrl}" class="btn">Restablecer contraseña</a>
+          <a href="${openUrl}" class="btn">Restablecer contraseña</a>
           <div class="warn">⚠️ Este enlace expira en 1 hora. Si no solicitaste el cambio, ignorá este mail.</div>
         </div>
         <div class="ftr">© ${new Date().getFullYear()} Dommuss Agenda</div>
@@ -287,7 +296,7 @@ export async function sendPasswordResetEmail(
     to: email,
     subject: 'Recuperar contraseña — Dommuss Agenda',
     html,
-    text: `Restablecé tu contraseña: ${resetUrl}\n\nExpira en 1 hora.`,
+    text: `Abrir en app/web: ${openUrl}\nRestablecer directo web: ${resetUrl}\n\nExpira en 1 hora.`,
   });
 }
 

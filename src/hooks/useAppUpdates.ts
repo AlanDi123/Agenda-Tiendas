@@ -27,6 +27,8 @@ interface UseAppUpdatesReturn {
   downloading: boolean;
   /** Error message if any */
   error: string | null;
+  /** Whether initial update check completed */
+  initialized: boolean;
   /** Manually check for updates */
   checkForUpdate: () => Promise<void>;
   /** Dismiss the current update */
@@ -45,6 +47,7 @@ export function useAppUpdates(): UseAppUpdatesReturn {
   const [checking, setChecking] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
   
   // Track if initialization has been done
   const initializedRef = useRef(false);
@@ -67,6 +70,8 @@ export function useAppUpdates(): UseAppUpdatesReturn {
     // Initialize in background without blocking UI
     initializeUpdateChecker(handleUpdateAvailable).catch((err) => {
       console.error('[useAppUpdates] Failed to initialize:', err);
+    }).finally(() => {
+      setInitialized(true);
     });
   }, [handleUpdateAvailable]);
 
@@ -143,6 +148,7 @@ export function useAppUpdates(): UseAppUpdatesReturn {
     checking,
     downloading,
     error,
+    initialized,
     checkForUpdate,
     dismissUpdate,
     installUpdate,

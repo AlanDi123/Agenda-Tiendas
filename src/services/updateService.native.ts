@@ -1,6 +1,7 @@
 import { App } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
 import type { UpdateCheckResult, UpdateCheckResponse } from '../types/update';
+import { getApiBaseUrl } from '../config/api';
 
 // ─── Configuración ──────────────────────────────────────────────────────────
 const GITHUB_REPO = 'AlanDi123/Agenda-Tiendas';
@@ -12,6 +13,13 @@ const GITHUB_RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/release
 const LAST_CHECK_KEY = 'update_last_check';
 const DISMISSED_PREFIX = 'update_dismissed_';
 const CHECK_INTERVAL_MS = 30 * 60 * 1000;
+const BACKEND_VERSION_CHECK_PATH = '/api/v1/app/version/check';
+const BACKEND_VERSION_PATH = '/api/v1/app/version';
+
+function getBackendUrl(path: string): string {
+  const base = getApiBaseUrl();
+  return `${base}${path}`;
+}
 
 // ─── Helpers de versión ──────────────────────────────────────────────────────
 export function compareVersions(v1: string, v2: string): number {
@@ -51,6 +59,39 @@ export async function checkForUpdates(force = false): Promise<UpdateCheckRespons
 
     const currentVersion = await getCurrentVersion();
 
+    // 1) Prioridad: backend manifest (actualizado por CI)
+    try {
+      const backendRes = await fetch(
+        `${getBackendUrl(BACKEND_VERSION_CHECK_PATH)}?version=${encodeURIComponent(currentVersion)}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (backendRes.ok) {
+        const payload = await backendRes.json();
+        const d = payload?.data;
+        if (payload?.success && d?.updateAvailable) {
+          await Preferences.set({ key: LAST_CHECK_KEY, value: new Date().toISOString() });
+          return {
+            hasUpdate: true,
+            platform: 'android',
+            updateInfo: {
+              latestVersion: d.latestVersion,
+              currentVersion,
+              updateAvailable: true,
+              apkUrl: d.apkUrl,
+              changelog: d.changelog || `Versión ${d.latestVersion} disponible`,
+              mandatory: !!d.mandatory,
+              publishedAt: d.publishedAt || new Date().toISOString(),
+              versionCode: Number(d.versionCode || 0),
+              minVersionSupported: d.minVersionSupported !== false,
+            },
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('[UpdateService] Backend version check failed, fallback GitHub:', err);
+    }
+
+    // 2) Fallback: GitHub Releases
     const response = await fetch(GITHUB_RELEASES_API, {
       headers: { ...GH_HEADERS },
       signal: AbortSignal.timeout(8000),
@@ -145,6 +186,18 @@ export async function shouldCheckForUpdates(): Promise<boolean> {
 
 export async function getVersionManifest(): Promise<import('../types/update').VersionManifest | null> {
   try {
+    // Prioridad: backend manifest
+    const backendRes = await fetch(getBackendUrl(BACKEND_VERSION_PATH), {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (backendRes.ok) {
+      const payload = await backendRes.json();
+      if (payload?.success && payload?.data) {
+        return payload.data;
+      }
+    }
+
+    // Fallback: GitHub latest release
     const res = await fetch(GITHUB_RELEASES_API, {
       headers: { ...GH_HEADERS },
       signal: AbortSignal.timeout(8000),
