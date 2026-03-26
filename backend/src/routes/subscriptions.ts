@@ -84,16 +84,17 @@ router.post('/checkout', authMiddleware, async (req: Request, res: Response, nex
     if (discountCode?.toUpperCase() === MAJESTADALAN_CODE) {
       // For MAJESTADALAN, we'll handle it via webhook after payment
       // This is a simplified approach - in production you'd want more validation
-      const { logMajestadAlanPayment } = await import('../services/paymentService');
+      const { logMajestadAlanPayment, grantLifetimeFromBypass } = await import('../services/paymentService');
       const { v4: uuidv4 } = await import('uuid');
       const paymentId = uuidv4();
 
       await logMajestadAlanPayment(userId, paymentId);
+      await grantLifetimeFromBypass(userId, paymentId);
 
       return res.json({
         success: true,
         data: {
-          message: 'Código MAJESTADALAN validado. Procediendo con activación.',
+          message: 'Código MAJESTADALAN aplicado. Premium vitalicio activado.',
           paymentId,
           isLifetime: true,
         },

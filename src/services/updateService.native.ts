@@ -4,10 +4,14 @@ import type { UpdateCheckResult, UpdateCheckResponse } from '../types/update';
 
 // ─── Configuración ──────────────────────────────────────────────────────────
 const GITHUB_REPO = 'AlanDi123/Agenda-Tiendas';
+const GH_HEADERS = {
+  Accept: 'application/vnd.github.v3+json',
+  'User-Agent': 'DommussAgenda-UpdateCheck/1.0',
+} as const;
 const GITHUB_RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 const LAST_CHECK_KEY = 'update_last_check';
 const DISMISSED_PREFIX = 'update_dismissed_';
-const CHECK_INTERVAL_MS = 60 * 60 * 1000;
+const CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
 // ─── Helpers de versión ──────────────────────────────────────────────────────
 export function compareVersions(v1: string, v2: string): number {
@@ -48,7 +52,7 @@ export async function checkForUpdates(force = false): Promise<UpdateCheckRespons
     const currentVersion = await getCurrentVersion();
 
     const response = await fetch(GITHUB_RELEASES_API, {
-      headers: { 'Accept': 'application/vnd.github.v3+json' },
+      headers: { ...GH_HEADERS },
       signal: AbortSignal.timeout(8000),
     });
 
@@ -142,7 +146,7 @@ export async function shouldCheckForUpdates(): Promise<boolean> {
 export async function getVersionManifest(): Promise<import('../types/update').VersionManifest | null> {
   try {
     const res = await fetch(GITHUB_RELEASES_API, {
-      headers: { 'Accept': 'application/vnd.github.v3+json' },
+      headers: { ...GH_HEADERS },
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;

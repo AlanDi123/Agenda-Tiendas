@@ -221,7 +221,9 @@ export function SubscriptionModal({ isOpen, onClose, onSuccess }: SubscriptionMo
           <div className="summary-row total">
             <span>Total:</span>
             <span className="total-amount">
-              {appliedDiscount === 'MAJESTADALAN' ? 'GRATIS' : `$${selectedPlanData?.priceUsd} USD`}
+              {appliedDiscount === 'MAJESTADALAN'
+                ? 'GRATIS'
+                : `$${selectedPlanData?.priceArs.toLocaleString('es-AR')} ARS`}
             </span>
           </div>
         </div>

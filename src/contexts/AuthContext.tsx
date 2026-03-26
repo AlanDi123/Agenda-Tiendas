@@ -24,6 +24,8 @@ import {
 } from '../services/authService';
 import { getUserPlan, initializeDiscountCodes } from '../services/subscriptionService';
 import { generateId, getInitials, generateAvatarColor, generateFamilyCode } from '../utils/helpers';
+import { getCreatedEnvironmentIdsForUser, registerCreatedEnvironment } from '../utils/familyLimits';
+import { updateEventsColorForProfile } from '../services/database';
 
 interface AuthContextType {
   // User auth
@@ -220,15 +222,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pin?: string,
     initialProfiles?: Array<{ name: string; permissions: 'admin' | 'readonly' }>
   ): Promise<Environment> => {
+    if (currentUser) {
+      const created = getCreatedEnvironmentIdsForUser(currentUser.id);
+      if (created.length >= 1 && !isPremium) {
+        throw new Error(
+          'Ya creaste una familia con esta cuenta. Para crear otra familía necesitás una suscripción Premium (mensual o anual).'
+        );
+      }
+    }
+
     const profiles: Profile[] = [];
     let activeProfileId: string | undefined;
 
     if (initialProfiles && initialProfiles.length > 0) {
-      for (const prof of initialProfiles) {
+      for (let i = 0; i < initialProfiles.length; i++) {
+        const prof = initialProfiles[i];
         const profile: Profile = {
           id: generateId(),
           name: prof.name,
-          email: currentUser?.email || '',
+          email: (i === 0 ? (currentUser?.email || '').toLowerCase() : '') || '',
           avatarColor: generateAvatarColor(),
           initials: getInitials(prof.name),
           permissions: 'admin',
@@ -258,10 +270,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Save environment for current user
     if (currentUser) {
       await saveEnvUserSession(currentUser.email, env.id);
+      registerCreatedEnvironment(currentUser.id, env.id);
     }
     
     return env;
-  }, [currentUser]);
+  }, [currentUser, isPremium]);
 
   const loadEnvironment = useCallback(async (id: string) => {
     const env = await getEnvironment(id);
@@ -303,6 +316,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    const ownerEmail = currentUser?.email?.trim().toLowerCase();
+    if (ownerEmail && emailNorm === ownerEmail) {
+      const ownerAlready = environment.profiles.some(
+        p => p.email.trim().toLowerCase() === ownerEmail
+      );
+      if (ownerAlready) {
+        throw new Error('Solo puede haber un perfil asociado al email de tu cuenta en esta familia.');
+      }
+    }
+
     const profile: Profile = {
       id: generateId(),
       name,
@@ -330,7 +353,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return profile;
-  }, [environment]);
+  }, [environment, currentUser]);
 
   const updateProfile = useCallback(async (profile: Profile) => {
     if (!environment) throw new Error('No environment loaded');
@@ -344,6 +367,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     await saveEnvironment(updatedEnv);
     setEnvironment(updatedEnv);
+    await updateEventsColorForProfile(profile.id, profile.avatarColor);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('agenda-reload-events'));
+    }
   }, [environment]);
 
   const deleteProfile = useCallback(async (id: string) => {

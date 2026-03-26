@@ -14,14 +14,26 @@ import { payments, subscriptions, users, plans, discountCodes, webhookEvents, pa
 // CONFIGURATION
 // ============================================
 
-const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || '';
-const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173';
-const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || 'http://localhost:3001';
+const MP_ACCESS_TOKEN =
+  (process.env.MERCADO_PAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN || '').trim();
 
-// Initialize Mercado Pago client
-const client = new MercadoPagoConfig({
-  accessToken: MP_ACCESS_TOKEN,
-});
+function resolvePublicAppUrl(): string {
+  const explicit = process.env.APP_BASE_URL?.replace(/\/$/, '');
+  if (explicit) return explicit;
+  const v = process.env.VERCEL_URL;
+  if (v) return `https://${v.replace(/^https?:\/\//, '')}`;
+  return 'http://localhost:5173';
+}
+
+function resolveBackendPublicUrl(): string {
+  const explicit = process.env.BACKEND_BASE_URL?.replace(/\/$/, '');
+  if (explicit) return explicit;
+  return resolvePublicAppUrl();
+}
+
+function getMpClient(): MercadoPagoConfig {
+  return new MercadoPagoConfig({ accessToken: MP_ACCESS_TOKEN });
+}
 
 // ============================================
 // TYPES
@@ -90,6 +102,18 @@ export async function createCheckoutPreference(
   discountCode?: string
 ): Promise<CheckoutResult> {
   try {
+    if (!MP_ACCESS_TOKEN) {
+      return {
+        success: false,
+        message:
+          'Mercado Pago no está configurado en el servidor. Definí MERCADO_PAGO_ACCESS_TOKEN (o MP_ACCESS_TOKEN) en las variables de entorno.',
+      };
+    }
+
+    const APP_BASE_URL = resolvePublicAppUrl();
+    const BACKEND_BASE_URL = resolveBackendPublicUrl();
+    const client = getMpClient();
+
     // Get user info
     const foundUsers = await db.select({
       id: users.id,
@@ -161,7 +185,7 @@ export async function createCheckoutPreference(
           id: planType,
           title: pricing.description,
           description: 'Suscripción Dommuss Agenda',
-          picture_url: `${APP_BASE_URL}/pwa-512x512.svg`,
+          picture_url: `${APP_BASE_URL}/logo-dommuss.png`,
           quantity: 1,
           currency_id: 'ARS',
           unit_price: finalPriceArs,
@@ -216,9 +240,21 @@ export async function createCheckoutPreference(
     };
   } catch (error) {
     console.error('[PaymentService] Error creating preference:', error);
+    let detail = error instanceof Error ? error.message : String(error);
+    const anyErr = error as { cause?: unknown; apiResponse?: { message?: string } };
+    if (anyErr?.cause && typeof anyErr.cause === 'object' && anyErr.cause !== null) {
+      const c = anyErr.cause as { message?: string };
+      if (c.message) detail = `${detail}: ${c.message}`;
+    }
+    if (anyErr?.apiResponse?.message) {
+      detail = `${detail} (${anyErr.apiResponse.message})`;
+    }
     return {
       success: false,
-      message: 'Error al crear preferencia de pago',
+      message:
+        detail.includes('Unauthorized') || detail.includes('invalid access token')
+          ? 'Token de Mercado Pago inválido o vencido. Revisá MERCADO_PAGO_ACCESS_TOKEN en el servidor.'
+          : `Error al crear preferencia de pago: ${detail}`,
     };
   }
 }
@@ -231,7 +267,7 @@ export async function processWebhookPayment(paymentId: string): Promise<{
   message: string;
 }> {
   try {
-    const payment = new Payment(client);
+    const payment = new Payment(getMpClient());
     const paymentData = await payment.get({ id: paymentId });
 
     if (!paymentData) {
@@ -414,6 +450,7 @@ async function activateSubscription(
       id: uuidv4(),
       userId,
       planId,
+      planType: planType as any,
       paymentGateway: 'mercadopago',
       externalPaymentId,
       status: 'active',
@@ -437,6 +474,16 @@ async function activateSubscription(
     console.error('[PaymentService] Error activating subscription:', error);
     throw error;
   }
+}
+
+/**
+ * Otorga Premium vitalicio tras validación en servidor (p. ej. código MAJESTADALAN).
+ */
+export async function grantLifetimeFromBypass(
+  userId: string,
+  externalPaymentId: string
+): Promise<void> {
+  await activateSubscription(userId, 'PREMIUM_LIFETIME', true, externalPaymentId);
 }
 
 /**
@@ -557,4 +604,5 @@ export default {
   processWebhookPayment,
   verifySubscription,
   logMajestadAlanPayment,
+  grantLifetimeFromBypass,
 };

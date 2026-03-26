@@ -101,6 +101,14 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    const handler = () => {
+      void loadEvents();
+    };
+    window.addEventListener('agenda-reload-events', handler);
+    return () => window.removeEventListener('agenda-reload-events', handler);
+  }, [loadEvents]);
+
   // Expandir eventos cuando cambie la vista o los eventos
   useEffect(() => {
     // Expandir 6 semanas antes y después del mes visible para cubrir week/day view

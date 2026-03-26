@@ -81,6 +81,8 @@ export interface SubscriptionPlan {
   trialDays?: number;
   features: string[];
   popular?: boolean;
+  /** Precio en ARS para checkout Mercado Pago */
+  priceArs?: number;
 }
 
 // Payment gateway configuration
@@ -178,6 +180,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Soporte por email',
     ],
     popular: true,
+    priceArs: 35000,
   },
   {
     id: 'PREMIUM_YEARLY',
@@ -194,6 +197,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Soporte prioritario',
       'Actualizaciones anticipadas',
     ],
+    priceArs: 336000,
   },
   {
     id: 'PREMIUM_LIFETIME',

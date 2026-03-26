@@ -3,7 +3,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Button';
 import { Modal } from '../Modal';
 import { SUBSCRIPTION_PLANS } from '../../types/payment';
-import type { SubscriptionPlan } from '../../types/payment';
+import type { PlanType, SubscriptionPlan } from '../../types/payment';
+import { redirectToCheckout } from '../../services/paymentGatewayService';
 import './Payment.css';
 
 interface PaymentModalProps {
@@ -12,25 +13,37 @@ interface PaymentModalProps {
   onSuccess: () => void;
 }
 
+const CHECKOUT_PLAN_IDS: PlanType[] = ['PREMIUM_MONTHLY', 'PREMIUM_YEARLY'];
+
+const PAYMENT_MODAL_PLANS = SUBSCRIPTION_PLANS.filter(p => CHECKOUT_PLAN_IDS.includes(p.id));
+
+function displayArs(plan: SubscriptionPlan): number {
+  if (plan.priceArs != null) return plan.priceArs;
+  if (plan.id === 'PREMIUM_MONTHLY') return 35000;
+  if (plan.id === 'PREMIUM_YEARLY') return 336000;
+  return 0;
+}
+
 export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) {
-  const { currentUser, upgradeToPremium } = useAuth();
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>(SUBSCRIPTION_PLANS[0]);
+  const { currentUser } = useAuth();
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>(
+    () => PAYMENT_MODAL_PLANS[0] ?? SUBSCRIPTION_PLANS[1]
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
 
   const handlePayment = async () => {
     if (!currentUser) return;
+    if (!CHECKOUT_PLAN_IDS.includes(selectedPlan.id)) {
+      setError('Seleccioná un plan mensual o anual para pagar con Mercado Pago.');
+      return;
+    }
 
     setIsProcessing(true);
     setError('');
 
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Upgrade to premium
-      await upgradeToPremium();
-      
+      await redirectToCheckout(selectedPlan.id);
       onSuccess();
       onClose();
     } catch (err) {
@@ -39,6 +52,8 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
       setIsProcessing(false);
     }
   };
+
+  const ars = displayArs(selectedPlan);
 
   return (
     <Modal
@@ -56,7 +71,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
         </div>
 
         <div className="payment-plans">
-          {SUBSCRIPTION_PLANS.filter(p => p.id !== 'FREE').map((plan: SubscriptionPlan) => (
+          {PAYMENT_MODAL_PLANS.map((plan: SubscriptionPlan) => (
             <button
               key={plan.id}
               className={`payment-plan-card ${selectedPlan.id === plan.id ? 'selected' : ''}`}
@@ -66,8 +81,14 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
               <div className="payment-plan-header">
                 <h3 className="payment-plan-name">{plan.name}</h3>
                 <div className="payment-plan-price">
-                  <span className="payment-plan-amount">${plan.price}</span>
-                  <span className="payment-plan-currency">/{plan.interval === 'lifetime' ? 'único' : plan.interval === 'yearly' ? 'año' : 'mes'}</span>
+                  <span className="payment-plan-amount">
+                    ${displayArs(plan).toLocaleString('es-AR')}
+                  </span>
+                  <span className="payment-plan-currency">
+                    {' '}
+                    ARS/
+                    {plan.interval === 'yearly' ? 'año' : 'mes'}
+                  </span>
                 </div>
               </div>
               <ul className="payment-plan-features">
@@ -96,7 +117,9 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
           </div>
           <div className="payment-summary-row">
             <span>Total</span>
-            <span className="payment-summary-total">${selectedPlan.price} {selectedPlan.currency}</span>
+            <span className="payment-summary-total">
+              ${ars.toLocaleString('es-AR')} ARS
+            </span>
           </div>
         </div>
 
@@ -110,7 +133,9 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
             onClick={handlePayment}
             loading={isProcessing}
           >
-            {isProcessing ? 'Procesando...' : `Pagar $${selectedPlan.price}`}
+            {isProcessing
+              ? 'Procesando...'
+              : `Pagar con Mercado Pago — $${ars.toLocaleString('es-AR')} ARS`}
           </Button>
           <Button
             variant="text"
@@ -127,7 +152,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
-          <span>Pago seguro y encriptado</span>
+          <span>Pago seguro con Mercado Pago</span>
         </div>
       </div>
     </Modal>

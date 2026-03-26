@@ -13,7 +13,16 @@ import { emailVerifications, users } from '../db/schema';
 // ─── Configuración ───────────────────────────────────────────────────────────
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const FROM_ADDRESS   = process.env.SMTP_FROM || 'Dommuss Agenda <onboarding@resend.dev>';
-const APP_BASE_URL   = process.env.APP_BASE_URL || 'https://agenda-tienda.vercel.app';
+
+function resolveEmailAppBaseUrl(): string {
+  const explicit = process.env.APP_BASE_URL?.replace(/\/$/, '');
+  if (explicit) return explicit;
+  const v = process.env.VERCEL_URL;
+  if (v) return `https://${v.replace(/^https?:\/\//, '')}`;
+  return 'https://agenda-tienda.vercel.app';
+}
+
+const APP_BASE_URL = resolveEmailAppBaseUrl();
 const CODE_EXPIRY_MIN = parseInt(process.env.VERIFICATION_CODE_EXPIRY_MINUTES || '15');
 
 // Inicializar el cliente de Resend
@@ -47,7 +56,8 @@ async function sendEmail(opts: {
 
   if (error) {
     console.error('[EmailService] Error de Resend:', JSON.stringify(error));
-    throw new Error(`Resend error: ${error.message}`);
+    const extra = 'name' in error && error.name ? ` (${error.name})` : '';
+    throw new Error(`Resend error: ${error.message}${extra}`);
   }
 
   console.log('[EmailService] ✉️  Mail enviado, id:', data?.id, '→', opts.to);

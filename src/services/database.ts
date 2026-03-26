@@ -212,6 +212,18 @@ export async function deleteEvent(id: string): Promise<void> {
   await db.delete('events', id);
 }
 
+
+export async function updateEventsColorForProfile(profileId: string, color: string): Promise<void> {
+  const db = await getDB();
+  const allEvents = await db.getAll('events');
+  const now = new Date();
+  for (const event of allEvents) {
+    if (!event.assignedProfileIds?.includes(profileId)) continue;
+    if (event.color === color) continue;
+    await db.put('events', { ...event, color, updatedAt: now });
+  }
+}
+
 // Settings operations
 export async function saveSetting(key: string, value: unknown): Promise<void> {
   const db = await getDB();
