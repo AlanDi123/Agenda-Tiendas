@@ -212,6 +212,11 @@ export async function deleteEvent(id: string): Promise<void> {
   await db.delete('events', id);
 }
 
+export async function clearAllEvents(): Promise<void> {
+  const db = await getDB();
+  await db.clear('events');
+}
+
 
 export async function updateEventsColorForProfile(profileId: string, color: string): Promise<void> {
   const db = await getDB();

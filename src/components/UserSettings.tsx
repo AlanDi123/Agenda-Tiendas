@@ -16,6 +16,7 @@ interface UserSettingsModalProps {
   onClose: () => void;
   onUpdateProfile: (profile: Profile) => void;
   onLogout: () => void;
+  onCloseFamily: () => void;
 }
 
 export function UserSettingsModal({
@@ -24,6 +25,7 @@ export function UserSettingsModal({
   onClose,
   onUpdateProfile,
   onLogout,
+  onCloseFamily,
 }: UserSettingsModalProps) {
   const { isPremium } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'subscription'>('profile');
@@ -287,6 +289,14 @@ export function UserSettingsModal({
             className="user-settings-logs"
           >
             🛠️ Ver Registro de Errores
+          </Button>
+          <Button
+            variant="text"
+            fullWidth
+            onClick={onCloseFamily}
+            className="user-settings-logout"
+          >
+            Cerrar familia
           </Button>
           <Button
             variant="text"

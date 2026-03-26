@@ -10,6 +10,8 @@ import {
   setDarkMode,
   saveUserSession as saveEnvUserSession,
   getUserSession,
+  clearUserSession,
+  clearAllEvents,
 } from '../services/database';
 import {
   createUser,
@@ -40,6 +42,7 @@ interface AuthContextType {
   register: (email: string, password: string) => Promise<User & { verificationToken: string }>;
   login: (email: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
+  closeFamily: () => Promise<void>;
   verifyEmail: (token: string) => Promise<boolean>;
   resendVerificationEmail: (email: string) => Promise<boolean>;
   requestPasswordReset: (email: string) => Promise<boolean>;
@@ -184,11 +187,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    const email = currentUser?.email;
     await logoutUser();
+
+    if (email) {
+      await clearUserSession(email);
+    }
+
+    await clearAllEvents();
     setCurrentUser(null);
     setEnvironment(null);
     setActiveProfileId(undefined);
-  }, []);
+  }, [currentUser]);
+
+  // Cierra la "familia" (environment) actual sin desloguear.
+  // Útil para que el usuario pueda entrar a otra familia.
+  const closeFamily = useCallback(async () => {
+    if (!currentUser) return;
+    await clearUserSession(currentUser.email);
+    await clearAllEvents();
+    setEnvironment(null);
+    setActiveProfileId(undefined);
+  }, [currentUser]);
 
   const verifyEmail = useCallback(async (token: string) => {
     const success = await verifyEmailService(token);
@@ -422,6 +442,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       login,
       logout,
+      closeFamily,
       verifyEmail,
       resendVerificationEmail: handleResendVerificationEmail,
       requestPasswordReset,

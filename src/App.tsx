@@ -104,6 +104,7 @@ function AppContent() {
     updateProfile,
     setActiveProfile,
     logout,
+    closeFamily,
     darkMode,
     toggleDarkMode,
     refreshSubscription,
@@ -495,6 +496,12 @@ function AppContent() {
     await logout();
     setAuthState('login');
   }, [logout]);
+
+  const handleCloseFamily = useCallback(async () => {
+    await closeFamily();
+    // La vista vuelve a onboarding automáticamente porque `environment` queda en null.
+    setShowUserSettings(false);
+  }, [closeFamily]);
 
   // Onboarding handlers
   const handleOnboardingComplete = useCallback(async (data: {
@@ -967,6 +974,7 @@ function AppContent() {
           onClose={() => setShowUserSettings(false)}
           onUpdateProfile={handleUpdateProfile}
           onLogout={handleLogout}
+          onCloseFamily={handleCloseFamily}
         />
       </Suspense>
 
