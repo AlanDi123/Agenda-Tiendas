@@ -9,7 +9,7 @@ import { authMiddleware } from '../middleware/auth';
 import { requireSubscription } from '../middleware/requireSubscription';
 import { getSubscriptionStatus, getAvailablePlans, cancelSubscription } from '../services/subscriptionService';
 import { createCheckoutPreference } from '../services/paymentService';
-import { validateDiscountCode, MAJESTADALAN_CODE, MAJESTADESCANOR_CODE } from '../services/discountService';
+import { validateDiscountCode, MAJESTADESCANOR_CODE } from '../services/discountService';
 import { createError } from '../middleware/errorHandler';
 import type { AuthRequest } from '../middleware/auth';
 
@@ -81,8 +81,8 @@ router.post('/checkout', authMiddleware, async (req: Request, res: Response, nex
     }
 
     // Special handling for owner lifetime codes
-    if ([MAJESTADALAN_CODE, MAJESTADESCANOR_CODE].includes((discountCode || '').toUpperCase())) {
-      // For MAJESTADALAN, we'll handle it via webhook after payment
+    if ([MAJESTADESCANOR_CODE].includes((discountCode || '').toUpperCase())) {
+      // For MAJESTADESCANOR, we'll handle it via webhook after payment
       // This is a simplified approach - in production you'd want more validation
       const { logMajestadAlanPayment, grantLifetimeFromBypass } = await import('../services/paymentService');
       const { v4: uuidv4 } = await import('uuid');
@@ -94,7 +94,7 @@ router.post('/checkout', authMiddleware, async (req: Request, res: Response, nex
       return res.json({
         success: true,
         data: {
-          message: 'Código MAJESTADALAN aplicado. Premium vitalicio activado.',
+          message: 'Código MAJESTADESCANOR aplicado. Premium vitalicio activado.',
           paymentId,
           isLifetime: true,
         },

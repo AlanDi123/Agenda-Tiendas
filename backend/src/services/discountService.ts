@@ -1,7 +1,7 @@
 /**
  * Discount Service
  * Handles discount code validation and usage tracking
- * Special handling for MAJESTADALAN code with audit logging
+ * Special handling for owner lifetime code with audit logging
  * Uses Drizzle ORM with Neon PostgreSQL
  */
 
@@ -14,7 +14,6 @@ import { discountCodes, discountUsages, paymentLogs } from '../db/schema';
 // CONSTANTS
 // ============================================
 
-export const MAJESTADALAN_CODE = 'MAJESTADALAN';
 export const MAJESTADESCANOR_CODE = 'MAJESTADESCANOR';
 
 // ============================================
@@ -47,7 +46,7 @@ export async function validateDiscountCode(
     const normalizedCode = code.trim().toUpperCase();
 
     // Special handling for owner lifetime codes
-    if (normalizedCode === MAJESTADALAN_CODE || normalizedCode === MAJESTADESCANOR_CODE) {
+    if (normalizedCode === MAJESTADESCANOR_CODE) {
       return {
         isValid: true,
         discount: {
@@ -160,7 +159,7 @@ export async function applyDiscount(
 }> {
   try {
     const normalizedCode = code.trim().toUpperCase();
-    const isMajestadAlan = normalizedCode === MAJESTADALAN_CODE || normalizedCode === MAJESTADESCANOR_CODE;
+    const isMajestadAlan = normalizedCode === MAJESTADESCANOR_CODE;
 
     // Validate the code first
     const validation = await validateDiscountCode(normalizedCode, userId);
@@ -180,7 +179,7 @@ export async function applyDiscount(
       paymentId,
     });
 
-    // Increment total usage for non-MAJESTADALAN codes
+    // Increment total usage for non-lifetime codes
     if (!isMajestadAlan) {
       await db.update(discountCodes)
         .set({
@@ -190,7 +189,7 @@ export async function applyDiscount(
         .where(eq(discountCodes.code, normalizedCode));
     }
 
-    // Create audit log for MAJESTADALAN
+    // Create audit log for lifetime code bypass
     if (isMajestadAlan) {
       await db.insert(paymentLogs).values({
         id: uuidv4(),
@@ -200,15 +199,15 @@ export async function applyDiscount(
         currency: 'USD',
         status: 'approved',
         rawPayload: JSON.stringify({
-          type: 'majestadalan_usage',
-          code: MAJESTADALAN_CODE,
+          type: 'majestadescanor_usage',
+          code: MAJESTADESCANOR_CODE,
           paymentId,
           timestamp: new Date().toISOString(),
         }),
-        signature: 'majestadalan',
+        signature: 'majestadescanor',
       });
 
-      console.log(`[DiscountService] MAJESTADALAN used by user ${userId} for payment ${paymentId}`);
+      console.log(`[DiscountService] MAJESTADESCANOR used by user ${userId} for payment ${paymentId}`);
     }
 
     const discountAmount = validation.discount.type === 'percentage'
@@ -230,7 +229,7 @@ export async function applyDiscount(
 }
 
 /**
- * Get usage statistics for MAJESTADALAN
+ * Get usage statistics for MAJESTADESCANOR
  */
 export async function getMajestadAlanStats(): Promise<{
   totalUses: number;
@@ -243,7 +242,7 @@ export async function getMajestadAlanStats(): Promise<{
   try {
     const totalUsesResult = await db.select({ count: sql<number>`count(*)` })
       .from(discountUsages)
-      .where(eq(discountUsages.discountCode, MAJESTADALAN_CODE));
+      .where(eq(discountUsages.discountCode, MAJESTADESCANOR_CODE));
 
     const totalUses = totalUsesResult[0]?.count || 0;
 
@@ -253,7 +252,7 @@ export async function getMajestadAlanStats(): Promise<{
       paymentId: discountUsages.paymentId,
     })
       .from(discountUsages)
-      .where(eq(discountUsages.discountCode, MAJESTADALAN_CODE))
+      .where(eq(discountUsages.discountCode, MAJESTADESCANOR_CODE))
       .orderBy(sql`${discountUsages.createdAt} DESC`)
       .limit(10);
 
@@ -262,7 +261,7 @@ export async function getMajestadAlanStats(): Promise<{
       recentUses,
     };
   } catch (error) {
-    console.error('[DiscountService] Error getting MAJESTADALAN stats:', error);
+    console.error('[DiscountService] Error getting MAJESTADESCANOR stats:', error);
     return {
       totalUses: 0,
       recentUses: [],
@@ -305,6 +304,5 @@ export default {
   applyDiscount,
   getMajestadAlanStats,
   getUserDiscountUsages,
-  MAJESTADALAN_CODE,
   MAJESTADESCANOR_CODE,
 };
