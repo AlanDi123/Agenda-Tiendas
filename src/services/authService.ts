@@ -57,14 +57,22 @@ export async function createUser(
       json: { email: email.toLowerCase(), password },
     });
 
+    const errorData = !response.ok ? await response.json().catch(() => null) : null;
+
     if (!response.ok) {
-      if (response.status === 409) {
+      const backendCode = errorData?.code;
+      const backendMessage = errorData?.message;
+
+      if (response.status === 409 || backendCode === 'EMAIL_EXISTS') {
         throw new Error('El email ya está registrado');
+      }
+      if (response.status === 400 && backendMessage) {
+        throw new Error(backendMessage);
       }
       if (response.status >= 500) {
         throw new Error('Error del servidor. Intente más tarde.');
       }
-      throw new Error('Error al registrarse');
+      throw new Error(backendMessage || 'Error al registrarse');
     }
 
     const data = await response.json();

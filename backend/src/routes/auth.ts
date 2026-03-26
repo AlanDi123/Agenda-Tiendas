@@ -65,7 +65,12 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     const result = await authService.registerUser(data);
 
     // Enviar el mail de verificación por Resend
-    await sendVerificationEmail(result.user.email, result.verificationToken);
+    try {
+      await sendVerificationEmail(result.user.email, result.verificationToken);
+    } catch (emailError) {
+      // No bloquear el registro por fallo del proveedor de correo
+      console.error('[Auth] Error enviando mail de verificación:', emailError);
+    }
 
     res.status(201).json({
       success: true,
