@@ -12,6 +12,7 @@ import { ToastContainer } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReloadPrompt } from './components/ReloadPrompt';
 import { RouteLoadingFallback } from './components/RouteLoadingFallback';
+import { apiFetch } from './config/api';
 
 const TurnosGrid = lazy(() =>
   import('./components/TurnosGrid').then((m) => ({ default: m.TurnosGrid }))
@@ -505,13 +506,36 @@ function AppContent() {
   }) => {
     try {
       const { environmentName, pin, profiles: profileList, planType } = data;
+
+      let createdFamilyCode: string | null = null;
+      let createdEnvironmentName: string | null = null;
       
       if (environment && environment.profiles.length === 0 && profileList.length > 0) {
         for (const profileData of profileList) {
           await addProfile(profileData.name, currentUser?.email || '', profileData.permissions);
         }
       } else {
-        await createEnvironment(environmentName, pin, profileList);
+        const createdEnv = await createEnvironment(environmentName, pin, profileList);
+        createdFamilyCode = createdEnv.familyCode;
+        createdEnvironmentName = createdEnv.name;
+      }
+
+      // Enviar el código de familia al mail registrado (owner)
+      if (createdFamilyCode && currentUser) {
+        try {
+          await apiFetch('/api/v1/app/send-family-code', {
+            method: 'POST',
+            auth: true,
+            json: {
+              familyCode: createdFamilyCode,
+              familyName: createdEnvironmentName || environmentName,
+            },
+          });
+        } catch (emailErr) {
+          console.error('[Onboarding] Error enviando código de familia:', emailErr);
+          // No bloquea el onboarding, pero te avisa para que lo notemos
+          alert('Se creó la familia, pero no se pudo enviar el código al mail registrado.');
+        }
       }
       
       // Si eligió plan pago → redirigir a MP y bloquear entrada

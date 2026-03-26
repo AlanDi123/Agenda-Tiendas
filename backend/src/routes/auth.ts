@@ -65,12 +65,7 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     const result = await authService.registerUser(data);
 
     // Enviar el mail de verificación por Resend
-    try {
-      await sendVerificationEmail(result.user.email, result.verificationToken);
-    } catch (emailError) {
-      console.error('[Auth] Error enviando mail de verificación:', emailError);
-      // No fallar el registro si el mail falla — el usuario puede reenviar
-    }
+    await sendVerificationEmail(result.user.email, result.verificationToken);
 
     res.status(201).json({
       success: true,
@@ -114,11 +109,7 @@ router.post('/resend-verification', async (req: Request, res: Response, next: Ne
 
     // Enviar el nuevo token por Resend
     if (result.verificationToken) {
-      try {
-        await sendVerificationEmail(email, result.verificationToken);
-      } catch (emailError) {
-        console.error('[Auth] Error reenviando mail:', emailError);
-      }
+      await sendVerificationEmail(email, result.verificationToken);
     }
 
     res.json({
@@ -257,11 +248,7 @@ router.post('/password-reset/request', async (req: Request, res: Response, next:
 
     // Enviar mail de recuperación
     if (result.resetToken) {
-      try {
-        await sendPasswordResetEmail(email, result.resetToken);
-      } catch (emailError) {
-        console.error('[Auth] Error enviando mail de reset:', emailError);
-      }
+      await sendPasswordResetEmail(email, result.resetToken);
     }
 
     res.json({

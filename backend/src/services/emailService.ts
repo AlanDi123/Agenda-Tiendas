@@ -42,8 +42,17 @@ async function sendEmail(opts: {
   text: string;
 }): Promise<void> {
   if (!RESEND_API_KEY) {
-    console.warn('[EmailService] Mail no enviado (sin API key):', opts.to, opts.subject);
-    return;
+    throw new Error(
+      `[EmailService] RESEND_API_KEY no configurada. No se pudo enviar el mail a ${opts.to}.`
+    );
+  }
+
+  // En producción no usar el from de testing, porque Resend puede rechazarlo o suprimirlo.
+  const usingResendDevFrom = FROM_ADDRESS.includes('@resend.dev');
+  if (process.env.NODE_ENV === 'production' && usingResendDevFrom) {
+    throw new Error(
+      '[EmailService] SMTP_FROM no configurado o no verificado en Resend. Definí SMTP_FROM con un from verificado (dominio verificado en https://resend.com/domains).'
+    );
   }
 
   const { data, error } = await resend.emails.send({
@@ -61,6 +70,22 @@ async function sendEmail(opts: {
   }
 
   console.log('[EmailService] ✉️  Mail enviado, id:', data?.id, '→', opts.to);
+}
+
+/**
+ * Envío de correo de prueba para verificar que Resend funciona.
+ */
+export async function sendTestEmail(params: {
+  to: string;
+  subject?: string;
+}): Promise<void> {
+  const subject = params.subject || '[Dommuss Agenda] Test Resend';
+  await sendEmail({
+    to: params.to,
+    subject,
+    html: `<p>Si recibiste este mail, Resend está funcionando correctamente.</p>`,
+    text: `Si recibiste este mail, Resend está funcionando correctamente. (${subject})`,
+  });
 }
 
 // ─── Verificación de email (código 6 dígitos) ─────────────────────────────────

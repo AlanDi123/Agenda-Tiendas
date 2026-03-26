@@ -12,6 +12,7 @@ import { generateId } from '../utils/helpers';
 import { AppLogger } from '../services/logger';
 import { useEventAlarms } from '../hooks/useEventAlarms';
 import { apiFetch } from '../config/api';
+import { useAuth } from './AuthContext';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -46,6 +47,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [viewDate, setViewDate] = useState(new Date());
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const { environment } = useAuth();
 
   // Initialize alarm management
   const { scheduleAlarm, cancelAlarms, rescheduleAlarms } = useEventAlarms(events);
@@ -84,10 +87,13 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           eventTitle: event.title,
           eventId: event.id,
           startDate: event.startDate,
+          familyMemberEmails: (environment?.profiles || [])
+            .map(p => p.email?.trim())
+            .filter((e): e is string => !!e),
         },
       }).catch(() => {}); // Ignorar errores — no bloquear la UX
     }
-  }, [addToast]);
+  }, [addToast, environment]);
 
   const loadEvents = useCallback(async () => {
     setIsLoading(true);

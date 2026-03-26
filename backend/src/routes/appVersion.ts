@@ -6,8 +6,10 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { authMiddleware, requireAdmin } from '../middleware/auth';
+import type { AuthRequest } from '../middleware/auth';
 import { createError } from '../middleware/errorHandler';
 import { z } from 'zod';
+import { sendFamilyCode, sendTestEmail } from '../services/emailService';
 
 const router = Router();
 
@@ -90,6 +92,48 @@ router.get('/version/check', async (req: Request, res: Response, next) => {
     });
   } catch (error) {
     return next(error);
+  }
+});
+
+// ============================================
+// POST /api/v1/app/test-resend
+// Envía un mail de prueba al email del usuario logueado (para validar Resend)
+// ============================================
+router.post('/test-resend', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as AuthRequest).user;
+    if (!user?.email) {
+      throw createError('No user email', 400, 'NO_USER_EMAIL');
+    }
+
+    await sendTestEmail({ to: user.email });
+    res.json({ success: true, message: 'Test email enviado' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// POST /api/v1/app/send-family-code
+// Envía el código de familia al mail del owner logueado
+// ============================================
+const sendFamilyCodeSchema = z.object({
+  familyCode: z.string().min(4).max(16),
+  familyName: z.string().min(1).max(80).optional(),
+});
+
+router.post('/send-family-code', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = sendFamilyCodeSchema.parse(req.body);
+    const user = (req as AuthRequest).user;
+    if (!user?.email) {
+      throw createError('No user email', 400, 'NO_USER_EMAIL');
+    }
+
+    await sendFamilyCode(user.email, parsed.familyName || 'Tu familia', parsed.familyCode.toUpperCase());
+    res.json({ success: true, message: 'Código de familia enviado' });
+  } catch (error) {
+    next(error);
   }
 });
 
