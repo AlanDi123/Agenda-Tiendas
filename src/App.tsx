@@ -77,6 +77,7 @@ const UpdateModal = lazy(() =>
 );
 import { useTouchGestures } from './hooks/useTouchGestures';
 import { useAppUpdates } from './hooks/useAppUpdates';
+import { initializeNotifications } from './services/notificationService';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -359,6 +360,15 @@ function AppContent() {
     if (!isAuthenticated || !environment || !isOnline) return;
     queueCloudFamilySync(environment, rawEvents);
   }, [isAuthenticated, environment, rawEvents, isOnline]);
+
+  // Crear canales de notificación de Android al autenticarse
+  useEffect(() => {
+    if (isAuthenticated && Capacitor.isNativePlatform()) {
+      initializeNotifications().catch(err =>
+        console.error('Error al inicializar notificaciones:', err)
+      );
+    }
+  }, [isAuthenticated]);
 
   // Rastrea qué familyCodes ya fueron sincronizados en esta sesión
   // para no borrar y re-descargar eventos en cada re-render.

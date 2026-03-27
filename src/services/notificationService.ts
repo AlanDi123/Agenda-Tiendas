@@ -84,7 +84,7 @@ export async function scheduleAlarmNotification(
           channelId: 'event-alarms',
           schedule: {
             at: alarmTime,
-            allowWhileIdle: true, // Important for alarms
+            allowWhileIdle: false,
           },
           actionTypeId: 'event-alarm-action',
           group: event.id,
