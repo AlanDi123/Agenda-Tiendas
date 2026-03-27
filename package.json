@@ -11,7 +11,8 @@
     "build": "tsc -b && vite build",
     "build:vercel": "npm run build && npm run build --workspace=dommuss-agenda-backend",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "release": "bash scripts/bump-version.sh patch && git push origin main --tags"
   },
   "dependencies": {
     "@bixbyte/capacitor-apk-installer": "^1.0.1",
