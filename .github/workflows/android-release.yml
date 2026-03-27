@@ -268,10 +268,11 @@ jobs:
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.build.outputs.version_name }}
+          name: Dommuss Agenda ${{ needs.build.outputs.version_name }}
           files: |
             ./apk/Dommuss-Agenda.apk
             ./manifest/version-manifest.json
-          name: Dommuss Agenda ${{ needs.build.outputs.version_name }}
           draft: false
           prerelease: false
         env:
