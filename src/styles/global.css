@@ -421,3 +421,80 @@ textarea {
 .gap-sm { gap: var(--spacing-sm); }
 .gap-md { gap: var(--spacing-md); }
 .gap-lg { gap: var(--spacing-lg); }
+
+/* ═══════════════════════════════════════════════════
+   UX REFINEMENT — Mejoras visuales y de interacción
+   ═══════════════════════════════════════════════════ */
+
+/* Variables adicionales de escala tipográfica y safe areas */
+:root {
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --safe-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+/* Font smoothing y prevención de zoom accidental */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  touch-action: manipulation;
+}
+
+/* Botones: transición suave + efecto "hundimiento" táctil */
+button, .btn {
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active:not(:disabled), .btn:active:not(:disabled) {
+  transform: scale(0.96);
+  opacity: 0.88;
+}
+
+/* Inputs: tamaño mínimo 16px para evitar auto-zoom en iOS/Android */
+input, select, textarea {
+  font-size: max(16px, var(--text-md)) !important;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.15);
+}
+
+/* Scroll interno invisible (para aspecto nativo) */
+::-webkit-scrollbar { width: 0; background: transparent; }
+
+/* Tarjetas con respiro visual consistente */
+.card, .event-item, .event-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card:active, .event-item:active {
+  transform: scale(0.99);
+}
+
+/* Títulos proporcionados para no "gritar" en pantalla */
+h1 { font-size: var(--text-xl); font-weight: 700; }
+h2 { font-size: var(--text-lg); font-weight: 600; }
+
+/* Skeleton loading base */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.skeleton {
+  background: var(--color-divider);
+  border-radius: var(--radius-md);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* Navegación inferior con safe area para notch */
+.bottom-nav, .nav-bar {
+  padding-bottom: var(--safe-bottom);
+}
