@@ -12,8 +12,7 @@ export async function registerDeviceTokenAfterLogin(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 
   try {
-    const pushMod = await import('@capacitor/push-notifications' as string).catch(() => null);
-    const PushNotifications = pushMod?.PushNotifications;
+    const { PushNotifications } = await import('@capacitor/push-notifications').catch(() => ({ PushNotifications: null }));
     if (!PushNotifications) return;
 
     // Pedir permiso de forma diferida (no en splash)
