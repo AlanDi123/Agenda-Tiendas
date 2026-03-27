@@ -7,7 +7,7 @@ import {
   hasBiometricCredentials,
   isBiometricEnabled,
   loginWithBiometricPrompt,
-  saveBiometricCredentials,
+  // saveBiometricCredentials,  // deshabilitado temporalmente
   setBiometricEnabled as persistBiometricEnabled,
 } from '../../services/biometricAuth';
 import type { User } from '../../types/auth';
@@ -64,10 +64,11 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
 
     try {
       const user = await login(email, password, rememberSession);
-      if (biometricEnabled && canBiometric) {
-        await saveBiometricCredentials(email, password).catch(() => {});
-        setHasBioCreds(true);
-      }
+      // Guardado biométrico deshabilitado temporalmente (aislamiento de crash)
+      // if (biometricEnabled && canBiometric) {
+      //   await saveBiometricCredentials(email, password).catch(() => {});
+      //   setHasBioCreds(true);
+      // }
       onLoginSuccess(user?.emailVerified, user || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión');

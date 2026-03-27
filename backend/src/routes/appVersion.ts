@@ -9,8 +9,7 @@ import { authMiddleware, requireAdmin } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
 import { createError } from '../middleware/errorHandler';
 import { z } from 'zod';
-import { sendFamilyCode } from '../services/emailService';
-import { enqueueEmail } from '../services/emailQueue';
+import { sendFamilyCode, sendVerificationEmail } from '../services/emailService';
 import db from '../db';
 import { sql } from 'drizzle-orm';
 
@@ -179,12 +178,7 @@ router.post('/test-resend', authMiddleware, async (req: Request, res: Response, 
     }
 
     try {
-      await enqueueEmail({
-        to: user.email,
-        subject: '[Dommuss Agenda] Test Gmail SMTP',
-        html: '<p>Si recibiste este mail, Gmail SMTP está funcionando correctamente.</p>',
-        text: 'Si recibiste este mail, Gmail SMTP está funcionando correctamente.',
-      });
+      await sendVerificationEmail(user.email, 'TEST-OK');
     } catch (emailError) {
       const message = emailError instanceof Error ? emailError.message : 'Error enviando email de test';
       throw createError(message, 502, 'EMAIL_SEND_FAILED');

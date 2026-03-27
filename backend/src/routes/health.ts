@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import { checkDatabaseConnection } from '../db';
-import { verifySmtpConnection } from '../services/emailQueue';
+import { verifySmtpConnection } from '../services/emailService';
 
 const router = Router();
 
