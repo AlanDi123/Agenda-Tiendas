@@ -99,15 +99,24 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Check Keystore Secret
+        id: check_keystore
+        run: |
+          if [ "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" != "" ]; then
+            echo "has_keystore=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_keystore=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Decode and write keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: steps.check_keystore.outputs.has_keystore == 'true'
         run: |
           mkdir -p android/app
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
           echo "Keystore written successfully"
 
       - name: Create keystore.properties
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: steps.check_keystore.outputs.has_keystore == 'true'
         run: |
           printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=keystore.jks\n' \
             "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
@@ -142,7 +151,7 @@ jobs:
           echo "Built APK: $APK_PATH"
 
       - name: Sign APK
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: steps.check_keystore.outputs.has_keystore == 'true'
         working-directory: android
         run: |
           APK_PATH="${{ steps.build.outputs.apk_path }}"
@@ -295,8 +304,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check Backend Secrets
+        id: check_backend
+        run: |
+          if [ "${{ secrets.BACKEND_MANIFEST_URL }}" != "" ] && [ "${{ secrets.BACKEND_MANIFEST_KEY }}" != "" ]; then
+            echo "has_backend=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_backend=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Update backend manifest
-        if: ${{ secrets.BACKEND_MANIFEST_URL != '' && secrets.BACKEND_MANIFEST_KEY != '' }}
+        if: steps.check_backend.outputs.has_backend == 'true'
         run: |
           curl --fail --show-error --silent -X POST "${{ secrets.BACKEND_MANIFEST_URL }}" \
             -H "Content-Type: application/json" \
