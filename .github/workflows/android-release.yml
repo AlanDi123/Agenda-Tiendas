@@ -14,6 +14,7 @@ on:
         default: 'auto'
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2048m"
   NODE_VERSION: '22'
   JAVA_VERSION: '21'
@@ -205,8 +206,8 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release.apk
-          path: ${{ steps.build.outputs.apk_path }}
+          name: app-release-folder
+          path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
 
       - name: Generate version manifest
@@ -218,7 +219,7 @@ jobs:
             "versionCode": ${{ steps.version.outputs.version_code }},
             "mandatory": false,
             "minVersion": "0.0.1",
-            "apkUrl": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version_name }}/app-release-signed.apk",
+            "apkUrl": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version_name }}/Dommuss-Agenda.apk",
             "changelog": "Build ${{ github.run_number }} - Commit ${{ github.sha }}",
             "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "buildNumber": ${{ github.run_number }},
@@ -250,8 +251,13 @@ jobs:
       - name: Download APK artifact
         uses: actions/download-artifact@v4
         with:
-          name: app-release.apk
+          name: app-release-folder
           path: ./apk
+
+      - name: Rename APK for release
+        run: |
+          mv ./apk/*.apk ./apk/Dommuss-Agenda.apk
+          echo "APK renamed successfully"
 
       - name: Download manifest artifact
         uses: actions/download-artifact@v4
@@ -291,8 +297,8 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./apk/app-release-signed.apk
-          asset_name: app-release-signed.apk
+          asset_path: ./apk/Dommuss-Agenda.apk
+          asset_name: Dommuss-Agenda.apk
           asset_content_type: application/vnd.android.package-archive
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
