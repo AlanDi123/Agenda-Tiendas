@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Button } from './Button';
 import { Input } from './Input';
-import { Avatar } from './Avatar';
-import { getInitials, generateFamilyCode } from '../utils/helpers';
+import { generateFamilyCode } from '../utils/helpers';
 import './Onboarding.css';
 
 const PLANS = [
@@ -15,7 +14,7 @@ interface OnboardingProps {
   onComplete: (data: {
     environmentName: string;
     pin?: string;
-    profiles: Array<{ name: string; permissions: 'admin' | 'readonly' }>;
+    profiles: Array<{ name: string; permissions: 'admin' | 'readonly'; color?: string }>;
     planType: 'FREE' | 'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY';
     familyCode?: string;
   }) => void;
@@ -29,8 +28,10 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
   const [environmentName, setEnvironmentName] = useState(existingEnvName || '');
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
-  const [profiles, setProfiles] = useState<Array<{ name: string; permissions: 'admin' | 'readonly' }>>([]);
-  const [newProfileName, setNewProfileName] = useState('');
+  const [userName, setUserName] = useState('');
+  const [userColor, setUserColor] = useState('#FF6B35');
+  const [isJoining, setIsJoining] = useState(false);
+  const AVATAR_COLORS = ['#FF6B35', '#4CAF50', '#2196F3', '#9C27B0', '#E91E63', '#00BCD4', '#FFC107', '#795548'];
   const [selectedPlan, setSelectedPlan] = useState<'FREE' | 'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY'>('FREE');
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
@@ -39,22 +40,24 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
   const [pendingCompleteData, setPendingCompleteData] = useState<{
     environmentName: string;
     pin?: string;
-    profiles: Array<{ name: string; permissions: 'admin' | 'readonly' }>;
+    profiles: Array<{ name: string; permissions: 'admin' | 'readonly'; color?: string }>;
     planType: 'FREE' | 'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY';
     familyCode?: string;
   } | null>(null);
 
-  const handleAddProfile = () => {
-    if (!newProfileName.trim()) return;
-    setProfiles(prev => [...prev, { name: newProfileName.trim(), permissions: 'admin' as const }]);
-    setNewProfileName('');
-  };
-
-  const removeProfile = (index: number) => setProfiles(prev => prev.filter((_, i) => i !== index));
-
   const handleJoinFamily = () => {
     if (joinCode.trim().length !== 8) { setJoinError('El código debe tener 8 caracteres'); return; }
-    onComplete({ environmentName: '', profiles: [], planType: 'FREE', familyCode: joinCode.trim().toUpperCase() });
+    setIsJoining(true);
+    setStep('first-profile');
+  };
+
+  const handleSubmit = () => {
+    onComplete({
+      environmentName: '',
+      familyCode: joinCode.trim().toUpperCase(),
+      profiles: [{ name: userName, permissions: 'admin', color: userColor }],
+      planType: 'FREE',
+    });
   };
 
   const handleFinish = () => {
@@ -63,7 +66,7 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
     setPendingCompleteData({
       environmentName: environmentName.trim(),
       pin: showPin ? pin : undefined,
-      profiles,
+      profiles: [{ name: userName, permissions: 'admin', color: userColor }],
       planType: selectedPlan,
       familyCode: code,
     });
@@ -189,38 +192,43 @@ export function Onboarding({ onComplete, existingEnvName }: OnboardingProps) {
 
         {step === 'first-profile' && (
           <div className="onboarding-step">
-            <h2 className="onboarding-step-title">Crea los perfiles</h2>
-            <p className="onboarding-step-description">Agregá las personas que compartirán este calendario.</p>
-            <div className="onboarding-profiles-input">
-              <Input
-                label="Nombre del perfil" value={newProfileName}
-                onChange={e => setNewProfileName(e.target.value)}
-                placeholder="Ej. Juan, María..."
-                onKeyDown={e => e.key === 'Enter' && handleAddProfile()}
-              />
-              {/* Todos los perfiles tienen acceso completo — sin modo lectura */}
-              <Button variant="secondary" onClick={handleAddProfile} disabled={!newProfileName.trim()}
-                leftIcon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>}>
-                Agregar
-              </Button>
+            <h2 className="onboarding-step-title">Tu Perfil en la Familia</h2>
+            <p className="onboarding-step-description">¿Cómo quieres que te vean los demás?</p>
+
+            <input
+              type="text"
+              className="input"
+              placeholder="Tu Nombre"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              style={{ width: '100%', marginTop: 8 }}
+            />
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap' }}>
+              {AVATAR_COLORS.map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setUserColor(color)}
+                  style={{
+                    width: '36px', height: '36px', borderRadius: '50%', backgroundColor: color,
+                    border: userColor === color ? '3px solid #333' : '2px solid transparent',
+                    cursor: 'pointer', transition: 'all 0.2s',
+                  }}
+                />
+              ))}
             </div>
-            {profiles.length > 0 && (
-              <div className="onboarding-profiles-list">
-                {profiles.map((p, i) => (
-                  <div key={i} className="onboarding-profile-item">
-                    <Avatar name={p.name} initials={getInitials(p.name)} color="#1E88E5" size="md"/>
-                    <span className="onboarding-profile-name">{p.name}</span>
-                    <button className="onboarding-profile-remove" onClick={() => removeProfile(i)}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="onboarding-actions">
-              <Button variant="primary" size="lg" fullWidth onClick={() => setStep('plan')} disabled={profiles.length === 0}>
-                Continuar
-              </Button>
+
+            <div className="onboarding-actions" style={{ marginTop: '20px' }}>
+              {isJoining ? (
+                <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={!userName.trim()}>
+                  Ingresar
+                </Button>
+              ) : (
+                <Button variant="primary" size="lg" fullWidth onClick={() => setStep('plan')} disabled={!userName.trim()}>
+                  Continuar
+                </Button>
+              )}
             </div>
           </div>
         )}

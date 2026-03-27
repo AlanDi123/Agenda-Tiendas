@@ -127,25 +127,27 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
             disabled={isLoading}
           />
 
-          <label className="auth-option-toggle">
-            <input
-              type="checkbox"
-              checked={rememberSession}
-              onChange={(e) => setRememberSession(e.target.checked)}
-            />
-            <span>Mantener sesión iniciada</span>
-          </label>
-
-          {canBiometric && (
+          <div className="login-options-container">
             <label className="auth-option-toggle">
               <input
                 type="checkbox"
-                checked={biometricEnabled}
-                onChange={(e) => setBiometricEnabled(e.target.checked)}
+                checked={rememberSession}
+                onChange={(e) => setRememberSession(e.target.checked)}
               />
-              <span>Ingreso biométrico</span>
+              <span>Mantener sesión iniciada</span>
             </label>
-          )}
+
+            {canBiometric && (
+              <label className="auth-option-toggle">
+                <input
+                  type="checkbox"
+                  checked={biometricEnabled}
+                  onChange={(e) => setBiometricEnabled(e.target.checked)}
+                />
+                <span>Ingreso biométrico</span>
+              </label>
+            )}
+          </div>
 
           {error && <div className="auth-error">{error}</div>}
 

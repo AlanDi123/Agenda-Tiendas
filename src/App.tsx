@@ -656,63 +656,77 @@ function AppContent() {
   const handleOnboardingComplete = useCallback(async (data: {
     environmentName: string;
     pin?: string;
-    profiles: Array<{ name: string; permissions: 'admin' | 'readonly' }>;
+    profiles: Array<{ name: string; permissions: 'admin' | 'readonly'; color?: string }>;
     planType: 'FREE' | 'PREMIUM_MONTHLY' | 'PREMIUM_YEARLY';
     familyCode?: string;
   }) => {
     try {
       const { environmentName, pin, profiles: profileList, planType, familyCode } = data;
-      if (planType === 'FREE' && profileList.length > 3) {
-        alert('Plan Gratis: máximo 3 perfiles por familia.');
-        return;
-      }
+      const currentUserProfile = profileList[0];
 
-      // JOIN existente por código de familia (recuperación nube)
+      // 1. LÓGICA PARA UNIRSE A UNA FAMILIA EXISTENTE
       if (!environmentName.trim() && familyCode) {
         const snapshot = await loadFamilySnapshotByCode(familyCode);
         await saveEnvironment(snapshot.environment);
-        await clearAllEvents();
-        for (const ev of snapshot.events) {
-          await saveEvent(ev);
-        }
         await loadEnvironment(snapshot.environment.id);
-        if (currentUser) {
-          await saveUserSession(currentUser.email, snapshot.environment.id);
+
+        // Registrar a la nueva persona en esta familia con SU propio correo y color
+        if (currentUser?.email && currentUserProfile) {
+          const existing = snapshot.environment.profiles.find(
+            (p: { email?: string }) => p.email === currentUser.email
+          );
+          if (!existing) {
+            await addProfile(
+              currentUserProfile.name,
+              currentUser.email,
+              'admin',
+              undefined,
+              undefined,
+              currentUserProfile.color || '#FF6B35'
+            );
+          }
         }
+
+        await clearAllEvents();
+        for (const ev of snapshot.events) { await saveEvent(ev); }
+        if (currentUser) { await saveUserSession(currentUser.email, snapshot.environment.id); }
         return;
       }
 
+      // 2. LÓGICA PARA CREAR UNA FAMILIA NUEVA
       let createdFamilyCode: string | null = null;
       let createdEnvironmentName: string | null = null;
-      
-      if (environment && environment.profiles.length === 0 && profileList.length > 0) {
-        for (const profileData of profileList) {
-          await addProfile(profileData.name, currentUser?.email || '', profileData.permissions);
-        }
-      } else {
-        await clearAllEvents();
-        const createdEnv = await createEnvironment(environmentName, pin, profileList, familyCode);
-        createdFamilyCode = createdEnv.familyCode;
-        createdEnvironmentName = createdEnv.name;
+
+      await clearAllEvents();
+      const createdEnv = await createEnvironment(environmentName, pin, [], familyCode);
+      createdFamilyCode = createdEnv.familyCode;
+      createdEnvironmentName = createdEnv.name;
+
+      // Agregar al creador explícitamente con su correo y color
+      if (currentUser?.email && currentUserProfile) {
+        await addProfile(
+          currentUserProfile.name,
+          currentUser.email,
+          'admin',
+          undefined,
+          undefined,
+          currentUserProfile.color || '#FF6B35'
+        );
       }
 
-      // Enviar el código de familia al mail registrado (owner)
+      // Enviar el código de familia al mail registrado
       if (createdFamilyCode && currentUser) {
         try {
           await apiFetch('/api/v1/app/send-family-code', {
             method: 'POST',
             auth: true,
-            json: {
-              familyCode: createdFamilyCode,
-              familyName: createdEnvironmentName || environmentName,
-              email: currentUser.email,
-            },
+            json: { familyCode: createdFamilyCode, familyName: createdEnvironmentName, email: currentUser.email },
           });
         } catch (emailErr) {
           console.error('[Onboarding] Error enviando código de familia:', emailErr);
         }
       }
-      
+
       // Si eligió plan pago → redirigir a MP y bloquear entrada
       if (planType === 'PREMIUM_MONTHLY' || planType === 'PREMIUM_YEARLY') {
         setPendingPlanType(planType);
@@ -720,18 +734,16 @@ function AppContent() {
         try {
           const { redirectToCheckout } = await import('./services/paymentGatewayService');
           await redirectToCheckout(planType);
-          // Si llegamos aquí, el window.location.href ya fue seteado — la app se redirige
         } catch (payErr) {
           console.error('[Onboarding] Error al redirigir a pago:', payErr);
           setWaitingForPayment(false);
           setPendingPlanType(null);
-          alert('Error al conectar con Mercado Pago. Podés intentarlo desde Configuración > Suscripción.');
         }
       }
     } catch (error) {
       console.error('Error during onboarding:', error);
     }
-  }, [createEnvironment, addProfile, environment, currentUser, loadEnvironment]);
+  }, [createEnvironment, addProfile, currentUser, loadEnvironment]);
 
   const handleUserAuthComplete = useCallback(async (userData: {
     name: string;
