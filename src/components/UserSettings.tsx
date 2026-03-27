@@ -42,7 +42,7 @@ export function UserSettingsModal({
   const [showLogViewer, setShowLogViewer] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [isTestingResend, setIsTestingResend] = useState(false);
+  const [isTestingEmail, setIsTestingEmail] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(isBiometricEnabled());
 
@@ -106,13 +106,13 @@ export function UserSettingsModal({
     onClose();
   };
 
-  const handleTestResend = useCallback(async () => {
-    if (isTestingResend) return;
+  const handleTestEmail = useCallback(async () => {
+    if (isTestingEmail) return;
     setError('');
     setSuccess('');
-    setIsTestingResend(true);
+    setIsTestingEmail(true);
     try {
-      const resp = await apiFetch('/api/v1/app/test-resend', {
+      const resp = await apiFetch('/api/v1/app/test-email', {
         method: 'POST',
         auth: true,
       });
@@ -125,9 +125,9 @@ export function UserSettingsModal({
       const msg = err instanceof Error ? err.message : String(err);
       setError(`Error al enviar test: ${msg}`);
     } finally {
-      setIsTestingResend(false);
+      setIsTestingEmail(false);
     }
-  }, [isTestingResend]);
+  }, [isTestingEmail]);
 
   const toggleBiometric = useCallback(async () => {
     if (!biometricAvailable) return;
@@ -345,10 +345,10 @@ export function UserSettingsModal({
               <Button
                 variant="primary"
                 fullWidth
-                onClick={handleTestResend}
-                disabled={isTestingResend}
+                onClick={handleTestEmail}
+                disabled={isTestingEmail}
               >
-                {isTestingResend ? 'Enviando…' : 'Enviar test a mi mail'}
+                {isTestingEmail ? 'Enviando…' : 'Enviar test a mi mail'}
               </Button>
             </div>
 

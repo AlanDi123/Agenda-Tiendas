@@ -9,7 +9,7 @@ import { authMiddleware, requireAdmin } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
 import { createError } from '../middleware/errorHandler';
 import { z } from 'zod';
-import { sendFamilyCode, sendVerificationEmail } from '../services/emailService';
+import { sendFamilyCode, sendTestEmail } from '../services/emailService';
 import db from '../db';
 import { sql } from 'drizzle-orm';
 
@@ -167,10 +167,10 @@ router.get('/version/check', async (req: Request, res: Response, next) => {
 });
 
 // ============================================
-// POST /api/v1/app/test-resend
-// Envía un mail de prueba al email del usuario logueado (para validar Gmail SMTP)
+// POST /api/v1/app/test-email
+// Envía un mail de prueba validando el servidor SMTP de Gmail
 // ============================================
-router.post('/test-resend', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/test-email', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as AuthRequest).user;
     if (!user?.email) {
@@ -178,12 +178,12 @@ router.post('/test-resend', authMiddleware, async (req: Request, res: Response, 
     }
 
     try {
-      await sendVerificationEmail(user.email, 'TEST-OK');
+      await sendTestEmail(user.email);
     } catch (emailError) {
       const message = emailError instanceof Error ? emailError.message : 'Error enviando email de test';
       throw createError(message, 502, 'EMAIL_SEND_FAILED');
     }
-    res.json({ success: true, message: 'Test email enviado' });
+    res.json({ success: true, message: 'Test email enviado correctamente' });
   } catch (error) {
     next(error);
   }

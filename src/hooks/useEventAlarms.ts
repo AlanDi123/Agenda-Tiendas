@@ -28,9 +28,6 @@ export function useEventAlarms(events: Event[]) {
       AppLogger.info('Notifications initialized', {}, 'Alarms');
     }
 
-    // Schedule alarms for all events
-    scheduleAllUpcomingAlarms(events);
-    
     // Cleanup old notifications periodically
     const cleanupInterval = setInterval(() => {
       cleanupOldNotifications();
@@ -41,16 +38,20 @@ export function useEventAlarms(events: Event[]) {
     };
   }, []);
 
-  // Reschedule alarms when events change
+  // Reschedule alarms when events change — retrasado 3s para no bloquear
+  // la UI mientras la app termina de cargar la interfaz tras el login.
   useEffect(() => {
-    if (!initializedRef.current) return;
+    if (!events || events.length === 0) return;
 
-    // Debounce alarm scheduling
-    const timeoutId = setTimeout(() => {
-      scheduleAllUpcomingAlarms(events);
-    }, 1000);
+    const timer = setTimeout(() => {
+      try {
+        void scheduleAllUpcomingAlarms(events);
+      } catch (error) {
+        console.error('[EventAlarms] Error al programar alarmas en lote:', error);
+      }
+    }, 3000);
 
-    return () => clearTimeout(timeoutId);
+    return () => clearTimeout(timer);
   }, [events]);
 
   // Schedule alarm for a specific event

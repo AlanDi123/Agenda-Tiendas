@@ -7,7 +7,6 @@ import {
   hasBiometricCredentials,
   isBiometricEnabled,
   loginWithBiometricPrompt,
-  saveBiometricCredentials,
   setBiometricEnabled as persistBiometricEnabled,
 } from '../../services/biometricAuth';
 import type { User } from '../../types/auth';
@@ -64,21 +63,6 @@ export function Login({ onSwitchToRegister, onSwitchToReset, onLoginSuccess }: L
 
     try {
       const user = await login(email, password, rememberSession);
-
-      // Guardado biométrico con protección: timeout de 3s + captura silenciosa de errores
-      if (biometricEnabled && canBiometric) {
-        try {
-          await Promise.race([
-            saveBiometricCredentials(email, password),
-            new Promise<void>((_, reject) =>
-              setTimeout(() => reject(new Error('Biometric timeout')), 3000)
-            ),
-          ]);
-          setHasBioCreds(true);
-        } catch (bioError) {
-          console.warn('[Login] Biometría falló silenciosamente:', bioError);
-        }
-      }
       onLoginSuccess(user?.emailVerified, user || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión');

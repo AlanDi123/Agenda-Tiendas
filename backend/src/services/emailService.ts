@@ -447,3 +447,24 @@ export async function invalidateUserTokens(userId: string): Promise<void> {
     .where(eq(emailVerifications.userId, userId))
     .catch((err: unknown) => console.error('[EmailService] invalidateUserTokens error:', err));
 }
+
+// ─── Test del sistema de correos ──────────────────────────────────────────────
+export async function sendTestEmail(email: string): Promise<void> {
+  try {
+    await transporter.sendMail({
+      from: getSender(),
+      to: email,
+      subject: 'Prueba exitosa del Servidor — Dommuss Agenda',
+      html: baseHtml('¡Conexión Exitosa!', `
+        <p style="font-size:16px">Este es un correo de prueba enviado desde el servidor SMTP de Gmail de la Agenda.</p>
+        <div style="background:#e8f5e9;padding:15px;border-radius:8px;margin:20px 0">
+          <h3 style="color:#4CAF50;margin:0">Ya no hay rastros de Resend en el sistema.</h3>
+        </div>
+        <p>Todo está configurado y funcionando perfectamente.</p>
+      `),
+    });
+  } catch (error) {
+    console.error('[EmailService] sendTestEmail error:', error);
+    throw error;
+  }
+}
