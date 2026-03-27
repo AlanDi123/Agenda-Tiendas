@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense, useRef } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EventsProvider, useEvents } from './contexts/EventsContext';
 import { ToastProvider, useToastsState, useToastActions } from './contexts/ToastContext';
@@ -360,27 +360,48 @@ function AppContent() {
     queueCloudFamilySync(environment, rawEvents);
   }, [isAuthenticated, environment, rawEvents, isOnline]);
 
-  // Al cambiar de familia, refrescar eventos desde snapshot cloud para evitar mezclas locales.
+  // Rastrea qué familyCodes ya fueron sincronizados en esta sesión
+  // para no borrar y re-descargar eventos en cada re-render.
+  const syncedFamilyCodes = useRef<Set<string>>(new Set());
+
+  // Al cambiar de familia, refrescar eventos desde snapshot cloud UNA SOLA VEZ por sesión.
   useEffect(() => {
     if (!isAuthenticated || !environment?.familyCode) return;
+    const familyCode = environment.familyCode;
+    if (syncedFamilyCodes.current.has(familyCode)) return; // ya sincronizado
+    syncedFamilyCodes.current.add(familyCode);
+
     let cancelled = false;
     (async () => {
       try {
-        const snapshot = await loadFamilySnapshotByCode(environment.familyCode);
+        const snapshot = await loadFamilySnapshotByCode(familyCode);
         if (cancelled) return;
-        await clearAllEvents();
-        for (const ev of snapshot.events) {
-          await saveEvent(ev);
+
+        // Solo reemplazar eventos locales si el servidor devolvió datos.
+        // Esto protege contra el caso donde la familia aún no fue sincronizada
+        // al servidor (primer uso o datos aún no subidos).
+        if (snapshot.events.length > 0) {
+          await clearAllEvents();
+          for (const ev of snapshot.events) {
+            await saveEvent(ev);
+          }
+          await loadEvents();
+        } else {
+          // El servidor no tiene eventos — mantener los locales e intentar cargarlos
+          await loadEvents();
         }
-        await loadEvents();
       } catch {
-        // Fallback silencioso: si no hay snapshot aún, mantener estado local.
+        // Fallback silencioso: red caída o familia no encontrada en nube.
+        // Se mantiene el estado local sin tocar nada.
+        await loadEvents().catch(() => {});
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, environment?.familyCode, loadEvents]);
+  // loadEvents es estable (useCallback), familyCode es string primitivo — sin loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, environment?.familyCode]);
 
   // Set active profile if not set but environment has profiles
   useEffect(() => {

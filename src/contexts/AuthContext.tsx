@@ -6,6 +6,7 @@ import type { PlanType } from '../types/payment';
 import {
   saveEnvironment,
   getEnvironment,
+  getAllEnvironments,
   getDarkMode,
   setDarkMode,
   saveUserSession as saveEnvUserSession,
@@ -103,12 +104,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const envId = await getUserSession(user.email);
           if (!isMounted) return;
           if (envId) {
-            const env = await getEnvironment(envId);
+            let env = await getEnvironment(envId);
+            if (!isMounted) return;
+
+            // Si el envId guardado no corresponde a un ambiente válido,
+            // intentar recuperar buscando todos los ambientes en IndexedDB
+            // (puede ocurrir si la sesión apunta a un id obsoleto)
+            if (!env) {
+              const allEnvs = await getAllEnvironments();
+              if (allEnvs.length > 0) {
+                // Usar el más reciente como fallback
+                env = allEnvs[allEnvs.length - 1];
+                // Reparar la sesión apuntando al ambiente encontrado
+                await saveEnvUserSession(user.email, env.id);
+              } else {
+                // No hay ningún ambiente: limpiar la sesión corrupta
+                await clearUserSession(user.email);
+              }
+            }
+
             if (!isMounted) return;
             if (env) {
               setEnvironment(env);
               if (env.activeProfileId) {
                 setActiveProfileId(env.activeProfileId);
+              } else if (env.profiles?.length > 0) {
+                setActiveProfileId(env.profiles[0].id);
               }
             }
           }
@@ -182,11 +203,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Load user's environment
     const envId = await getUserSession(email);
     if (envId) {
-      const env = await getEnvironment(envId);
+      let env = await getEnvironment(envId);
+
+      // Fallback: si el envId no existe, recuperar cualquier ambiente guardado
+      if (!env) {
+        const allEnvs = await getAllEnvironments();
+        if (allEnvs.length > 0) {
+          env = allEnvs[allEnvs.length - 1];
+          await saveEnvUserSession(email, env.id);
+        } else {
+          await clearUserSession(email);
+        }
+      }
+
       if (env) {
         setEnvironment(env);
         if (env.activeProfileId) {
           setActiveProfileId(env.activeProfileId);
+        } else if (env.profiles?.length > 0) {
+          setActiveProfileId(env.profiles[0].id);
         }
       }
     }
