@@ -42,7 +42,7 @@ export async function setupKeyboardScroll(): Promise<void> {
   if (!isNative) return;
   try {
     const { Keyboard } = await import('@capacitor/keyboard');
-    Keyboard.addListener('keyboardWillShow', (info) => {
+    Keyboard.addListener('keyboardWillShow', (info: { keyboardHeight: number }) => {
       document.documentElement.style.setProperty(
         '--keyboard-height',
         `${info.keyboardHeight}px`
