@@ -7,7 +7,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import * as authService from '../services/authService';
-import { sendVerificationCode, verifyCode, sendPasswordResetEmail } from '../services/emailService';
+import { sendVerificationEmail, sendVerificationCode, verifyCode, sendPasswordResetEmail } from '../services/emailService';
 import { createError } from '../middleware/errorHandler';
 import { authMiddleware } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
@@ -72,11 +72,11 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     const data = registerSchema.parse(req.body);
     const result = await authService.registerUser(data);
 
-    // Enviar código OTP de verificación (5 min)
+    // FIX: Usamos sendVerificationEmail con el token generado por authService
     try {
-      await sendVerificationCode(result.user.id, result.user.email);
+      await sendVerificationEmail(result.user.email, result.verificationToken);
     } catch (emailError) {
-      // No bloquear el registro por fallo del proveedor de correo
+      // No bloqueamos el registro si el correo falla, pero lo avisamos en consola
       console.error('[Auth] Error enviando mail de verificación:', emailError);
     }
 
@@ -85,7 +85,6 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
       data: {
         user: result.user,
         message: 'Registro exitoso. Verificá tu email.',
-        // Solo devolver el token en desarrollo para testing
         verificationToken: process.env.NODE_ENV !== 'production' ? result.verificationToken : undefined,
       },
     });
