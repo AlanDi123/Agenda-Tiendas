@@ -313,19 +313,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check Backend Secrets
-        id: check_backend
-        run: |
-          if [ "${{ secrets.BACKEND_MANIFEST_URL }}" != "" ] && [ "${{ secrets.BACKEND_MANIFEST_KEY }}" != "" ]; then
-            echo "has_backend=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_backend=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Update backend manifest
-        if: steps.check_backend.outputs.has_backend == 'true'
-        run: |
-          curl --fail --show-error --silent -X POST "${{ secrets.BACKEND_MANIFEST_URL }}" \
-            -H "Content-Type: application/json" \
-            -H "x-deploy-secret: ${{ secrets.BACKEND_MANIFEST_KEY }}" \
-            -d @./manifest/version-manifest.json
