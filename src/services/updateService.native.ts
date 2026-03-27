@@ -1,5 +1,7 @@
 import { App } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { ApkInstaller } from '@bixbyte/capacitor-apk-installer';
 import type { UpdateCheckResult, UpdateCheckResponse } from '../types/update';
 
 // ─── Configuración GitHub ────────────────────────────────────────────────────
@@ -9,9 +11,9 @@ const GH_HEADERS = {
   Accept: 'application/vnd.github.v3+json',
   'User-Agent': 'DommussAgenda-UpdateCheck/1.0',
 } as const;
-const LAST_CHECK_KEY    = 'update_last_check';
-const DISMISSED_PREFIX  = 'update_dismissed_';
-const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 min
+const LAST_CHECK_KEY   = 'update_last_check';
+const DISMISSED_PREFIX = 'update_dismissed_';
+const CHECK_INTERVAL_MS = 0; // TODO: Volver a poner en 30 * 60 * 1000 en producción
 
 // ─── Helpers de versión ──────────────────────────────────────────────────────
 export function compareVersions(v1: string, v2: string): number {
@@ -101,51 +103,45 @@ export async function checkForUpdates(force = false): Promise<UpdateCheckRespons
   }
 }
 
-// ─── Instalador nativo de APK ────────────────────────────────────────────────
-// Descarga el APK con CapacitorHttp (sin colapsar el WebView por memoria),
-// luego lo instala con el instalador del sistema de Android.
+// ─── Instalar actualización Nativa ───────────────────────────────────────────
 export async function downloadAndInstall(
   apkUrl: string,
   onProgress?: (pct: number) => void
 ): Promise<void> {
   try {
-    const { Filesystem, Directory } = await import('@capacitor/filesystem');
-    const { ApkInstaller } = await import(/* @vite-ignore */ '@bixbyte/capacitor-apk-installer');
-
-    // 1. Verificar permiso REQUEST_INSTALL_PACKAGES (Android 8+)
+    // 1. Pedir permisos a Android para instalar APKs desconocidos
     const { hasPermission } = await ApkInstaller.checkInstallPermission();
     if (!hasPermission) {
       await ApkInstaller.requestInstallPermission();
-      throw new Error(
-        'Por favor, concede el permiso de instalación en Ajustes y vuelve a tocar "Actualizar".'
-      );
+      throw new Error('Permiso de instalación requerido. Otórgalo y vuelve a intentar.');
     }
 
     onProgress?.(10);
 
-    // 2. Descargar el APK con @capacitor/filesystem (maneja archivos grandes sin colapsar el WebView)
-    const fileName = 'agenda-update.apk';
+    // 2. Descargar el APK en el directorio de caché de la app
+    const fileName = 'update_agenda.apk';
     await Filesystem.downloadFile({
       url: apkUrl,
       path: fileName,
-      directory: Directory.Data,
+      directory: Directory.Cache,
     });
 
-    onProgress?.(90);
+    onProgress?.(80);
 
-    // 3. Obtener la URI real que Android necesita para acceder al archivo
-    const { uri } = await Filesystem.getUri({
-      directory: Directory.Data,
+    // 3. Obtener la URI estricta que Android necesita para leer el archivo
+    const uriResult = await Filesystem.getUri({
+      directory: Directory.Cache,
       path: fileName,
     });
 
     onProgress?.(100);
 
-    // 4. Lanzar el instalador nativo de Android
-    await ApkInstaller.installApk({ filePath: uri });
+    // 4. Lanzar la pantalla del instalador nativo de Android
+    await ApkInstaller.installApk({ filePath: uriResult.uri });
+
   } catch (err) {
-    // Fallback: abrir el link en el navegador del sistema
-    console.warn('[UpdateService] Instalador nativo falló, abriendo en browser:', err);
+    console.error('[UpdateService] Instalación nativa fallida:', err);
+    // Fallback de emergencia: abrir el link en el navegador del sistema
     try {
       const { Browser } = await import('@capacitor/browser');
       await Browser.open({ url: apkUrl });
@@ -176,10 +172,9 @@ export async function isUpdateDismissed(version: string): Promise<boolean> {
 
 export async function clearUpdatePreferences(): Promise<void> {
   try {
-    const { value: keys } = await Preferences.get({ key: '_all_keys' }).catch(() => ({ value: null }));
     const updateKeys = [LAST_CHECK_KEY];
+    const { value: keys } = await Preferences.get({ key: '_all_keys' }).catch(() => ({ value: null }));
     if (keys) {
-      // Solo borrar keys relacionadas con updates, no todo
       (keys as unknown as string[])
         .filter((k: string) => k.startsWith(DISMISSED_PREFIX) || k === LAST_CHECK_KEY)
         .forEach((k: string) => updateKeys.push(k));
