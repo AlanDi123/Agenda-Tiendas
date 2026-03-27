@@ -17,8 +17,8 @@ case "$BUMP_TYPE" in
 esac
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-# versionCode como entero concatenado (ej. 1.0.2 → 10002)
-NEW_CODE=$(printf "%d%02d%02d" "$MAJOR" "$MINOR" "$PATCH")
+# Convertir versión a versionCode (matemáticamente para evitar octales con ceros a la izquierda)
+NEW_CODE=$(echo "$NEW_VERSION" | awk -F. '{print $1 * 10000 + $2 * 100 + $3}')
 
 echo "🔖 Bumping: $CURRENT → $NEW_VERSION (versionCode: $NEW_CODE)"
 
