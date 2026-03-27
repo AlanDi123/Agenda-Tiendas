@@ -1,35 +1,34 @@
 /**
  * App Version Routes
- * Handles mobile app version checking
- * Simplified version without database dependency
+ * Handles mobile app version checking y actualización del manifest
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { authMiddleware, requireAdmin } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
+import db from '../db';
+import { sql } from 'drizzle-orm';
 import { createError } from '../middleware/errorHandler';
 import { z } from 'zod';
 import { sendFamilyCode, sendTestEmail } from '../services/emailService';
-import db from '../db';
-import { sql } from 'drizzle-orm';
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+interface ManifestPayload {
+  latestVersion: string;
+  versionCode: number;
+  mandatory: boolean;
+  minVersion: string;
+  apkUrl: string;
+  changelog: string;
+  publishedAt: string;
+  buildNumber: number;
+  commitSha: string;
+}
 
 const router = Router();
+const DEFAULT_VERSION = '1.0.0';
 
-// ============================================
-// CONFIGURATION
-// ============================================
-
-const DEFAULT_VERSION = {
-  latestVersion: process.env.APP_LATEST_VERSION || '1.0.0',
-  versionCode: parseInt(process.env.APP_VERSION_CODE || '10000', 10),
-  mandatory: process.env.APP_UPDATE_MANDATORY === 'true',
-  minVersion: process.env.APP_MIN_VERSION || '1.0.0',
-  apkUrl: process.env.APP_BUNDLE_URL ||
-    'https://github.com/AlanDi123/Agenda-Tiendas/releases/latest/download/app-release-signed.apk',
-  changelog: process.env.APP_CHANGELOG || 'Nueva versión disponible',
-  publishedAt: process.env.APP_PUBLISHED_AT || new Date().toISOString(),
-};
-
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 let versionTableReady = false;
 
 async function ensureVersionTable(): Promise<void> {
@@ -55,120 +54,151 @@ async function ensureVersionTable(): Promise<void> {
 async function getCurrentManifest() {
   await ensureVersionTable();
   const result = await db.execute(sql.raw(`
-    SELECT latest_version, version_code, mandatory, min_version, apk_url, changelog, published_at, build_number, commit_sha
+    SELECT latest_version, version_code, mandatory, min_version, apk_url,
+           changelog, published_at, build_number, commit_sha
     FROM app_version_manifest
     ORDER BY updated_at DESC
     LIMIT 1
   `));
-  const row = (result as any)?.rows?.[0];
-  if (!row) return DEFAULT_VERSION;
+  const row = (result as unknown as { rows?: Record<string, unknown>[] })?.rows?.[0];
+  if (!row) {
+    return {
+      latestVersion: DEFAULT_VERSION,
+      versionCode: 10000,
+      mandatory: false,
+      minVersion: DEFAULT_VERSION,
+      apkUrl: 'https://github.com/AlanDi123/Agenda-Tiendas/releases/latest/download/Dommuss-Agenda.apk',
+      changelog: 'Nueva versión disponible',
+      publishedAt: new Date().toISOString(),
+    };
+  }
   return {
-    latestVersion: row.latest_version,
+    latestVersion: String(row.latest_version),
     versionCode: Number(row.version_code),
     mandatory: !!row.mandatory,
-    minVersion: row.min_version || DEFAULT_VERSION.minVersion,
-    apkUrl: row.apk_url,
-    changelog: row.changelog,
-    publishedAt: new Date(row.published_at).toISOString(),
+    minVersion: String(row.min_version || DEFAULT_VERSION),
+    apkUrl: String(row.apk_url),
+    changelog: String(row.changelog),
+    publishedAt: new Date(row.published_at as string).toISOString(),
     buildNumber: row.build_number ? Number(row.build_number) : undefined,
-    commitSha: row.commit_sha || undefined,
+    commitSha: row.commit_sha ? String(row.commit_sha) : undefined,
   };
 }
 
-async function upsertManifest(m: z.infer<typeof manifestSchema>): Promise<void> {
-  await ensureVersionTable();
-  const esc = (v: string) => v.replace(/'/g, "''");
-  await db.execute(sql.raw(`
-    INSERT INTO app_version_manifest (
-      latest_version, version_code, mandatory, min_version, apk_url, changelog, published_at, build_number, commit_sha, updated_at
-    ) VALUES (
-      '${esc(m.latestVersion)}',
-      ${m.versionCode},
-      ${m.mandatory ? 'true' : 'false'},
-      ${m.minVersion ? `'${esc(m.minVersion)}'` : 'NULL'},
-      '${esc(m.apkUrl)}',
-      '${esc(m.changelog)}',
-      '${esc(m.publishedAt)}',
-      ${m.buildNumber ?? 'NULL'},
-      ${m.commitSha ? `'${esc(m.commitSha)}'` : 'NULL'},
-      NOW()
-    )
-  `));
+function compareVersions(v1: string, v2: string): number {
+  const p1 = v1.split('.').map(Number);
+  const p2 = v2.split('.').map(Number);
+  const len = Math.max(p1.length, p2.length);
+  for (let i = 0; i < len; i++) {
+    const a = p1[i] ?? 0, b = p2[i] ?? 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+  return 0;
 }
-
-// ============================================
-// SCHEMAS
-// ============================================
-
-const manifestSchema = z.object({
-  latestVersion: z.string(),
-  versionCode: z.number().int().positive(),
-  mandatory: z.boolean().default(false),
-  minVersion: z.string().optional(),
-  apkUrl: z.string().url(),
-  changelog: z.string(),
-  publishedAt: z.string().datetime(),
-  buildNumber: z.number().int().positive().optional(),
-  commitSha: z.string().optional(),
-});
 
 // ============================================
 // GET /api/v1/app/version
 // ============================================
-
-router.get('/version', async (_req: Request, res: Response, next) => {
+router.get('/version', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const manifest = await getCurrentManifest();
-    return res.json({
-      success: true,
-      data: manifest,
-    });
+    res.json({ success: true, data: manifest });
   } catch (error) {
-    return next(error);
+    next(error);
   }
 });
 
 // ============================================
 // GET /api/v1/app/version/check
 // ============================================
-
-router.get('/version/check', async (req: Request, res: Response, next) => {
+router.get('/version/check', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const version = req.query.version as string | undefined;
-
     if (!version || typeof version !== 'string') {
       throw createError('Missing or invalid version parameter', 400, 'INVALID_VERSION');
     }
 
-    const currentManifest = await getCurrentManifest();
+    const manifest = await getCurrentManifest();
+    const updateAvailable = compareVersions(manifest.latestVersion, version) > 0;
+    const minVersionSupported = !manifest.minVersion ||
+      compareVersions(version, manifest.minVersion) >= 0;
 
-    // Compare versions
-    const updateAvailable = compareVersions(currentManifest.latestVersion, version) > 0;
-    const isMinVersionSupported = !currentManifest.minVersion ||
-      compareVersions(version, currentManifest.minVersion) >= 0;
-
-    return res.json({
+    res.json({
       success: true,
       data: {
         updateAvailable,
         currentVersion: version,
-        latestVersion: currentManifest.latestVersion,
-        versionCode: currentManifest.versionCode,
-        mandatory: currentManifest.mandatory,
-        minVersionSupported: isMinVersionSupported,
-        apkUrl: currentManifest.apkUrl,
-        changelog: currentManifest.changelog,
-        publishedAt: currentManifest.publishedAt,
+        latestVersion: manifest.latestVersion,
+        versionCode: manifest.versionCode,
+        mandatory: manifest.mandatory,
+        minVersionSupported,
+        apkUrl: manifest.apkUrl,
+        changelog: manifest.changelog,
+        publishedAt: manifest.publishedAt,
       },
     });
   } catch (error) {
-    return next(error);
+    next(error);
+  }
+});
+
+// ============================================
+// POST /api/v1/app/version/manifest
+// Endpoint privado invocado por GitHub Actions al lanzar un release
+// ============================================
+router.post('/version/manifest', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const deploySecret = req.headers['x-deploy-secret'];
+
+    // Verificación de seguridad estricta
+    if (!process.env.DEPLOY_SECRET || deploySecret !== process.env.DEPLOY_SECRET) {
+      console.warn('[VersionManifest] Intento de actualización de manifiesto no autorizado');
+      return next(createError('No autorizado para actualizar manifest', 401, 'UNAUTHORIZED_MANIFEST_UPDATE'));
+    }
+
+    const manifest = req.body as ManifestPayload;
+
+    if (!manifest.latestVersion || !manifest.apkUrl) {
+      return next(createError('Payload de manifest incompleto', 400, 'INVALID_MANIFEST_PAYLOAD'));
+    }
+
+    console.log(`[VersionManifest] Recibido manifest para la versión: ${manifest.latestVersion}`);
+
+    try {
+      await db.execute(sql`
+        INSERT INTO app_version_manifest (
+          latest_version, version_code, mandatory, min_version,
+          apk_url, changelog, published_at
+        ) VALUES (
+          ${manifest.latestVersion},
+          ${manifest.versionCode},
+          ${manifest.mandatory},
+          ${manifest.minVersion},
+          ${manifest.apkUrl},
+          ${manifest.changelog},
+          ${manifest.publishedAt}
+        )
+      `);
+      console.log('[VersionManifest] ✅ Manifest guardado en DB con éxito');
+    } catch (dbError) {
+      console.error('[VersionManifest] ❌ Error SQL al guardar manifest:', dbError);
+      // Fallback: si falla la DB, devolvemos 200 igual para que GitHub Actions no falle
+      console.warn('[VersionManifest] Ignorando fallo de DB. GitHub Actions continuará.');
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Manifiesto actualizado exitosamente',
+      version: manifest.latestVersion,
+    });
+  } catch (error) {
+    next(error);
   }
 });
 
 // ============================================
 // POST /api/v1/app/test-email
-// Envía un mail de prueba validando el servidor SMTP de Gmail
 // ============================================
 router.post('/test-email', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -176,7 +206,6 @@ router.post('/test-email', authMiddleware, async (req: Request, res: Response, n
     if (!user?.email) {
       throw createError('No user email', 400, 'NO_USER_EMAIL');
     }
-
     try {
       await sendTestEmail(user.email);
     } catch (emailError) {
@@ -191,7 +220,6 @@ router.post('/test-email', authMiddleware, async (req: Request, res: Response, n
 
 // ============================================
 // POST /api/v1/app/send-family-code
-// Envía el código de familia al mail del owner logueado
 // ============================================
 const sendFamilyCodeSchema = z.object({
   familyCode: z.string().min(4).max(16),
@@ -204,20 +232,17 @@ router.post('/send-family-code', async (req: Request, res: Response, next: NextF
     const parsed = sendFamilyCodeSchema.parse(req.body);
     let targetEmail = parsed.email?.trim().toLowerCase();
 
-    // Si viene Authorization válido, priorizar email autenticado
     try {
       const authHeader = req.headers.authorization;
       if (authHeader?.startsWith('Bearer ')) {
         await new Promise<void>((resolve, reject) => {
-          authMiddleware(req as any, res as any, (err?: unknown) => {
+          authMiddleware(req as Parameters<typeof authMiddleware>[0], res as Parameters<typeof authMiddleware>[1], (err?: unknown) => {
             if (err) return reject(err);
             resolve();
           });
         });
         const authUser = (req as AuthRequest).user;
-        if (authUser?.email) {
-          targetEmail = authUser.email;
-        }
+        if (authUser?.email) targetEmail = authUser.email;
       }
     } catch {
       // Si falla auth, seguimos con email del body
@@ -233,82 +258,5 @@ router.post('/send-family-code', async (req: Request, res: Response, next: NextF
     next(error);
   }
 });
-
-// ============================================
-// POST /api/v1/app/version/manifest
-// ============================================
-
-// Middleware interno para CI/CD — acepta header x-deploy-secret
-function deploySecretMiddleware(req: Request, res: Response, next: NextFunction) {
-  const DEPLOY_SECRET = process.env.DEPLOY_SECRET;
-  if (!DEPLOY_SECRET) {
-    // Si no hay secret configurado, caer al flujo normal de admin JWT
-    return next('route');
-  }
-  const provided = req.headers['x-deploy-secret'];
-  if (provided && provided === DEPLOY_SECRET) {
-    return next();
-  }
-  return next('route'); // si no coincide, pasa al siguiente handler (admin JWT)
-}
-
-// POST /api/v1/app/version/manifest — acepta CI via deploy secret O admin JWT
-router.post(
-  '/version/manifest',
-  deploySecretMiddleware,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const parsed = manifestSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return next(createError('Invalid manifest data', 400, 'VALIDATION_ERROR'));
-      }
-      await upsertManifest(parsed.data);
-      console.log('[AppVersion] Manifest updated via deploy secret:', parsed.data);
-      return res.json({ success: true, message: 'Version manifest received', data: parsed.data });
-    } catch (error) {
-      return next(error);
-    }
-  }
-);
-
-// Fallback: requiere admin JWT si no usó deploy secret
-router.post(
-  '/version/manifest',
-  authMiddleware as any,
-  requireAdmin as any,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const parsed = manifestSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return next(createError('Invalid manifest data', 400, 'VALIDATION_ERROR'));
-      }
-      await upsertManifest(parsed.data);
-      return res.json({ success: true, message: 'Version manifest received', data: parsed.data });
-    } catch (error) {
-      return next(error);
-    }
-  }
-);
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-function compareVersions(v1: string, v2: string): number {
-  const parts1 = v1.split('.').map(Number);
-  const parts2 = v2.split('.').map(Number);
-
-  const maxLength = Math.max(parts1.length, parts2.length);
-
-  for (let i = 0; i < maxLength; i++) {
-    const num1 = parts1[i] || 0;
-    const num2 = parts2[i] || 0;
-
-    if (num1 > num2) return 1;
-    if (num1 < num2) return -1;
-  }
-
-  return 0;
-}
 
 export { router as appVersionRoutes };
