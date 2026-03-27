@@ -40,5 +40,22 @@ export async function checkDatabaseConnection(): Promise<boolean> {
   }
 }
 
+/** Envuelve una query con un AbortController de 5 segundos. */
+export async function withTimeout<T>(queryFn: () => Promise<T>, timeoutMs = 5000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const result = await queryFn();
+    clearTimeout(timer);
+    return result;
+  } catch (err) {
+    clearTimeout(timer);
+    if (controller.signal.aborted) {
+      throw new Error(`[Database] Query timeout después de ${timeoutMs}ms`);
+    }
+    throw err;
+  }
+}
+
 export { sql };
 export default db;

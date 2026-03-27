@@ -100,6 +100,40 @@
   background-color: var(--color-surface);
 }
 
+/* Inline variant — para aislar secciones sin romper toda la UI */
+.error-boundary-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fff3cd;
+  border: 1px solid #ffe082;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  color: #664d03;
+}
+
+.error-boundary-inline-icon { font-size: 1rem; }
+
+.error-boundary-inline-msg { flex: 1; }
+
+.error-boundary-inline-retry {
+  background: transparent;
+  border: 1px solid #664d03;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: #664d03;
+}
+
+.error-boundary-subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-sm);
+  font-style: italic;
+}
+
 /* Mobile optimization */
 @media (max-width: 480px) {
   .error-boundary {

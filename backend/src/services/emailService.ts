@@ -1,107 +1,42 @@
 /**
- * Email Service — usando Resend SDK oficial v4
- * Documentación: https://resend.com/docs/send-with-nodejs
+ * Email Service — re-exports y funciones legacy mantenidas para compatibilidad
+ *
+ * Las nuevas implementaciones viven en:
+ *  - authEmails.ts      → verificación, passwords, bienvenida, login-alert, eliminación
+ *  - billingEmails.ts   → recibos, expiración, pago fallido
+ *  - notificationEmails.ts → familia, eventos, resumen semanal
+ *  - emailQueue.ts      → cola asíncrona + circuit breaker + retry
  */
 
-import { Resend } from 'resend';
+export { sanitizeHtmlInput, enqueueEmail, processOutbox } from './emailQueue';
+export {
+  sendVerificationCodeEmail,
+  sendPasswordResetEmail,
+  sendWelcomeEmail,
+  sendNewLoginAlert,
+  sendAccountDeletionConfirmation,
+} from './authEmails';
+export {
+  sendPaymentReceiptEmail,
+  sendExpiryWarningEmail,
+  sendPaymentFailedEmail,
+} from './billingEmails';
+export {
+  sendFamilyInvitationEmail,
+  sendFamilyEventNotification,
+  sendWeeklySummaryEmail,
+} from './notificationEmails';
+
+// ─── Legacy: verificación de código OTP (mantiene lógica de DB) ───────────────
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { eq, and, desc } from 'drizzle-orm';
 import db from '../db';
 import { emailVerifications, users } from '../db/schema';
+import { sendVerificationCodeEmail } from './authEmails';
 
-// ─── Configuración ───────────────────────────────────────────────────────────
-const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
-const FROM_ADDRESS   = process.env.SMTP_FROM || 'Dommuss Agenda <onboarding@resend.dev>';
-
-function resolveEmailAppBaseUrl(): string {
-  const explicit = process.env.APP_BASE_URL?.replace(/\/$/, '');
-  if (explicit) return explicit;
-  const v = process.env.VERCEL_URL;
-  if (v) return `https://${v.replace(/^https?:\/\//, '')}`;
-  return 'https://agenda-tienda.vercel.app';
-}
-
-const APP_BASE_URL = resolveEmailAppBaseUrl();
 const CODE_EXPIRY_MIN = parseInt(process.env.VERIFICATION_CODE_EXPIRY_MINUTES || '5');
-const APP_SCHEME = process.env.APP_DEEP_LINK_SCHEME || 'dommussagenda';
 
-// Inicializar el cliente de Resend
-const resend = new Resend(RESEND_API_KEY);
-
-if (!RESEND_API_KEY) {
-  console.warn('[EmailService] ⚠️  RESEND_API_KEY no configurada. Los mails NO se enviarán.');
-} else {
-  console.log('[EmailService] ✅ Resend SDK inicializado correctamente.');
-}
-
-// ─── Helper de envío ─────────────────────────────────────────────────────────
-async function sendEmail(opts: {
-  to: string;
-  subject: string;
-  html: string;
-  text: string;
-}): Promise<void> {
-  if (!RESEND_API_KEY) {
-    throw new Error(
-      `[EmailService] RESEND_API_KEY no configurada. No se pudo enviar el mail a ${opts.to}.`
-    );
-  }
-
-  // En producción conviene usar dominio verificado.
-  // No bloqueamos el envío para permitir testing/controlado mientras se configura DNS.
-  const usingResendDevFrom = FROM_ADDRESS.includes('@resend.dev');
-  if (process.env.NODE_ENV === 'production' && usingResendDevFrom) {
-    console.warn(
-      '[EmailService] SMTP_FROM usa dominio de testing (@resend.dev) en producción. Configurá SMTP_FROM con dominio verificado en Resend para máxima entregabilidad.'
-    );
-  }
-
-  const { data, error } = await resend.emails.send({
-    from: FROM_ADDRESS,
-    to: [opts.to],
-    subject: opts.subject,
-    html: opts.html,
-    text: opts.text,
-  });
-
-  if (error) {
-    console.error('[EmailService] Error de Resend:', JSON.stringify(error));
-    const extra = 'name' in error && error.name ? ` (${error.name})` : '';
-    if (String(error.message || '').toLowerCase().includes('testing emails')) {
-      throw new Error(
-        'Resend está en modo testing: verificá dominio y definí SMTP_FROM con remitente verificado para enviar a terceros.'
-      );
-    }
-    throw new Error(`Resend error: ${error.message}${extra}`);
-  }
-
-  console.log('[EmailService] ✉️  Mail enviado, id:', data?.id, '→', opts.to);
-}
-
-function buildMobileFirstOpenUrl(webUrl: string): string {
-  const normalizedWeb = webUrl.replace(/ /g, '%20');
-  const deep = `${APP_SCHEME}://open?target=${encodeURIComponent(normalizedWeb)}`;
-  return `${APP_BASE_URL}/open-app.html?deep=${encodeURIComponent(deep)}&web=${encodeURIComponent(normalizedWeb)}`;
-}
-
-/**
- * Envío de correo de prueba para verificar que Resend funciona.
- */
-export async function sendTestEmail(params: {
-  to: string;
-  subject?: string;
-}): Promise<void> {
-  const subject = params.subject || '[Dommuss Agenda] Test Resend';
-  await sendEmail({
-    to: params.to,
-    subject,
-    html: `<p>Si recibiste este mail, Resend está funcionando correctamente.</p>`,
-    text: `Si recibiste este mail, Resend está funcionando correctamente. (${subject})`,
-  });
-}
-
-// ─── Verificación de email (código 6 dígitos) ─────────────────────────────────
 function generate6DigitCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -136,37 +71,7 @@ export async function sendVerificationCode(
       verified: false,
     });
 
-    const html = `
-      <!DOCTYPE html><html><head><style>
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-        .box{max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,.08)}
-        .hdr{background:#1565C0;padding:28px 24px;text-align:center}
-        .hdr h1{color:#fff;margin:0;font-size:22px}
-        .hdr p{color:rgba(255,255,255,.8);margin:6px 0 0;font-size:14px}
-        .body{padding:28px 24px}
-        .code-box{background:#f8f9fa;border:2px dashed #1565C0;border-radius:10px;padding:20px;text-align:center;margin:20px 0}
-        .code{font-size:42px;font-weight:800;color:#1565C0;letter-spacing:10px;font-family:monospace}
-        .warn{background:#fff3cd;border-left:4px solid #FFC107;padding:12px 16px;border-radius:0 8px 8px 0;font-size:13px;margin:16px 0}
-        .ftr{text-align:center;padding:16px;color:#999;font-size:12px;border-top:1px solid #f0f0f0}
-      </style></head><body>
-        <div class="box">
-          <div class="hdr"><h1>🏠 Dommuss Agenda</h1><p>Verificá tu dirección de email</p></div>
-          <div class="body">
-            <p>Usá el siguiente código para verificar tu cuenta:</p>
-            <div class="code-box"><div class="code">${code}</div>
-              <p style="margin:8px 0 0;color:#666;font-size:13px">Código válido por ${CODE_EXPIRY_MIN} minutos</p></div>
-            <div class="warn">⚠️ No compartas este código. Expira en ${CODE_EXPIRY_MIN} minutos.</div>
-          </div>
-          <div class="ftr">© ${new Date().getFullYear()} Dommuss Agenda</div>
-        </div>
-      </body></html>`;
-
-    await sendEmail({
-      to: email,
-      subject: `${code} — Código de verificación Dommuss`,
-      html,
-      text: `Tu código de verificación es: ${code}\n\nExpira en ${CODE_EXPIRY_MIN} minutos.`,
-    });
+    await sendVerificationCodeEmail(email, code, CODE_EXPIRY_MIN);
 
     return {
       success: true,
@@ -179,7 +84,6 @@ export async function sendVerificationCode(
   }
 }
 
-// ─── Verificar código ─────────────────────────────────────────────────────────
 export async function verifyCode(
   userId: string,
   code: string
@@ -218,11 +122,7 @@ export async function verifyCode(
       .where(eq(emailVerifications.id, row.id));
 
     await db.update(users)
-      .set({
-        emailVerified: true,
-        emailVerifiedAt: new Date(),
-        updatedAt: new Date(),
-      })
+      .set({ emailVerified: true, emailVerifiedAt: new Date(), updatedAt: new Date() })
       .where(eq(users.id, userId));
 
     const user = await db.select({ email: users.email })
@@ -235,144 +135,6 @@ export async function verifyCode(
   }
 }
 
-// ─── Mail de verificación inicial (link + token) ──────────────────────────────
-export async function sendVerificationEmail(
-  email: string,
-  verificationToken: string
-): Promise<void> {
-  const verifyUrl = `${APP_BASE_URL}/verify?token=${verificationToken}`;
-  const openUrl = buildMobileFirstOpenUrl(verifyUrl);
-
-  const html = `
-    <!DOCTYPE html><html><head><style>
-      body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-      .box{max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,.08)}
-      .hdr{background:#1565C0;padding:28px 24px;text-align:center}
-      .hdr h1{color:#fff;margin:0;font-size:22px}.hdr p{color:rgba(255,255,255,.8);margin:6px 0 0;font-size:14px}
-      .body{padding:28px 24px}
-      .btn{display:block;background:#FFC107;color:#333;text-align:center;padding:16px 24px;border-radius:10px;font-weight:700;font-size:16px;text-decoration:none;margin:24px 0}
-      .token{background:#f5f5f5;border:1px dashed #ddd;border-radius:8px;padding:12px;text-align:center;font-family:monospace;font-size:12px;word-break:break-all;color:#555;margin:12px 0}
-      .warn{background:#fff3cd;border-left:4px solid #FFC107;padding:12px 16px;border-radius:0 8px 8px 0;font-size:13px}
-      .ftr{text-align:center;padding:16px;color:#999;font-size:12px;border-top:1px solid #f0f0f0}
-    </style></head><body>
-      <div class="box">
-        <div class="hdr"><h1>🏠 Dommuss Agenda</h1><p>Activá tu cuenta</p></div>
-        <div class="body">
-          <p>¡Gracias por registrarte! Hacé clic abajo para verificar tu email:</p>
-          <a href="${openUrl}" class="btn">✅ Verificar mi email</a>
-          <p style="font-size:13px;color:#666">O copiá este token manualmente:</p>
-          <div class="token">${verificationToken}</div>
-          <div class="warn">⚠️ Este enlace expira en 24 horas.</div>
-        </div>
-        <div class="ftr">© ${new Date().getFullYear()} Dommuss Agenda</div>
-      </div>
-    </body></html>`;
-
-  await sendEmail({
-    to: email,
-    subject: 'Verificá tu email — Dommuss Agenda',
-    html,
-    text: `Abrir en app/web: ${openUrl}\nVerificación directa web: ${verifyUrl}\n\nToken: ${verificationToken}\n\nExpira en 24 horas.`,
-  });
-}
-
-// ─── Mail de recuperación de contraseña ───────────────────────────────────────
-export async function sendPasswordResetEmail(
-  email: string,
-  resetToken: string
-): Promise<void> {
-  const resetUrl = `${APP_BASE_URL}/reset-password?token=${resetToken}`;
-  const openUrl = buildMobileFirstOpenUrl(resetUrl);
-
-  const html = `
-    <!DOCTYPE html><html><head><style>
-      body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-      .box{max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden}
-      .hdr{background:#1565C0;padding:24px;text-align:center}
-      .hdr h1{color:#fff;margin:0;font-size:20px}
-      .body{padding:24px}
-      .btn{display:block;background:#1565C0;color:#fff;text-align:center;padding:14px;border-radius:8px;font-weight:700;text-decoration:none;margin:20px 0}
-      .warn{background:#fff3cd;border-left:4px solid #FFC107;padding:12px;border-radius:0 6px 6px 0;font-size:13px}
-      .ftr{text-align:center;padding:14px;color:#999;font-size:12px}
-    </style></head><body>
-      <div class="box">
-        <div class="hdr"><h1>🔑 Recuperar contraseña</h1></div>
-        <div class="body">
-          <p>Recibimos una solicitud para restablecer tu contraseña.</p>
-          <a href="${openUrl}" class="btn">Restablecer contraseña</a>
-          <div class="warn">⚠️ Este enlace expira en 1 hora. Si no solicitaste el cambio, ignorá este mail.</div>
-        </div>
-        <div class="ftr">© ${new Date().getFullYear()} Dommuss Agenda</div>
-      </div>
-    </body></html>`;
-
-  await sendEmail({
-    to: email,
-    subject: 'Recuperar contraseña — Dommuss Agenda',
-    html,
-    text: `Abrir en app/web: ${openUrl}\nRestablecer directo web: ${resetUrl}\n\nExpira en 1 hora.`,
-  });
-}
-
-// ─── Mail de código de familia ────────────────────────────────────────────────
-/** Notificación de cambio de evento a otros miembros (best-effort, no bloquea la app). */
-export async function sendFamilyEventNotification(
-  emails: string[],
-  actorName: string,
-  action: string,
-  eventTitle: string,
-  startDate?: Date
-): Promise<void> {
-  const when = startDate ? startDate.toLocaleString('es-AR') : '';
-  const actionLabel =
-    action === 'create' ? 'Nuevo evento' : action === 'update' ? 'Evento actualizado' : 'Evento eliminado';
-  const text = `${actionLabel}: "${eventTitle}"${when ? ` (${when})` : ''}\n— ${actorName} (Dommuss Agenda)`;
-  await Promise.all(
-    emails.map((to) =>
-      sendEmail({
-        to,
-        subject: `${actionLabel}: ${eventTitle} — Dommuss`,
-        html: `<p>${text.replace(/\n/g, '<br/>')}</p>`,
-        text,
-      }).catch(() => {})
-    )
-  );
-}
-
-export async function sendFamilyCode(
-  email: string,
-  familyName: string,
-  familyCode: string
-): Promise<void> {
-  const html = `
-    <!DOCTYPE html><html><head><style>
-      body{font-family:sans-serif;background:#f5f5f5;margin:0;padding:20px}
-      .box{max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden}
-      .hdr{background:#1565C0;padding:24px;text-align:center;color:#fff}
-      .body{padding:24px}
-      .code{background:#f5f5f5;border:3px dashed #1565C0;border-radius:12px;padding:20px;text-align:center;font-size:36px;font-weight:800;letter-spacing:.4em;font-family:monospace;color:#1565C0;margin:20px 0}
-      .warn{background:#fff3cd;border-left:4px solid #FFC107;padding:12px;border-radius:0 6px 6px 0;font-size:13px}
-    </style></head><body>
-      <div class="box">
-        <div class="hdr"><h2 style="margin:0">🏠 ¡Tu familia está lista!</h2></div>
-        <div class="body">
-          <p>La familia <strong>${familyName}</strong> fue creada exitosamente.</p>
-          <p>Tu código de acceso familiar es:</p>
-          <div class="code">${familyCode}</div>
-          <div class="warn">⚠️ Guardá este código. Cada miembro que quiera unirse necesitará ingresarlo.</div>
-        </div>
-      </div>
-    </body></html>`;
-
-  await sendEmail({
-    to: email,
-    subject: `🏠 Código de tu familia "${familyName}" — Dommuss`,
-    html,
-    text: `Familia: ${familyName}\nCódigo de acceso: ${familyCode}\n\nGuardá este código para compartirlo con tu familia.`,
-  });
-}
-
-// ─── Invalidar tokens ─────────────────────────────────────────────────────────
 export async function invalidateUserTokens(userId: string): Promise<void> {
   await db.update(emailVerifications)
     .set({ verified: true, verifiedAt: new Date() })
@@ -380,12 +142,19 @@ export async function invalidateUserTokens(userId: string): Promise<void> {
     .catch((err: unknown) => console.error('[EmailService] invalidateUserTokens error:', err));
 }
 
+/** @deprecated Usar sendFamilyInvitationEmail de notificationEmails.ts */
+export async function sendFamilyCode(
+  email: string,
+  familyName: string,
+  familyCode: string
+): Promise<void> {
+  const { sendFamilyInvitationEmail } = await import('./notificationEmails');
+  await sendFamilyInvitationEmail({ email, familyName, familyCode });
+}
+
 export default {
   sendVerificationCode,
   verifyCode,
-  sendVerificationEmail,
-  sendPasswordResetEmail,
-  sendFamilyCode,
-  sendFamilyEventNotification,
   invalidateUserTokens,
+  sendFamilyCode,
 };

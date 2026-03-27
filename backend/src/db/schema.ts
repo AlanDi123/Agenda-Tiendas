@@ -3,7 +3,7 @@
  * Compatible with Neon PostgreSQL serverless
  */
 
-import { pgTable, text, timestamp, boolean, integer, decimal, uuid, index, uniqueIndex, pgEnum, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, integer, decimal, uuid, index, uniqueIndex, pgEnum, jsonb, smallint } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ============================================
@@ -16,6 +16,10 @@ export const planStatusEnum = pgEnum('plan_status', ['active', 'expired', 'grace
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['pending', 'active', 'failed', 'refunded', 'cancelled']);
 export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'approved', 'rejected', 'refunded', 'cancelled', 'in_process']);
 export const discountTypeEnum = pgEnum('discount_type', ['percentage', 'fixed']);
+export const emailStatusEnum = pgEnum('email_status', ['pending', 'sent', 'bounced', 'failed', 'suppressed']);
+export const emailOutboxStatusEnum = pgEnum('email_outbox_status', ['pending', 'processing', 'sent', 'failed', 'dead']);
+export const devicePlatformEnum = pgEnum('device_platform', ['android', 'ios', 'web']);
+export const notificationTypeEnum = pgEnum('notification_type', ['event_created', 'event_updated', 'event_deleted', 'family_join', 'role_changed', 'payment_failed', 'payment_success', 'expiry_warning', 'new_login', 'weekly_summary']);
 
 // ============================================
 // USERS TABLE
@@ -39,6 +43,7 @@ export const users = pgTable('users', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   lastLoginAt: timestamp('last_login_at'),
   lastLoginIp: text('last_login_ip'),
+  emailStatus: emailStatusEnum('email_status').notNull().default('pending'),
 }, (table) => ({
   emailIdx: index('users_email_idx').on(table.email),
   planTypeIdx: index('users_plan_type_idx').on(table.planType, table.planStatus),
@@ -359,6 +364,7 @@ export const events = pgTable('events', {
   rrule: text('rrule'), // Regla de recurrencia
   baseEventId: uuid('base_event_id'), // Para excepciones de eventos recurrentes
   location: text('location'),
+  version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
@@ -520,6 +526,116 @@ export const menusRelations = relations(menus, ({ one }) => ({
 }));
 
 // ============================================
+// EMAIL OUTBOX (Cola de envío con reintentos)
+// ============================================
+export const emailOutbox = pgTable('email_outbox', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  to: text('to').notNull(),
+  subject: text('subject').notNull(),
+  html: text('html').notNull(),
+  text: text('text').notNull(),
+  status: emailOutboxStatusEnum('status').notNull().default('pending'),
+  attempts: smallint('attempts').notNull().default(0),
+  maxAttempts: smallint('max_attempts').notNull().default(5),
+  nextRetryAt: timestamp('next_retry_at').notNull().defaultNow(),
+  lastError: text('last_error'),
+  sentAt: timestamp('sent_at'),
+  resendMessageId: text('resend_message_id'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  statusIdx: index('email_outbox_status_idx').on(table.status, table.nextRetryAt),
+  toIdx: index('email_outbox_to_idx').on(table.to),
+}));
+
+// ============================================
+// DEVICE TOKENS (FCM / APNs push)
+// ============================================
+export const deviceTokens = pgTable('device_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  platform: devicePlatformEnum('platform').notNull().default('android'),
+  deviceId: text('device_id'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index('device_tokens_user_id_idx').on(table.userId),
+  tokenIdx: index('device_tokens_token_idx').on(table.token),
+  activeIdx: index('device_tokens_active_idx').on(table.userId, table.isActive),
+}));
+
+// ============================================
+// NOTIFICATION LOGS (Centro de notificaciones)
+// ============================================
+export const notificationLogs = pgTable('notification_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  environmentId: uuid('environment_id').references(() => environments.id, { onDelete: 'cascade' }),
+  type: notificationTypeEnum('type').notNull(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  data: jsonb('data'),
+  read: boolean('read').notNull().default(false),
+  readAt: timestamp('read_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index('notification_logs_user_id_idx').on(table.userId),
+  unreadIdx: index('notification_logs_unread_idx').on(table.userId, table.read),
+  createdAtIdx: index('notification_logs_created_at_idx').on(table.createdAt),
+}));
+
+// ============================================
+// USER PREFERENCES (Modo no molestar, etc.)
+// ============================================
+export const userPreferences = pgTable('user_preferences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  pushEnabled: boolean('push_enabled').notNull().default(true),
+  emailEnabled: boolean('email_enabled').notNull().default(true),
+  weeklySummaryEnabled: boolean('weekly_summary_enabled').notNull().default(true),
+  dndStart: text('dnd_start'),
+  dndEnd: text('dnd_end'),
+  timezone: text('timezone').notNull().default('America/Argentina/Buenos_Aires'),
+  preferredView: text('preferred_view').notNull().default('month'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index('user_preferences_user_id_idx').on(table.userId),
+}));
+
+// ============================================
+// RELATIONS (nuevas tablas)
+// ============================================
+export const emailOutboxRelations = relations(emailOutbox, (_) => ({}));
+
+export const deviceTokensRelations = relations(deviceTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [deviceTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+export const notificationLogsRelations = relations(notificationLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [notificationLogs.userId],
+    references: [users.id],
+  }),
+  environment: one(environments, {
+    fields: [notificationLogs.environmentId],
+    references: [environments.id],
+  }),
+}));
+
+export const userPreferencesRelations = relations(userPreferences, ({ one }) => ({
+  user: one(users, {
+    fields: [userPreferences.userId],
+    references: [users.id],
+  }),
+}));
+
+// ============================================
 // DEFAULT EXPORT
 // ============================================
 
@@ -542,4 +658,8 @@ export default {
   shoppingItems,
   contacts,
   menus,
+  emailOutbox,
+  deviceTokens,
+  notificationLogs,
+  userPreferences,
 };

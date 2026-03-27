@@ -7,10 +7,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import * as authService from '../services/authService';
-import { sendVerificationCode, verifyCode, sendPasswordResetEmail } from '../services/emailService';
+import { sendVerificationCode, verifyCode } from '../services/emailService';
+import { sendPasswordResetEmail, sendNewLoginAlert, sendWelcomeEmail } from '../services/authEmails';
 import { createError } from '../middleware/errorHandler';
 import { authMiddleware } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
+import db from '../db';
+import { users } from '../db/schema';
+import { eq } from 'drizzle-orm';
 
 const router = Router();
 
@@ -103,10 +107,19 @@ router.post('/verify-email', async (req: Request, res: Response, next: NextFunct
     const { token } = verifyEmailSchema.parse(req.body);
     const result = await authService.verifyEmail(token);
 
-    res.json({
-      success: true,
-      message: result.message,
-    });
+    // Enviar welcome email asíncronamente
+    if (result.success) {
+      const userRow = await db.select({ email: users.email })
+        .from(users)
+        .where(eq(users.emailVerified, true))
+        .limit(1)
+        .catch(() => []);
+      if (userRow[0]) {
+        void sendWelcomeEmail(userRow[0].email).catch(() => {});
+      }
+    }
+
+    res.json({ success: true, message: result.message });
   } catch (error) {
     next(error);
   }
@@ -123,6 +136,8 @@ router.post('/verify-email-code', async (req: Request, res: Response, next: Next
     if (!result.success) {
       throw createError(result.message, 400, 'INVALID_CODE');
     }
+    // Enviar welcome email asíncronamente
+    void sendWelcomeEmail(result.email || email).catch(() => {});
     res.json({ success: true, message: result.message });
   } catch (error) {
     next(error);
@@ -206,13 +221,25 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
   try {
     const { email, password, deviceId } = loginSchema.parse(req.body);
 
+    // Capturar lastLoginIp antes del login para detectar nuevo IP
+    const prevUser = await db.select({ lastLoginIp: users.lastLoginIp, email: users.email })
+      .from(users).where(eq(users.email, email.toLowerCase())).limit(1);
+    const prevIp = prevUser[0]?.lastLoginIp;
+    const currentIp = req.ip || '';
+
     const result = await authService.loginUser(
       email,
       password,
-      req.ip,
+      currentIp,
       req.headers['user-agent'],
       deviceId
     );
+
+    // Detectar login desde IP diferente y enviar alerta (sin bloquear)
+    if (prevIp && prevIp !== currentIp) {
+      void sendNewLoginAlert(result.user.email, currentIp, req.headers['user-agent'])
+        .catch(() => {});
+    }
 
     res.json({
       success: true,

@@ -2,9 +2,10 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import MercadoPagoConfig, { Payment } from 'mercadopago';
 import db from '../db';
-import { webhookEvents, payments, users, subscriptions } from '../db/schema';
+import { webhookEvents, payments, users, subscriptions, emailOutbox } from '../db/schema';
 import { and, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+import { sendPaymentReceiptEmail, sendPaymentFailedEmail } from '../services/billingEmails';
 
 const router = Router();
 const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET || '';
@@ -208,6 +209,20 @@ router.post('/mercadopago', async (req: Request, res: Response) => {
 
     console.log(`[Webhook] ✅ Suscripción activada: userId=${externalRef}, plan=${planType}, expira=${expiresAt}`);
 
+    // Enviar recibo de pago asíncronamente
+    const userRow = await db.select({ email: users.email, planType: users.planType })
+      .from(users).where(eq(users.id, externalRef)).limit(1);
+    if (userRow[0]) {
+      void sendPaymentReceiptEmail({
+        email: userRow[0].email,
+        planType,
+        amountArs: amount.toString(),
+        currency: mpPayment.currency_id || 'ARS',
+        externalPaymentId: mpPaymentId,
+        currentPeriodEnd: expiresAt ?? undefined,
+      }).catch((e) => console.error('[Webhook] sendPaymentReceiptEmail error:', e));
+    }
+
   } catch (error) {
     console.error('[Webhook] Error procesando pago:', error);
   }
@@ -216,6 +231,39 @@ router.post('/mercadopago', async (req: Request, res: Response) => {
 // GET para verificación del endpoint en el panel de MP
 router.get('/mercadopago', (_req: Request, res: Response) => {
   res.json({ success: true, message: 'Webhook endpoint activo', timestamp: new Date().toISOString() });
+});
+
+// ============================================
+// POST /api/webhooks/email-bounce — Bounce tracking manual
+// Con Gmail SMTP los rebotes se detectan en el momento del envío (SMTP error 550/551).
+// Este endpoint permite marcar manualmente un email como rebotado si fuera necesario.
+// ============================================
+router.post('/email-bounce', async (req: Request, res: Response) => {
+  const secret = process.env.CRON_SECRET || '';
+  const auth = req.headers.authorization;
+  if (secret && auth !== `Bearer ${secret}`) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  try {
+    const { email, reason } = req.body as { email?: string; reason?: string };
+    if (!email) { res.status(400).json({ error: 'email requerido' }); return; }
+
+    await db.update(users)
+      .set({ emailStatus: 'bounced', updatedAt: new Date() })
+      .where(eq(users.email, email));
+
+    await db.update(emailOutbox)
+      .set({ status: 'dead', lastError: `Bounce manual: ${reason || 'sin motivo'}`, updatedAt: new Date() })
+      .where(and(eq(emailOutbox.to, email), eq(emailOutbox.status, 'pending')));
+
+    console.log(`[Webhook/Bounce] Marcado como bounced: ${email}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Webhook/Bounce] Error:', err);
+    res.status(500).json({ success: false });
+  }
 });
 
 export { router as webhookRoutes };

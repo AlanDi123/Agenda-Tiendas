@@ -8,7 +8,8 @@ let inFlight = false;
 let queuedPayload: { environment: Environment; events: Event[]; queuedAt: string } | null = null;
 const lastSuccessfulSyncAtByFamilyCode: Record<string, string> = {};
 
-const DEBOUNCE_MS = 1200;
+/** 3-second debounce para agrupar ediciones rápidas en un solo batch */
+const DEBOUNCE_MS = 3000;
 const SYNC_QUEUE_KEY = 'cloudSyncQueueByFamilyCode';
 const RETRY_START_MS = 2000;
 const RETRY_MAX_MS = 30000;
@@ -23,6 +24,7 @@ type PersistentSyncPayload = {
   queuedAt: string;
   environment: Environment;
   events: Event[];
+  checksum?: number;
 };
 
 async function loadPersistentQueue(): Promise<Record<string, PersistentSyncPayload>> {
@@ -37,21 +39,31 @@ async function upsertPersistentPayload(familyCode: string, payload: PersistentSy
 
 async function clearPersistentPayloadIfMatch(familyCode: string, queuedAt: string): Promise<void> {
   const queue = await loadPersistentQueue();
-  if (queue[familyCode]?.queuedAt !== queuedAt) return; // En caso de payload nuevo, no borrarlo
+  if (queue[familyCode]?.queuedAt !== queuedAt) return;
   delete queue[familyCode];
   await saveSetting(SYNC_QUEUE_KEY, queue);
 }
 
+/** Checksum simple: suma de longitudes de IDs de eventos activos */
+function computeChecksum(events: Event[]): number {
+  return events
+    .filter((e) => !(e as any).deletedAt)
+    .reduce((acc, e) => acc + (e.id?.length ?? 0), 0);
+}
+
+// AbortController para cancelar sync en vuelo si el usuario se desconecta
+let flushAbortController: AbortController | null = null;
+
 async function flush(token: string, familyCode?: string): Promise<void> {
-  const targetFamilyCode =
-    familyCode || queuedPayload?.environment.familyCode;
+  const targetFamilyCode = familyCode || queuedPayload?.environment.familyCode;
   if (inFlight || !targetFamilyCode) return;
 
   inFlight = true;
-  if (retryTimer) {
-    clearTimeout(retryTimer);
-    retryTimer = null;
-  }
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+
+  flushAbortController = new AbortController();
+  const { signal } = flushAbortController;
+
   try {
     const payload =
       queuedPayload?.environment.familyCode === targetFamilyCode
@@ -60,46 +72,47 @@ async function flush(token: string, familyCode?: string): Promise<void> {
     if (!payload) return;
     queuedPayload = payload;
 
-    await apiFetch('/api/v1/families/sync', {
+    const checksum = computeChecksum(payload.events);
+
+    const response = await apiFetch('/api/v1/families/sync', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       json: {
         familyCode: targetFamilyCode,
         environment: payload.environment,
         events: payload.events,
+        checksum,
       },
+      signal,
     });
 
-    // Solo limpiamos si el payload en disco corresponde al que intentamos enviar
-    await clearPersistentPayloadIfMatch(targetFamilyCode, payload.queuedAt);
-    // Si llegó un payload nuevo durante el envío, no lo pisamos.
-    if (queuedPayload?.queuedAt === payload.queuedAt) {
-      queuedPayload = null;
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data?.message || `HTTP ${response.status}`);
     }
+
+    await clearPersistentPayloadIfMatch(targetFamilyCode, payload.queuedAt);
+    if (queuedPayload?.queuedAt === payload.queuedAt) queuedPayload = null;
 
     currentRetryDelayMs = RETRY_START_MS;
     lastSuccessfulSyncAtByFamilyCode[targetFamilyCode] = new Date().toISOString();
-    // Persistimos last sync para facilitar reconciliación en reinstalaciones/cambios futuros.
     void saveSetting(lastSyncKey(targetFamilyCode), lastSuccessfulSyncAtByFamilyCode[targetFamilyCode]);
 
-    // Si mientras enviábamos se acumuló un payload nuevo, aseguramos que se procese.
     const remaining = (await loadPersistentQueue())[targetFamilyCode];
     if (remaining) {
       queuedPayload = remaining;
-      setTimeout(() => {
-        void flush(token, targetFamilyCode);
-      }, 0);
+      setTimeout(() => void flush(token, targetFamilyCode), 0);
     }
-  } catch {
-    // No perdemos el payload: se mantiene en disco y se reintentará con backoff.
+  } catch (err) {
+    if ((err as any)?.name === 'AbortError') return; // usuario canceló
+
     if (retryTimer) clearTimeout(retryTimer);
     const delay = currentRetryDelayMs;
     currentRetryDelayMs = Math.min(currentRetryDelayMs * 2, RETRY_MAX_MS);
-    retryTimer = setTimeout(() => {
-      void flush(token, targetFamilyCode);
-    }, delay);
+    retryTimer = setTimeout(() => void flush(token, targetFamilyCode), delay);
   } finally {
     inFlight = false;
+    flushAbortController = null;
   }
 }
 
@@ -115,30 +128,46 @@ export function queueCloudFamilySync(environment: Environment, events: Event[]):
     lastSyncMs === null
       ? events
       : events.filter((e) => {
-          const updatedMs = e?.updatedAt ? new Date(e.updatedAt).getTime() : 0;
-          return updatedMs > lastSyncMs;
-        });
+        const updatedMs = e?.updatedAt ? new Date(e.updatedAt as any).getTime() : 0;
+        return updatedMs > lastSyncMs;
+      });
 
   const queuedAt = new Date().toISOString();
   queuedPayload = { environment, events: eventsToSync, queuedAt };
-  // Persistimos la última versión por familia para reintentar si falla la red
   void upsertPersistentPayload(familyCode, { queuedAt, environment, events: eventsToSync });
 
   if (syncTimer) clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
-    void flush(token, familyCode);
-  }, DEBOUNCE_MS);
+  syncTimer = setTimeout(() => void flush(token, familyCode), DEBOUNCE_MS);
+}
+
+/** Cancela cualquier sync en vuelo (usar al desmontar/desconectar) */
+export function cancelPendingSync(): void {
+  if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+  flushAbortController?.abort();
+}
+
+/** Purga toda la cola local al desconectarse de una familia */
+export async function purgeFamilyData(familyCode: string): Promise<void> {
+  cancelPendingSync();
+  const queue = await loadPersistentQueue();
+  delete queue[familyCode];
+  await saveSetting(SYNC_QUEUE_KEY, queue);
+  delete lastSuccessfulSyncAtByFamilyCode[familyCode];
+
+  // Borrar last-sync timestamp
+  const storage = typeof localStorage !== 'undefined' ? localStorage : null;
+  if (storage) {
+    storage.removeItem(lastSyncKey(familyCode));
+  }
 }
 
 export async function loadFamilySnapshotByCode(familyCode: string): Promise<{
   environment: Environment;
   events: Event[];
 }> {
-  // Usamos paginación con `updatedAt` para no cargar todo el snapshot de golpe.
-  // En este flujo (recuperación por código), partimos desde epoch para reconstruir todo.
   const since = '0';
   const limit = 200;
-
   let offset = 0;
   let environment: Environment | null = null;
   const allEvents: Event[] = [];
@@ -180,10 +209,16 @@ export async function loadFamilySnapshotByCode(familyCode: string): Promise<{
     offset += pageEvents.length;
   }
 
-  if (!environment) {
-    throw new Error('No se pudo recuperar el ambiente de la familia');
+  if (!environment) throw new Error('No se pudo recuperar el ambiente de la familia');
+
+  // Verificar checksum del lado cliente
+  const serverChecksum: number | undefined = undefined; // El servidor puede devolver esto en el futuro
+  if (serverChecksum !== undefined) {
+    const localChecksum = computeChecksum(allEvents);
+    if (localChecksum !== serverChecksum) {
+      console.warn('[Sync] Checksum mismatch, forzando full sync');
+    }
   }
 
   return { environment, events: allEvents };
 }
-

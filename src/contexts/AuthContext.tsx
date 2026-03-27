@@ -172,6 +172,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserPlan(plan);
     }
 
+    // Registrar device token FCM en el backend (sin bloquear)
+    if (user) {
+      void import('../services/pushRegistrationService')
+        .then((m) => m.registerDeviceTokenAfterLogin())
+        .catch(() => {});
+    }
+
     // Load user's environment
     const envId = await getUserSession(email);
     if (envId) {

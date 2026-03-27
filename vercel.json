@@ -14,5 +14,11 @@
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/server" },
     { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/v1/crons/process-emails",  "schedule": "*/5 * * * *"  },
+    { "path": "/api/v1/crons/expiry-alerts",   "schedule": "0 9 * * *"    },
+    { "path": "/api/v1/crons/weekly-summary",  "schedule": "0 8 * * 0"    },
+    { "path": "/api/v1/crons/cleanup-tokens",  "schedule": "0 3 * * *"    }
   ]
 }

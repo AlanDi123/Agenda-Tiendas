@@ -78,8 +78,13 @@ const UpdateModal = lazy(() =>
 import { useTouchGestures } from './hooks/useTouchGestures';
 import { useAppUpdates } from './hooks/useAppUpdates';
 import { App as CapacitorApp } from '@capacitor/app';
-import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
+import {
+  watchOsThemeForStatusBar,
+  setupKeyboardScroll,
+  setupDeepLinkListener,
+  lockOrientationPortrait,
+} from './services/nativeService';
 import type { CalendarView, ExpandedEvent, Event, DeleteScope, Profile } from './types';
 import { formatMonthYear } from './utils/helpers';
 import { saveUserSession, getEnvironment, saveEnvironment, clearAllEvents, saveEvent } from './services/database';
@@ -165,12 +170,27 @@ function AppContent() {
   const [editScope, setEditScope] = useState<'single' | 'future' | 'all'>('single');
   const [showEditScopeDialog, setShowEditScopeDialog] = useState(false);
 
-  // Status Bar dinámica para nativo
+  // StatusBar dinámica que sigue el OS theme + Keyboard scroll + Orientation
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      StatusBar.setStyle({ style: Style.Dark });
-      StatusBar.setBackgroundColor({ color: '#2D3E50' });
-    }
+    if (!Capacitor.isNativePlatform()) return;
+    const cleanupTheme = watchOsThemeForStatusBar();
+    void setupKeyboardScroll();
+    void lockOrientationPortrait();
+    return cleanupTheme;
+  }, []);
+
+  // Deep link handler
+  useEffect(() => {
+    const cleanup = setupDeepLinkListener((path, params) => {
+      if (path === '/join' || path === 'join') {
+        const code = params.code;
+        if (code) {
+          // Navegar a la pantalla de unirse con el código
+          console.log('[DeepLink] Unirse con código:', code);
+        }
+      }
+    });
+    return cleanup;
   }, []);
 
   // Handle auth state changes

@@ -18,6 +18,9 @@ import { authRoutes } from './routes/auth';
 import { appVersionRoutes } from './routes/appVersion';
 import { notificationRoutes } from './routes/notifications';
 import { familyRoutes } from './routes/families';
+import { deviceRoutes } from './routes/devices';
+import { notificationCenterRoutes } from './routes/notificationCenter';
+import { cronRoutes } from './routes/crons';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 
@@ -72,9 +75,12 @@ const apiLimiter = rateLimit({
 });
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
   keyGenerator: (req) => req.ip || 'unknown',
+  message: { error: 'Demasiados intentos. Esperá 1 minuto.' },
 });
 
 const webhookLimiter = rateLimit({
@@ -127,6 +133,9 @@ app.use(`/api/${API_VERSION}/discounts`, authLimiter, discountRoutes);
 app.use(`/api/${API_VERSION}/notifications`, apiLimiter, notificationRoutes);
 app.use(`/api/${API_VERSION}/families`, syncLimiter, familyRoutes);
 app.use(`/api/${API_VERSION}/app`, apiLimiter, appVersionRoutes);
+app.use(`/api/${API_VERSION}/devices`, apiLimiter, deviceRoutes);
+app.use(`/api/${API_VERSION}/notification-center`, apiLimiter, notificationCenterRoutes);
+app.use(`/api/${API_VERSION}/crons`, cronRoutes);
 app.use('/api/webhooks', webhookLimiter, webhookRoutes);
 
 // 404 handler

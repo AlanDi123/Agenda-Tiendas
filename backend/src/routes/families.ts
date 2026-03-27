@@ -4,8 +4,15 @@ import { authMiddleware } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
 import { getFamilySnapshotByCode, saveFamilySnapshot } from '../services/familySnapshotService';
 import { createError } from '../middleware/errorHandler';
+import { notifyUser } from '../services/pushService';
+
+const FREE_EVENT_LIMIT = 50;
 
 const router = Router();
+
+function sanitizeTitle(str: string): string {
+  return str.replace(/[<>&"']/g, '').slice(0, 80);
+}
 
 const syncSchema = z.object({
   familyCode: z.string().min(4).max(16),
@@ -102,6 +109,17 @@ router.post('/sync', authMiddleware, async (req: Request, res: Response, next: N
 
     const mergedEvents = mergeEventsByIdWithUpdatedAt(existingEvents, parsed.events);
 
+    // Plan enforcement: FREE users cannot exceed FREE_EVENT_LIMIT active events
+    const isFree = !user.planType || user.planType === 'FREE';
+    const activeEvents = mergedEvents.filter((e: any) => !e?.deletedAt);
+    if (isFree && activeEvents.length > FREE_EVENT_LIMIT) {
+      throw createError(
+        `El plan gratuito permite hasta ${FREE_EVENT_LIMIT} eventos. Actualizá a Premium para continuar.`,
+        403,
+        'EVENT_LIMIT_REACHED'
+      );
+    }
+
     await saveFamilySnapshot({
       ownerId: user.id,
       ownerEmail: user.email,
@@ -112,6 +130,39 @@ router.post('/sync', authMiddleware, async (req: Request, res: Response, next: N
         syncedAt: new Date().toISOString(),
       },
     });
+
+    // Detectar eventos eliminados (tombstones) y notificar a los demás miembros
+    const deletedEventIds = (parsed.events || [])
+      .filter((e: any) => e?.deletedAt)
+      .map((e: any) => e.id as string);
+
+    if (deletedEventIds.length > 0) {
+      const profiles: any[] = (parsed.environment as any)?.profiles || [];
+      const otherUserIds = profiles
+        .filter((p: any) => p.userId && p.userId !== user.id)
+        .map((p: any) => p.userId as string);
+
+      const deletedTitles = deletedEventIds
+        .map((id: string) => {
+          const ev = (parsed.events as any[]).find((e: any) => e.id === id);
+          return sanitizeTitle(ev?.title || 'Evento desconocido');
+        })
+        .join(', ');
+
+      const actorName = profiles.find((p: any) => p.userId === user.id)?.name || user.email;
+
+      for (const memberId of otherUserIds) {
+        void notifyUser({
+          userId: memberId,
+          environmentId: (parsed.environment as any)?.id,
+          type: 'event_deleted',
+          title: '🗑️ Evento eliminado',
+          body: `${sanitizeTitle(actorName)} eliminó: ${deletedTitles}`,
+          data: { actorId: user.id, eventIds: deletedEventIds.join(',') },
+          deepLink: `${process.env.APP_DEEP_LINK_SCHEME || 'dommussagenda'}://home`,
+        }).catch(() => {});
+      }
+    }
 
     res.json({ success: true });
   } catch (error) {

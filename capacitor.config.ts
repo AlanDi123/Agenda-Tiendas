@@ -4,7 +4,10 @@ const config: CapacitorConfig = {
   appId: 'com.importmania.agenda',
   appName: 'Dommuss Agenda',
   webDir: 'dist',
-  // sin bloque server — Capacitor carga desde el dist bundleado en el APK
+  android: {
+    allowMixedContent: false,
+    webContentsDebuggingEnabled: false,
+  },
   plugins: {
     CapacitorUpdater: {
       autoUpdate: false,
@@ -27,8 +30,16 @@ const config: CapacitorConfig = {
       showSpinner: false,
       splashFullScreen: true,
       splashImmersive: true,
-    }
-  }
+    },
+    Keyboard: {
+      resize: 'body',
+      resizeOnFullScreen: true,
+    },
+    StatusBar: {
+      style: 'DARK',
+      backgroundColor: '#1565C0',
+    },
+  },
 };
 
 export default config;
