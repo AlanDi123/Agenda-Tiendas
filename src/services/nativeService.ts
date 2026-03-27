@@ -145,9 +145,10 @@ export async function trackEventCreatedForReview(): Promise<void> {
 
   if (next >= REVIEW_THRESHOLD) {
     try {
-      // Plugin opcional: @capacitor-community/in-app-review
-      // Añadirlo como dependencia si se instala
-      const reviewMod = await import('@capacitor-community/in-app-review' as string).catch(() => null);
+      // Plugin opcional — nombre resuelto en runtime para que Rollup no intente
+      // incluirlo en el bundle si no está instalado.
+      const pkgName = ['@capacitor-community', 'in-app-review'].join('/');
+      const reviewMod = await import(/* @vite-ignore */ pkgName).catch(() => null);
       if (!reviewMod?.InAppReview) return;
       await reviewMod.InAppReview.requestReview();
       localStorage.setItem(REVIEW_REQUESTED_KEY, 'true');
