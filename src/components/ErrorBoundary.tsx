@@ -100,21 +100,3 @@ export class ErrorBoundary extends Component<Props, State> {
     );
   }
 }
-
-/** Alias semántico para usarlo como Global Error Boundary en main.tsx */
-export const GlobalErrorBoundary = ErrorBoundary;
-
-/** HOC: envuelve un componente en un ErrorBoundary inline */
-export function withErrorBoundary<P extends object>(
-  WrappedComponent: React.ComponentType<P>,
-  name?: string
-) {
-  const displayName = name || WrappedComponent.displayName || WrappedComponent.name || 'Component';
-  const BoundedComponent = (props: P) => (
-    <ErrorBoundary name={displayName} inline>
-      <WrappedComponent {...props} />
-    </ErrorBoundary>
-  );
-  BoundedComponent.displayName = `WithErrorBoundary(${displayName})`;
-  return BoundedComponent;
-}

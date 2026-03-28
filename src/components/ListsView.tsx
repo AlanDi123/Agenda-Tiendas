@@ -14,7 +14,9 @@ function loadItems(): ListItem[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return JSON.parse(stored);
-  } catch (_) {}
+  } catch {
+    // JSON inválido o storage no disponible
+  }
   return [
     { id: '1', text: 'Leche', checked: false },
     { id: '2', text: 'Pan', checked: false },
@@ -32,7 +34,9 @@ export function ListsView() {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    } catch (_) {}
+    } catch {
+      // persistencia opcional — ignorado
+    }
   }, [items]);
 
   const toggleItem = useCallback((id: string) => {

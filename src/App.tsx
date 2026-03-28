@@ -345,7 +345,9 @@ function AppContent() {
 
   // Android back button handler (lee estado fresco desde uiStore)
   useEffect(() => {
-    const isCapacitor = () => !!(window as any).Capacitor;
+    const isCapacitor = () =>
+      typeof window !== 'undefined' &&
+      Reflect.get(window, 'Capacitor') != null;
     if (!isCapacitor()) return;
 
     let backButtonListener: Awaited<ReturnType<typeof CapacitorApp.addListener>> | null = null;
@@ -468,7 +470,7 @@ function AppContent() {
   // Navigation handlers
   const handleViewChange = useCallback((view: CalendarView) => {
     setCurrentView(view);
-  }, []);
+  }, [setCurrentView]);
 
   const handleViewToggle = useCallback(() => {
     cycleCalendarView();
@@ -477,7 +479,7 @@ function AppContent() {
   const handleDayClick = useCallback((date: Date) => {
     setViewDate(date);
     setCurrentView('day');
-  }, [setViewDate]);
+  }, [setViewDate, setCurrentView]);
 
   const handlePrev = useCallback(() => {
     if (currentView === 'month') {
@@ -526,7 +528,7 @@ function AppContent() {
   const handleEventClick = useCallback((event: ExpandedEvent) => {
     setSelectedEvent(event);
     setShowEventDetail(true);
-  }, []);
+  }, [setSelectedEvent, setShowEventDetail]);
 
   const handleTurnoSlotClick = useCallback((time: string) => {
     const [hours, minutes] = time.split(':').map(Number);
@@ -535,26 +537,26 @@ function AppContent() {
     setViewDate(newDate);
     setSelectedEvent(null);
     setShowEventForm(true);
-  }, [viewDate, setViewDate]);
+  }, [viewDate, setViewDate, setSelectedEvent, setShowEventForm]);
 
   const handleTurnoEventClick = useCallback((event: ExpandedEvent) => {
     setSelectedEvent(event);
     setShowEventDetail(true);
-  }, []);
+  }, [setSelectedEvent, setShowEventDetail]);
 
   // Check premium before allowing advanced features
   const requirePremium = useCallback((feature: string, callback: () => void) => {
     if (!isPremium) {
       try {
         setShowPaymentModal(true);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(`[Premium] Error showing payment modal for feature "${feature}":`, error);
         alert('Error al mostrar opciones de pago. Por favor intenta más tarde.');
       }
     } else {
       callback();
     }
-  }, [isPremium]);
+  }, [isPremium, setShowPaymentModal]);
 
   const handleEditEvent = useCallback(() => {
     if (!selectedEvent) return;
@@ -569,7 +571,14 @@ function AppContent() {
 
     setShowEventDetail(false);
     setShowEventForm(true);
-  }, [selectedEvent, expandedEvents, requirePremium, setShowEventDetail, setShowEventForm]);
+  }, [
+    selectedEvent,
+    expandedEvents,
+    requirePremium,
+    setShowEditScopeDialog,
+    setShowEventDetail,
+    setShowEventForm,
+  ]);
 
   const handleEditScopeSelect = (scope: 'single' | 'future' | 'all') => {
     if (scope !== 'single') {
@@ -617,7 +626,7 @@ function AppContent() {
     }
 
     await createEvent(eventData);
-  }, [createEvent, isPremium, rawEvents]);
+  }, [createEvent, isPremium, rawEvents, setShowPaymentModal]);
 
   const handleUpdateEvent = useCallback(async (eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!selectedEvent) return;
@@ -645,7 +654,7 @@ function AppContent() {
       setDeleteScope('single');
       setShowDeleteConfirm(true);
     }
-  }, [selectedEvent, requirePremium]);
+  }, [selectedEvent, requirePremium, setShowDeleteConfirm, setDeleteScope]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!selectedEvent) return;
@@ -663,33 +672,34 @@ function AppContent() {
       return;
     }
     setAuthState('authenticated');
-  }, [currentUser]);
+  }, [currentUser, setAuthState, setPendingVerifyEmail]);
 
-  const handleRegisterSuccess = useCallback((_token: string, email: string) => {
+  const handleRegisterSuccess = useCallback((token: string, email: string) => {
+    void token;
     setPendingVerifyEmail(email);
     setAuthState('verify-email');
-  }, []);
+  }, [setPendingVerifyEmail, setAuthState]);
 
   const handleVerificationComplete = useCallback(() => {
     setPendingVerifyEmail('');
     setAuthState('authenticated');
-  }, []);
+  }, [setPendingVerifyEmail, setAuthState]);
 
   const handlePasswordResetSuccess = useCallback(() => {
     setAuthState('login');
-  }, []);
+  }, [setAuthState]);
 
   const handleLogout = useCallback(async () => {
     await logout();
     setPendingVerifyEmail('');
     setAuthState('login');
-  }, [logout]);
+  }, [logout, setPendingVerifyEmail, setAuthState]);
 
   const handleCloseFamily = useCallback(async () => {
     await closeFamily();
     // La vista vuelve a onboarding automáticamente porque `environment` queda en null.
     setShowUserSettings(false);
-  }, [closeFamily]);
+  }, [closeFamily, setShowUserSettings]);
 
   // Onboarding handlers
   const handleOnboardingComplete = useCallback(async (data: {
@@ -785,10 +795,17 @@ function AppContent() {
           setPendingPlanType(null);
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error during onboarding:', error);
     }
-  }, [createEnvironment, addProfile, currentUser, loadEnvironment]);
+  }, [
+    createEnvironment,
+    addProfile,
+    currentUser,
+    loadEnvironment,
+    setPendingPlanType,
+    setWaitingForPayment,
+  ]);
 
   const handleUserAuthComplete = useCallback(async (userData: {
     name: string;
@@ -822,15 +839,21 @@ function AppContent() {
         setShowUserAuth(false);
         setPendingEnvironmentId('');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error in user auth:', error);
     }
-  }, [pendingEnvironmentId, addProfile, loadEnvironment]);
+  }, [
+    pendingEnvironmentId,
+    addProfile,
+    loadEnvironment,
+    setShowUserAuth,
+    setPendingEnvironmentId,
+  ]);
 
   const handleAddProfile = useCallback(async (name: string, permissions: 'admin' | 'readonly') => {
     await addProfile(name, '', permissions);
     setShowAddProfile(false);
-  }, [addProfile]);
+  }, [addProfile, setShowAddProfile]);
 
   const handleUpdateProfile = useCallback(async (profile: Profile) => {
     await updateProfile(profile);

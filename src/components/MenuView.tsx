@@ -29,7 +29,9 @@ function loadMenu(): WeeklyMenu {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return { ...DEFAULT_MENU, ...JSON.parse(stored) };
-  } catch (_) {}
+  } catch {
+    // localStorage inválido o no disponible
+  }
   return DEFAULT_MENU;
 }
 
@@ -38,7 +40,11 @@ export function MenuView() {
   const [menu, setMenu] = useState<WeeklyMenu>(loadMenu);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(menu)); } catch (_) {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(menu));
+    } catch {
+      // persistencia opcional — ignorado
+    }
   }, [menu]);
 
   const updateMeal = useCallback((day: string, mealType: 'lunch' | 'dinner', value: string) => {
