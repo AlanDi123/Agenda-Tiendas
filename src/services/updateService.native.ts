@@ -103,45 +103,45 @@ export async function checkForUpdates(force = false): Promise<UpdateCheckRespons
   }
 }
 
-// ─── Instalar actualización Nativa ───────────────────────────────────────────
+// ─── Instalador nativo de APK ────────────────────────────────────────────────
 export async function downloadAndInstall(
   apkUrl: string,
   onProgress?: (pct: number) => void
 ): Promise<void> {
   try {
-    // 1. Pedir permisos a Android para instalar APKs desconocidos
     const { hasPermission } = await ApkInstaller.checkInstallPermission();
     if (!hasPermission) {
       await ApkInstaller.requestInstallPermission();
-      throw new Error('Permiso de instalación requerido. Otórgalo y vuelve a intentar.');
+      throw new Error('Por favor, concede el permiso de instalación en Ajustes y vuelve a intentar.');
     }
 
     onProgress?.(10);
 
-    // 2. Descargar el APK en el directorio de caché de la app
-    const fileName = 'update_agenda.apk';
+    const fileName = 'agenda-update.apk';
+
+    // FIX 1: Usamos Directory.External para asegurar visibilidad al instalador
     await Filesystem.downloadFile({
       url: apkUrl,
       path: fileName,
-      directory: Directory.Cache,
+      directory: Directory.External,
     });
 
-    onProgress?.(80);
+    onProgress?.(90);
 
-    // 3. Obtener la URI estricta que Android necesita para leer el archivo
-    const uriResult = await Filesystem.getUri({
-      directory: Directory.Cache,
+    const { uri } = await Filesystem.getUri({
+      directory: Directory.External,
       path: fileName,
     });
 
     onProgress?.(100);
 
-    // 4. Lanzar la pantalla del instalador nativo de Android
-    await ApkInstaller.installApk({ filePath: uriResult.uri });
+    // FIX 2: Limpiamos el prefijo 'file://' que suele hacer crashear a algunos instaladores nativos
+    const cleanPath = uri.replace('file://', '');
+
+    await ApkInstaller.installApk({ filePath: cleanPath });
 
   } catch (err) {
-    console.error('[UpdateService] Instalación nativa fallida:', err);
-    // Fallback de emergencia: abrir el link en el navegador del sistema
+    console.warn('[UpdateService] Instalador nativo falló, abriendo en browser:', err);
     try {
       const { Browser } = await import('@capacitor/browser');
       await Browser.open({ url: apkUrl });
@@ -149,9 +149,7 @@ export async function downloadAndInstall(
       window.open(apkUrl, '_system');
     }
     onProgress?.(100);
-    throw new Error(
-      err instanceof Error ? err.message : 'Error al procesar la actualización'
-    );
+    throw new Error(err instanceof Error ? err.message : 'Error al procesar la actualización');
   }
 }
 
