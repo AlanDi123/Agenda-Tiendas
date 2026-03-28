@@ -109,47 +109,67 @@ export async function downloadAndInstall(
   onProgress?: (pct: number) => void
 ): Promise<void> {
   try {
-    const { hasPermission } = await ApkInstaller.checkInstallPermission();
-    if (!hasPermission) {
-      await ApkInstaller.requestInstallPermission();
-      throw new Error('Por favor, concede el permiso de instalación en Ajustes y vuelve a intentar.');
+    onProgress?.(5);
+
+    // 1. SOLICITAR PERMISOS TOTALES DE ALMACENAMIENTO
+    try {
+      const fsPerms = await Filesystem.checkPermissions();
+      if (fsPerms.publicStorage !== 'granted') {
+        await Filesystem.requestPermissions();
+      }
+    } catch (e) {
+      console.warn('[UpdateService] Ignorando chequeo de almacenamiento (OS limit):', e);
     }
 
-    onProgress?.(10);
+    // 2. SOLICITAR PERMISOS DE INSTALACIÓN
+    const installPerm = await ApkInstaller.checkInstallPermission();
+    if (!installPerm.hasPermission) {
+      await ApkInstaller.requestInstallPermission();
+      // Pausa para que Android registre el permiso cuando el usuario vuelve a la app
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
 
+    onProgress?.(15);
+
+    // 3. DESCARGA SEGURA
     const fileName = 'agenda-update.apk';
 
-    // FIX 1: Usamos Directory.External para asegurar visibilidad al instalador
+    // Limpiar archivo anterior fallido si existe
+    try {
+      await Filesystem.deleteFile({ path: fileName, directory: Directory.External });
+    } catch { /* no existe, ignorar */ }
+
     await Filesystem.downloadFile({
       url: apkUrl,
       path: fileName,
       directory: Directory.External,
     });
 
-    onProgress?.(90);
+    onProgress?.(80);
 
-    const { uri } = await Filesystem.getUri({
+    // 4. VERIFICACIÓN FÍSICA — confirmar que el archivo existe y obtener su ruta real
+    const fileStat = await Filesystem.stat({
       directory: Directory.External,
       path: fileName,
     });
 
     onProgress?.(100);
 
-    // FIX 2: Limpiamos el prefijo 'file://' que suele hacer crashear a algunos instaladores nativos
-    const cleanPath = uri.replace('file://', '');
+    // Limpiar prefijo 'file://' que marea al instalador en Xiaomi/Samsung
+    const cleanPath = fileStat.uri.replace('file://', '');
 
+    // 5. EJECUTAR INSTALADOR
     await ApkInstaller.installApk({ filePath: cleanPath });
 
   } catch (err) {
-    console.warn('[UpdateService] Instalador nativo falló, abriendo en browser:', err);
+    console.error('[UpdateService] Cancelado o fallido:', err);
     try {
       const { Browser } = await import('@capacitor/browser');
       await Browser.open({ url: apkUrl });
     } catch {
       window.open(apkUrl, '_system');
     }
-    onProgress?.(100);
-    throw new Error(err instanceof Error ? err.message : 'Error al procesar la actualización');
+    throw new Error('Permisos insuficientes o error del sistema. Abriendo navegador...');
   }
 }
 
