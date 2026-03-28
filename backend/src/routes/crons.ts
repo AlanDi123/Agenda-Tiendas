@@ -1,9 +1,11 @@
 /**
  * Cron Endpoints — invocados por Vercel Cron Jobs (vercel.json)
  *
- * Seguridad: verificar header Authorization: Bearer CRON_SECRET
- * Configurar en vercel.json:
- *   { "path": "/api/v1/crons/process-emails", "schedule": "* * * * *" }
+ * Vercel dispara crons solo con GET. Usar router.get en todas las rutas.
+ * Seguridad: Authorization: Bearer CRON_SECRET (Vercel lo inyecta cuando CRON_SECRET está definido).
+ *
+ * vercel.json ejemplos:
+ *   { "path": "/api/v1/crons/process-emails", "schedule": "0 9 * * *" }
  *   { "path": "/api/v1/crons/expiry-alerts", "schedule": "0 9 * * *" }
  *   { "path": "/api/v1/crons/weekly-summary", "schedule": "0 8 * * 0" }
  *   { "path": "/api/v1/crons/cleanup-tokens", "schedule": "0 3 * * *" }
@@ -27,8 +29,8 @@ function verifyCronSecret(req: Request): boolean {
   return auth === `Bearer ${CRON_SECRET}`;
 }
 
-/** POST /api/v1/crons/process-emails — Procesar cola de emails fallidos */
-router.post('/process-emails', async (req: Request, res: Response) => {
+/** GET /api/v1/crons/process-emails — Procesar cola de emails fallidos */
+router.get('/process-emails', async (req: Request, res: Response) => {
   if (!verifyCronSecret(req)) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
     const result = await processOutbox(50);
@@ -40,8 +42,8 @@ router.post('/process-emails', async (req: Request, res: Response) => {
   }
 });
 
-/** POST /api/v1/crons/expiry-alerts — Notificar usuarios con plan por expirar en 3 días */
-router.post('/expiry-alerts', async (req: Request, res: Response) => {
+/** GET /api/v1/crons/expiry-alerts — Notificar usuarios con plan por expirar en 3 días */
+router.get('/expiry-alerts', async (req: Request, res: Response) => {
   if (!verifyCronSecret(req)) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
     const now = new Date();
@@ -86,8 +88,8 @@ router.post('/expiry-alerts', async (req: Request, res: Response) => {
   }
 });
 
-/** POST /api/v1/crons/weekly-summary — Resumen semanal (domingo) */
-router.post('/weekly-summary', async (req: Request, res: Response) => {
+/** GET /api/v1/crons/weekly-summary — Resumen semanal (domingo) */
+router.get('/weekly-summary', async (req: Request, res: Response) => {
   if (!verifyCronSecret(req)) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
     const today = new Date();
@@ -123,8 +125,8 @@ router.post('/weekly-summary', async (req: Request, res: Response) => {
   }
 });
 
-/** POST /api/v1/crons/cleanup-shopping — Borrar ítems de compra completados hace +30 días */
-router.post('/cleanup-shopping', async (req: Request, res: Response) => {
+/** GET /api/v1/crons/cleanup-shopping — Borrar ítems de compra completados hace +30 días */
+router.get('/cleanup-shopping', async (req: Request, res: Response) => {
   if (!verifyCronSecret(req)) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
     const result = await db
@@ -143,8 +145,8 @@ router.post('/cleanup-shopping', async (req: Request, res: Response) => {
   }
 });
 
-/** POST /api/v1/crons/cleanup-tokens — Purgar refresh tokens expirados */
-router.post('/cleanup-tokens', async (req: Request, res: Response) => {
+/** GET /api/v1/crons/cleanup-tokens — Purgar refresh tokens expirados */
+router.get('/cleanup-tokens', async (req: Request, res: Response) => {
   if (!verifyCronSecret(req)) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
     const now = new Date();

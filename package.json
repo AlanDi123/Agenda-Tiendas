@@ -33,6 +33,7 @@
     "@capacitor/status-bar": "5.0.8",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
+    "@tanstack/react-query": "^5.95.2",
     "@tanstack/react-virtual": "^3.13.23",
     "capacitor-native-biometric": "^4.2.2",
     "date-fns": "^4.1.0",

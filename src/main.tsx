@@ -1,8 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import { AppLogger } from './services/logger'
 import { Capacitor } from '@capacitor/core'
+import { queryClient } from './lib/queryClient'
 
 // notifyAppReady SINCRONICO via bridge — debe correr antes que cualquier render
 // Evita el rollback automático de Capgo si aún está instalado
@@ -55,6 +57,8 @@ if (
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </React.StrictMode>,
 )

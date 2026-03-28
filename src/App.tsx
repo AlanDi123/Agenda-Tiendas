@@ -14,6 +14,9 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReloadPrompt } from './components/ReloadPrompt';
 import { RouteLoadingFallback } from './components/RouteLoadingFallback';
 import { apiFetch } from './config/api';
+import { useShallow } from 'zustand/react/shallow';
+import { useUiStore } from './stores/uiStore';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
 
 const TurnosGrid = lazy(() =>
   import('./components/TurnosGrid').then((m) => ({ default: m.TurnosGrid }))
@@ -86,7 +89,7 @@ import {
   setupDeepLinkListener,
   lockOrientationPortrait,
 } from './services/nativeService';
-import type { CalendarView, ExpandedEvent, Event, DeleteScope, Profile } from './types';
+import type { CalendarView, ExpandedEvent, Event, Profile } from './types';
 import { formatMonthYear } from './utils/helpers';
 import { saveUserSession, getEnvironment, saveEnvironment, clearAllEvents, saveEvent } from './services/database';
 import { queueCloudFamilySync, loadFamilySnapshotByCode } from './services/cloudFamilySync';
@@ -144,32 +147,90 @@ function AppContent() {
 
   // Auth flow state
   const [authState, setAuthState] = useState<AuthState>('loading');
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-
-  // UI State
-  const [currentView, setCurrentView] = useState<CalendarView>('month');
-  const [showEventForm, setShowEventForm] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<ExpandedEvent | null>(null);
-  const [showEventDetail, setShowEventDetail] = useState(false);
-  const [showProfileSelector, setShowProfileSelector] = useState(false);
-  const [showAddProfile, setShowAddProfile] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteScope, setDeleteScope] = useState<DeleteScope>('single');
   const [showSplash, setShowSplash] = useState(true);
-  const [filterProfileId, setFilterProfileId] = useState<string | null>(null);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [waitingForPayment, setWaitingForPayment] = useState(false);
-  const [pendingPlanType, setPendingPlanType] = useState<string | null>(null);
-
-  // User auth modal state
-  const [showUserAuth, setShowUserAuth] = useState(false);
-  const [showUserSettings, setShowUserSettings] = useState(false);
-  const [pendingEnvironmentId, setPendingEnvironmentId] = useState('');
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState('');
 
-  // Edit scope for recurring events
-  const [editScope, setEditScope] = useState<'single' | 'future' | 'all'>('single');
-  const [showEditScopeDialog, setShowEditScopeDialog] = useState(false);
+  const networkReachable = useNetworkStatus();
+  const [authStallOffline, setAuthStallOffline] = useState(false);
+  const isOnline = networkReachable && !authStallOffline;
+
+  const {
+    currentView,
+    showEventForm,
+    selectedEvent,
+    showEventDetail,
+    showProfileSelector,
+    showAddProfile,
+    showDeleteConfirm,
+    deleteScope,
+    filterProfileId,
+    showUserAuth,
+    showUserSettings,
+    pendingEnvironmentId,
+    showEditScopeDialog,
+    editScope,
+    showPaymentModal,
+    waitingForPayment,
+    pendingPlanType,
+    setCurrentView,
+    cycleCalendarView,
+    setShowEventForm,
+    setSelectedEvent,
+    setShowEventDetail,
+    setShowProfileSelector,
+    setShowAddProfile,
+    setShowDeleteConfirm,
+    setDeleteScope,
+    setFilterProfileId,
+    setShowUserAuth,
+    setShowUserSettings,
+    setPendingEnvironmentId,
+    setShowEditScopeDialog,
+    setEditScope,
+    setShowPaymentModal,
+    setWaitingForPayment,
+    setPendingPlanType,
+    closeEventEditing,
+  } = useUiStore(
+    useShallow((s) => ({
+      currentView: s.currentView,
+      showEventForm: s.showEventForm,
+      selectedEvent: s.selectedEvent,
+      showEventDetail: s.showEventDetail,
+      showProfileSelector: s.showProfileSelector,
+      showAddProfile: s.showAddProfile,
+      showDeleteConfirm: s.showDeleteConfirm,
+      deleteScope: s.deleteScope,
+      filterProfileId: s.filterProfileId,
+      showUserAuth: s.showUserAuth,
+      showUserSettings: s.showUserSettings,
+      pendingEnvironmentId: s.pendingEnvironmentId,
+      showEditScopeDialog: s.showEditScopeDialog,
+      editScope: s.editScope,
+      showPaymentModal: s.showPaymentModal,
+      waitingForPayment: s.waitingForPayment,
+      pendingPlanType: s.pendingPlanType,
+      setCurrentView: s.setCurrentView,
+      cycleCalendarView: s.cycleCalendarView,
+      setShowEventForm: s.setShowEventForm,
+      setSelectedEvent: s.setSelectedEvent,
+      setShowEventDetail: s.setShowEventDetail,
+      setShowProfileSelector: s.setShowProfileSelector,
+      setShowAddProfile: s.setShowAddProfile,
+      setShowDeleteConfirm: s.setShowDeleteConfirm,
+      setDeleteScope: s.setDeleteScope,
+      setFilterProfileId: s.setFilterProfileId,
+      setShowUserAuth: s.setShowUserAuth,
+      setShowUserSettings: s.setShowUserSettings,
+      setPendingEnvironmentId: s.setPendingEnvironmentId,
+      setShowEditScopeDialog: s.setShowEditScopeDialog,
+      setEditScope: s.setEditScope,
+      setShowPaymentModal: s.setShowPaymentModal,
+      setWaitingForPayment: s.setWaitingForPayment,
+      setPendingPlanType: s.setPendingPlanType,
+      closeEventEditing: s.closeEventEditing,
+    }))
+  );
 
   // StatusBar dinámica que sigue el OS theme + Keyboard scroll + Orientation
   useEffect(() => {
@@ -231,31 +292,19 @@ function AppContent() {
     }
   }, [isAuthLoading]);
 
-  // Failsafe: Si tarda más de 5 segundos en autenticar, asumimos modo OFFLINE
+  // Failsafe: auth lento → banner tipo offline + quitar splash (sin bloquear IndexedDB)
   useEffect(() => {
-    if (isAuthLoading) {
-      const offlineTimeout = setTimeout(() => {
-        console.warn('Timeout de conexión: Iniciando en modo Offline');
-        setIsOnline(false); // Forzamos modo offline visual
-        setShowSplash(false); // Quitamos el splash
-      }, 5000);
-      return () => clearTimeout(offlineTimeout);
+    if (!isAuthLoading) {
+      setAuthStallOffline(false);
+      return;
     }
+    const offlineTimeout = setTimeout(() => {
+      console.warn('Timeout de conexión: mostrando aviso tipo sin conexión');
+      setAuthStallOffline(true);
+      setShowSplash(false);
+    }, 5000);
+    return () => clearTimeout(offlineTimeout);
   }, [isAuthLoading]);
-
-  // Online/Offline detection
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
 
   // Deep links: abrir app por enlaces de mail y resolver token si viene
   useEffect(() => {
@@ -294,66 +343,59 @@ function AppContent() {
     };
   }, [verifyEmail]);
 
-  // Android back button handler
+  // Android back button handler (lee estado fresco desde uiStore)
   useEffect(() => {
     const isCapacitor = () => !!(window as any).Capacitor;
     if (!isCapacitor()) return;
 
-    const hasOpenModals = () => {
-      return showEventForm || showEventDetail || showUserSettings ||
-             showProfileSelector || showAddProfile || showDeleteConfirm ||
-             showEditScopeDialog;
-    };
-
     let backButtonListener: Awaited<ReturnType<typeof CapacitorApp.addListener>> | null = null;
 
     CapacitorApp.addListener('backButton', ({ canGoBack }) => {
-      if (hasOpenModals()) {
-        if (showEditScopeDialog) setShowEditScopeDialog(false);
-        if (showDeleteConfirm) setShowDeleteConfirm(false);
-        if (showAddProfile) setShowAddProfile(false);
-        if (showProfileSelector) setShowProfileSelector(false);
-        if (showUserSettings) setShowUserSettings(false);
-        if (showEventDetail) {
-          setShowEventDetail(false);
-          setSelectedEvent(null);
+      const s = useUiStore.getState();
+      const hasOpenModals =
+        s.showEventForm ||
+        s.showEventDetail ||
+        s.showUserSettings ||
+        s.showProfileSelector ||
+        s.showAddProfile ||
+        s.showDeleteConfirm ||
+        s.showEditScopeDialog;
+
+      if (hasOpenModals) {
+        if (s.showEditScopeDialog) s.setShowEditScopeDialog(false);
+        if (s.showDeleteConfirm) s.setShowDeleteConfirm(false);
+        if (s.showAddProfile) s.setShowAddProfile(false);
+        if (s.showProfileSelector) s.setShowProfileSelector(false);
+        if (s.showUserSettings) s.setShowUserSettings(false);
+        if (s.showEventDetail) {
+          s.setShowEventDetail(false);
+          s.setSelectedEvent(null);
           return;
         }
-        if (showEventForm) {
-          setShowEventForm(false);
-          setSelectedEvent(null);
+        if (s.showEventForm) {
+          s.setShowEventForm(false);
+          s.setSelectedEvent(null);
           return;
         }
         return;
       }
 
-      if (currentView === 'lists' || currentView === 'menu') {
-        setCurrentView('month');
+      if (s.currentView === 'lists' || s.currentView === 'menu') {
+        s.setCurrentView('month');
         return;
       }
 
       if (canGoBack) {
         window.history.back();
       }
-    }).then(listener => {
+    }).then((listener) => {
       backButtonListener = listener;
     });
 
     return () => {
       backButtonListener?.remove();
     };
-  }, [
-    showEventForm, showEventDetail, showUserSettings,
-    showProfileSelector, showAddProfile, showDeleteConfirm,
-    showEditScopeDialog, currentView
-  ]);
-
-  // Load events when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadEvents();
-    }
-  }, [isAuthenticated, loadEvents]);
+  }, []);
 
   // Sync near real-time de familia+eventos a nube (debounced)
   useEffect(() => {
@@ -429,13 +471,8 @@ function AppContent() {
   }, []);
 
   const handleViewToggle = useCallback(() => {
-    // Cycle through month -> week -> day -> month
-    setCurrentView(prev => {
-      if (prev === 'month') return 'week';
-      if (prev === 'week') return 'day';
-      return 'month';
-    });
-  }, []);
+    cycleCalendarView();
+  }, [cycleCalendarView]);
 
   const handleDayClick = useCallback((date: Date) => {
     setViewDate(date);
@@ -532,7 +569,7 @@ function AppContent() {
 
     setShowEventDetail(false);
     setShowEventForm(true);
-  }, [selectedEvent, expandedEvents, requirePremium]);
+  }, [selectedEvent, expandedEvents, requirePremium, setShowEventDetail, setShowEventForm]);
 
   const handleEditScopeSelect = (scope: 'single' | 'future' | 'all') => {
     if (scope !== 'single') {
@@ -615,9 +652,8 @@ function AppContent() {
 
     await deleteEvent(selectedEvent.baseEventId, deleteScope);
     setShowDeleteConfirm(false);
-    setShowEventDetail(false);
-    setSelectedEvent(null);
-  }, [selectedEvent, deleteScope, deleteEvent]);
+    closeEventEditing();
+  }, [selectedEvent, deleteScope, deleteEvent, setShowDeleteConfirm, closeEventEditing]);
 
   // Auth handlers
   const handleLoginSuccess = useCallback((emailVerified?: boolean) => {
