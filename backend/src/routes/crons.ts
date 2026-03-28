@@ -14,7 +14,7 @@ import { processOutbox } from '../services/emailQueue';
 import { sendExpiryWarningEmail } from '../services/billingEmails';
 import { sendWeeklySummaryEmail } from '../services/notificationEmails';
 import db from '../db';
-import { users, subscriptions, refreshTokens } from '../db/schema';
+import { users, subscriptions, refreshTokens, shoppingItems } from '../db/schema';
 import { and, eq, lt, lte, sql as drizzleSql } from 'drizzle-orm';
 import { logger } from '../middleware/requestLogger';
 
@@ -119,6 +119,26 @@ router.post('/weekly-summary', async (req: Request, res: Response) => {
     res.json({ success: true, sent });
   } catch (err) {
     logger.error({ err }, '[Cron] weekly-summary error');
+    res.status(500).json({ success: false });
+  }
+});
+
+/** POST /api/v1/crons/cleanup-shopping — Borrar ítems de compra completados hace +30 días */
+router.post('/cleanup-shopping', async (req: Request, res: Response) => {
+  if (!verifyCronSecret(req)) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  try {
+    const result = await db
+      .delete(shoppingItems)
+      .where(
+        and(
+          eq(shoppingItems.isCompleted, true),
+          lt(shoppingItems.updatedAt, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+        )
+      );
+    logger.info({ rowCount: (result as { rowCount?: number }).rowCount }, '[Cron] cleanup-shopping completado');
+    res.json({ success: true });
+  } catch (err) {
+    logger.error({ err }, '[Cron] cleanup-shopping error');
     res.status(500).json({ success: false });
   }
 });

@@ -223,5 +223,67 @@ router.get('/updates/:familyCode', authMiddleware, async (req: Request, res: Res
   }
 });
 
+// POST /api/v1/families/join — add the authenticated user to a family if not already a member
+const joinSchema = z.object({
+  familyCode: z.string().min(4).max(16),
+  name: z.string().min(1).max(60),
+  color: z.string().optional(),
+});
+
+router.post('/join', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as AuthRequest).user;
+    if (!user?.id || !user.email) {
+      throw createError('Usuario no autenticado', 401, 'UNAUTHORIZED');
+    }
+
+    const { familyCode, name, color } = joinSchema.parse(req.body);
+
+    const snapshot = await getFamilySnapshotByCode(familyCode);
+    const env: any = (snapshot as any)?.environment;
+    if (!env) {
+      throw createError('Familia no encontrada', 404, 'FAMILY_NOT_FOUND');
+    }
+
+    const profiles: any[] = env.profiles || [];
+    const already = profiles.find(
+      (p: any) => typeof p.email === 'string' && p.email.toLowerCase() === user.email.toLowerCase()
+    );
+
+    if (already) {
+      res.json({ success: true, message: 'Ya eres miembro de esta familia', profile: already });
+      return;
+    }
+
+    const newProfile = {
+      id: crypto.randomUUID(),
+      name: sanitizeTitle(name),
+      email: user.email.toLowerCase(),
+      avatarColor: color || '#FF6B35',
+      initials: name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
+      permissions: 'admin',
+      createdAt: new Date().toISOString(),
+    };
+
+    profiles.push(newProfile);
+    env.profiles = profiles;
+
+    await saveFamilySnapshot({
+      ownerId: user.id,
+      ownerEmail: user.email,
+      familyCode,
+      payload: {
+        environment: env,
+        events: (snapshot as any)?.events || [],
+        syncedAt: new Date().toISOString(),
+      },
+    });
+
+    res.json({ success: true, profile: newProfile });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export { router as familyRoutes };
 

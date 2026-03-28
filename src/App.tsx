@@ -413,12 +413,15 @@ function AppContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, environment?.familyCode]);
 
-  // Set active profile if not set but environment has profiles
+  // Set active profile if not set but environment has profiles — prefer matching email
   useEffect(() => {
     if (!activeProfile && environment && environment.profiles.length > 0) {
-      setActiveProfile(environment.profiles[0].id);
+      const byEmail = environment.profiles.find(
+        (p: Profile) => p.email?.toLowerCase() === currentUser?.email?.toLowerCase()
+      );
+      setActiveProfile((byEmail || environment.profiles[0]).id);
     }
-  }, [environment, activeProfile, setActiveProfile]);
+  }, [environment, activeProfile, setActiveProfile, currentUser]);
 
   // Navigation handlers
   const handleViewChange = useCallback((view: CalendarView) => {
@@ -684,6 +687,12 @@ function AppContent() {
               undefined,
               currentUserProfile.color || '#FF6B35'
             );
+            // Persist new member to backend so it survives re-sync
+            apiFetch('/api/v1/families/join', {
+              method: 'POST',
+              auth: true,
+              json: { familyCode, name: currentUserProfile.name, color: currentUserProfile.color },
+            }).catch(err => console.warn('[Onboarding] join backend failed, will sync later:', err));
           }
         }
 

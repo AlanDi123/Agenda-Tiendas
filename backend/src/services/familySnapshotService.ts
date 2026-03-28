@@ -2,9 +2,9 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import db from '../db';
 import { createError } from '../middleware/errorHandler';
 
-type SnapshotPayload = {
-  environment: unknown;
-  events: unknown[];
+export type SnapshotPayload = {
+  environment: Record<string, unknown>;
+  events: Record<string, unknown>[];
   syncedAt: string;
 };
 

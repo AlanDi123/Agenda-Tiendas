@@ -325,6 +325,7 @@ export const environments = pgTable('environments', {
   name: text('name').notNull(),
   ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   familyCode: text('family_code').unique(), // Para unirse con código
+  settings: jsonb('settings'), // UI / preferencias de familia (orden de módulos, etc.)
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'), // Borrado lógico para offline-first
@@ -347,6 +348,7 @@ export const profiles = pgTable('profiles', {
 }, (table) => ({
   environmentIdIdx: index('profiles_environment_id_idx').on(table.environmentId),
   userIdIdx: index('profiles_user_id_idx').on(table.userId),
+  emailEnvUnique: uniqueIndex('profiles_email_env_unique').on(table.email, table.environmentId),
 }));
 
 // ============================================
@@ -636,6 +638,33 @@ export const userPreferencesRelations = relations(userPreferences, ({ one }) => 
 }));
 
 // ============================================
+// ENTITY CHANGES (Audit / Changelog)
+// ============================================
+export const entityChangeActionEnum = pgEnum('entity_change_action', ['create', 'update', 'delete']);
+
+export const entityChanges = pgTable('entity_changes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  action: entityChangeActionEnum('action').notNull(),
+  oldData: jsonb('old_data'),
+  newData: jsonb('new_data'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  entityIdx: index('entity_changes_entity_idx').on(table.entityType, table.entityId),
+  userIdIdx: index('entity_changes_user_id_idx').on(table.userId),
+  createdAtIdx: index('entity_changes_created_at_idx').on(table.createdAt),
+}));
+
+export const entityChangesRelations = relations(entityChanges, ({ one }) => ({
+  user: one(users, {
+    fields: [entityChanges.userId],
+    references: [users.id],
+  }),
+}));
+
+// ============================================
 // DEFAULT EXPORT
 // ============================================
 
@@ -662,4 +691,5 @@ export default {
   deviceTokens,
   notificationLogs,
   userPreferences,
+  entityChanges,
 };

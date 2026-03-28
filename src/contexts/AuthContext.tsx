@@ -351,7 +351,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (env.activeProfileId && env.profiles?.find(p => p.id === env.activeProfileId)) {
         setActiveProfileId(env.activeProfileId);
       } else if (env.profiles && env.profiles.length > 0) {
-        setActiveProfileId(env.profiles[0].id);
+        const byEmail = currentUser?.email
+          ? env.profiles.find(p => p.email?.toLowerCase() === currentUser.email.toLowerCase())
+          : undefined;
+        setActiveProfileId((byEmail || env.profiles[0]).id);
       }
       
       // Save environment for current user

@@ -8,7 +8,10 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from './schema';
 
-const DATABASE_URL = process.env.DATABASE_URL;
+// Prefer the pooled connection URL if available; fall back to the standard URL.
+// Neon's HTTP driver is serverless-pooled, but using the -pooler endpoint
+// prevents hitting max connection limits when multiple functions run in parallel.
+const DATABASE_URL = process.env.DATABASE_POOL_URL || process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
   // En serverless, un throw aquí crashea toda la función antes de responder.
