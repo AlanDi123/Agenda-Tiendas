@@ -29,6 +29,14 @@ const CATEGORIES: { value: EventCategory; label: string; icon: string; color: st
   { value: 'otro', label: 'Otro', icon: '📌', color: '#9E9E9E' },
 ];
 
+function formatDateForInput(date: Date): string {
+  return format(date, 'yyyy-MM-dd');
+}
+
+function formatTimeForInput(date: Date): string {
+  return format(date, 'HH:mm');
+}
+
 export function EventForm({
   isOpen,
   onClose,
@@ -65,7 +73,26 @@ export function EventForm({
   const endTimeRef = useRef<HTMLInputElement>(null);
   
   const isEditing = !!event;
-  
+
+  const resetForm = useCallback(() => {
+    const now = new Date();
+    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+
+    setTitle('');
+    setPhone('');
+    setLocation('');
+    setAllDay(false);
+    setStartDate(formatDateForInput(initialDate || now));
+    setStartTime(formatTimeForInput(initialDate || now));
+    setEndDate(formatDateForInput(initialDate || now));
+    setEndTime(formatTimeForInput(oneHourLater));
+    setNotes('');
+    setAssignedProfileIds([]);
+    setCategory('otro');
+    setTitleError('');
+    setDateError('');
+  }, [initialDate]);
+
   // Load event data when editing
   useEffect(() => {
     if (event && isOpen) {
@@ -86,37 +113,14 @@ export function EventForm({
       setTitleError('');
       setDateError('');
     } else if (isOpen) {
-      // Reset form for new event
       resetForm();
     }
-  }, [event, isOpen]);
+  }, [event, isOpen, resetForm]);
 
-  function resetForm() {
-    const now = new Date();
-    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
-
-    setTitle('');
-    setPhone('');
-    setLocation('');
-    setAllDay(false);
-    setStartDate(formatDateForInput(initialDate || now));
-    setStartTime(formatTimeForInput(initialDate || now));
-    setEndDate(formatDateForInput(initialDate || now));
-    setEndTime(formatTimeForInput(oneHourLater));
-    setNotes('');
-    setAssignedProfileIds([]);
-    setCategory('otro');
-    setTitleError('');
-    setDateError('');
-  }
-  
-  function formatDateForInput(date: Date): string {
-    return format(date, 'yyyy-MM-dd');
-  }
-  
-  function formatTimeForInput(date: Date): string {
-    return format(date, 'HH:mm');
-  }
+  const handleClose = useCallback(() => {
+    resetForm();
+    onClose();
+  }, [resetForm, onClose]);
 
   const toggleProfileAssignment = (profileId: string) => {
     setAssignedProfileIds(prev =>
@@ -236,13 +240,23 @@ export function EventForm({
     } finally {
       setIsSaving(false);
     }
-  }, [title, phone, location, allDay, startDate, startTime, endDate, endTime, notes, assignedProfileIds, profiles, onSave]);
-  
-  const handleClose = () => {
-    resetForm();
-    onClose();
-  };
-  
+  }, [
+    title,
+    phone,
+    location,
+    allDay,
+    startDate,
+    startTime,
+    endDate,
+    endTime,
+    notes,
+    assignedProfileIds,
+    category,
+    profiles,
+    onSave,
+    handleClose,
+  ]);
+
   return (
     <Modal
       isOpen={isOpen}

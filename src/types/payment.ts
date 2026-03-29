@@ -37,7 +37,7 @@ export interface Payment {
   status: PaymentStatus;
   paymentMethod: PaymentMethodType;
   transactionId?: string;
-  gatewayResponse?: Record<string, any>;
+  gatewayResponse?: Record<string, unknown>;
   failureReason?: string;
   createdAt: Date;
   completedAt?: Date;
@@ -114,7 +114,7 @@ export interface PaymentSession {
   gatewayUrl?: string;
   expiresAt: Date;
   createdAt: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // Webhook event from payment gateway
@@ -127,9 +127,9 @@ export interface WebhookEvent {
   currency: string;
   transactionId: string;
   userId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   timestamp: Date;
-  rawEvent: any;
+  rawEvent: unknown;
 }
 
 // Premium features flags

@@ -1,46 +1,26 @@
-/**
- * Debounce hook y utilidades para inputs de búsqueda y estado de formularios.
- */
+import { useCallback, useLayoutEffect, useRef } from 'react';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-
-/** Hook: retarda la actualización de un valor hasta que deja de cambiar */
-export function useDebounce<T>(value: T, delayMs: number = 300): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedValue(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-
-  return debouncedValue;
-}
-
-/** Hook: retorna una función debounced estable */
-export function useDebouncedCallback<T extends (...args: any[]) => any>(
-  fn: T,
-  delayMs: number = 300
-): (...args: Parameters<T>) => void {
+// Tipado estricto reemplazando 'any' por 'unknown'
+export function useDebounce<T extends (...args: unknown[]) => void>(fn: T, delay: number) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fnRef = useRef(fn);
-  fnRef.current = fn;
+
+  // La actualización de refs debe ir dentro de un efecto, NUNCA suelta en el componente
+  useLayoutEffect(() => {
+    fnRef.current = fn;
+  }, [fn]);
 
   return useCallback(
     (...args: Parameters<T>) => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
       timerRef.current = setTimeout(() => {
-        fnRef.current(...args);
-      }, delayMs);
+        if (fnRef.current) {
+          fnRef.current(...args);
+        }
+      }, delay);
     },
-    [delayMs]
+    [delay]
   );
-}
-
-/** Utilidad pura (no-hook): retorna función debounced */
-export function debounce<T extends (...args: any[]) => any>(fn: T, delayMs: number): T {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  return function (...args: Parameters<T>) {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delayMs);
-  } as T;
 }

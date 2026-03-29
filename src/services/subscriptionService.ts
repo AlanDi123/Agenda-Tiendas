@@ -522,6 +522,13 @@ export async function getPaymentByTransactionId(transactionId: string): Promise<
 
 // ============ WEBHOOK HANDLING ============
 
+function gatewayResponseFromRaw(raw: unknown): Record<string, unknown> | undefined {
+  if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+    return { ...(raw as Record<string, unknown>) };
+  }
+  return undefined;
+}
+
 /**
  * Process webhook event from payment gateway
  */
@@ -537,10 +544,9 @@ export async function processWebhookEvent(event: WebhookEvent): Promise<void> {
 
   // Find or create payment record
   let payment = await getPaymentByTransactionId(event.transactionId);
-  
+
   if (!payment && event.userId) {
-    // Create new payment record
-    payment = {
+    const newPayment: Payment = {
       id: generateId(),
       userId: event.userId,
       amount: event.amount,
@@ -550,19 +556,24 @@ export async function processWebhookEvent(event: WebhookEvent): Promise<void> {
       status: event.status,
       paymentMethod: event.gateway,
       transactionId: event.transactionId,
-      gatewayResponse: event.rawEvent,
+      gatewayResponse: gatewayResponseFromRaw(event.rawEvent),
       createdAt: event.timestamp,
     };
 
     if (event.status === 'completed') {
-      payment.completedAt = event.timestamp;
+      newPayment.completedAt = event.timestamp;
     }
 
-    await recordPayment(payment);
+    await recordPayment(newPayment);
+    payment = newPayment;
   } else if (payment) {
     // Update existing payment
     payment.status = event.status;
-    payment.gatewayResponse = { ...payment.gatewayResponse, ...event.rawEvent };
+    const rawSlice = gatewayResponseFromRaw(event.rawEvent);
+    payment.gatewayResponse = {
+      ...(payment.gatewayResponse ?? {}),
+      ...(rawSlice ?? {}),
+    };
 
     if (event.status === 'completed' && !payment.completedAt) {
       payment.completedAt = event.timestamp;

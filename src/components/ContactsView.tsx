@@ -74,6 +74,7 @@ export function ContactsView() {
     );
   }, [contacts, search]);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,
     getScrollElement: () => parentRef.current,

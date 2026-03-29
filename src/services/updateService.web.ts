@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * App Update Service - Web Platform
- * 
+ *
  * This module provides dummy implementations for web platforms.
  * Web does not support APK updates, so all functions return
  * safe defaults indicating no updates are available.
- * 
+ *
  * IMPORTANT: This file MUST NOT import any Capacitor modules.
  */
 

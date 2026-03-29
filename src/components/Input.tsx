@@ -1,4 +1,4 @@
-import { forwardRef, type InputHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes } from 'react';
+import { forwardRef, useId, type InputHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes } from 'react';
 import './Input.css';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -21,7 +21,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     },
     ref
   ) => {
-    const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
+    const generatedId = useId();
+    const inputId = id ?? generatedId;
 
     return (
       <div className={`input-wrapper ${error ? 'input-error' : ''} ${className}`}>
@@ -67,7 +68,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     },
     ref
   ) => {
-    const textareaId = id || `textarea-${Math.random().toString(36).substr(2, 9)}`;
+    const generatedId = useId();
+    const textareaId = id ?? generatedId;
 
     return (
       <div className={`input-wrapper ${error ? 'input-error' : ''} ${className}`}>
@@ -100,7 +102,8 @@ interface ToggleProps {
 }
 
 export function Toggle({ label, checked, onChange, disabled = false, id }: ToggleProps) {
-  const toggleId = id || `toggle-${Math.random().toString(36).substr(2, 9)}`;
+  const generatedId = useId();
+  const toggleId = id ?? generatedId;
 
   return (
     <div className={`toggle-wrapper ${disabled ? 'toggle-disabled' : ''}`}>
@@ -140,7 +143,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     },
     ref
   ) => {
-    const selectId = id || `select-${Math.random().toString(36).substr(2, 9)}`;
+    const generatedId = useId();
+    const selectId = id ?? generatedId;
 
     return (
       <div className={`input-wrapper ${error ? 'input-error' : ''} ${className}`}>

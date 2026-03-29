@@ -777,7 +777,7 @@ function AppContent() {
             auth: true,
             json: { familyCode: createdFamilyCode, familyName: createdEnvironmentName, email: currentUser.email },
           });
-        } catch (emailErr) {
+        } catch (emailErr: unknown) {
           console.error('[Onboarding] Error enviando código de familia:', emailErr);
         }
       }
@@ -789,7 +789,7 @@ function AppContent() {
         try {
           const { redirectToCheckout } = await import('./services/paymentGatewayService');
           await redirectToCheckout(planType);
-        } catch (payErr) {
+        } catch (payErr: unknown) {
           console.error('[Onboarding] Error al redirigir a pago:', payErr);
           setWaitingForPayment(false);
           setPendingPlanType(null);
