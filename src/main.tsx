@@ -6,15 +6,29 @@ import { AppLogger } from './services/logger'
 import { Capacitor } from '@capacitor/core'
 import { queryClient } from './lib/queryClient'
 
+type CapacitorLegacyWindow = Window & {
+  Capacitor?: {
+    Plugins?: { CapacitorUpdater?: { notifyAppReady?: () => void } };
+  };
+};
+
 // notifyAppReady SINCRONICO via bridge — debe correr antes que cualquier render
 // Evita el rollback automático de Capgo si aún está instalado
 if (Capacitor.isNativePlatform()) {
   try {
-    (window as any).Capacitor?.Plugins?.CapacitorUpdater?.notifyAppReady?.();
-  } catch (_) {}
+    (window as CapacitorLegacyWindow).Capacitor?.Plugins?.CapacitorUpdater?.notifyAppReady?.();
+  } catch {
+    // Ignorado intencionalmente
+  }
   import('@capgo/capacitor-updater')
-    .then(({ CapacitorUpdater }) => CapacitorUpdater.notifyAppReady().catch(() => {}))
-    .catch(() => {});
+    .then(({ CapacitorUpdater }) =>
+      CapacitorUpdater.notifyAppReady().catch(() => {
+        // Ignorado intencionalmente
+      })
+    )
+    .catch(() => {
+      // Ignorado intencionalmente
+    });
 }
 
 // Global error handlers — AppLogger ya usa referencias nativas, sin loop

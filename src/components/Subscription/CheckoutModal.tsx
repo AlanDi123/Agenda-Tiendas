@@ -53,7 +53,7 @@ export function CheckoutModal({ isOpen, onClose, onSuccess, defaultPlan }: Check
         setDiscountApplied(null);
         setError(result.error || 'Código inválido');
       }
-    } catch (err) {
+    } catch {
       setError('Error al aplicar código');
     }
   };

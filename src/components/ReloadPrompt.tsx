@@ -11,7 +11,11 @@ export function ReloadPrompt() {
   } = useRegisterSW({
     onRegistered(r) {
       // Chequear actualizaciones cada hora por si el usuario deja la app abierta
-      r && setInterval(() => { r.update() }, 60 * 60 * 1000);
+      if (r) {
+        setInterval(() => {
+          r.update();
+        }, 60 * 60 * 1000);
+      }
     },
     onRegisterError(error) {
       console.error('Error en Service Worker:', error);

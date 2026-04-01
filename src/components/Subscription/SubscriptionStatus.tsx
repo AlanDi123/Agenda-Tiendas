@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../Button';
 import { Modal } from '../Modal';
@@ -18,15 +18,9 @@ export function SubscriptionStatus({ isOpen, onClose, onUpgrade }: SubscriptionS
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (isOpen && currentUser) {
-      loadSubscription();
-    }
-  }, [isOpen, currentUser]);
-
-  const loadSubscription = async () => {
+  const loadSubscription = useCallback(async () => {
     if (!currentUser) return;
-    
+
     try {
       const sub = await getUserSubscription(currentUser.id);
       setSubscription(sub);
@@ -35,7 +29,13 @@ export function SubscriptionStatus({ isOpen, onClose, onUpgrade }: SubscriptionS
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      void loadSubscription();
+    }
+  }, [isOpen, currentUser, loadSubscription]);
 
   const handleCancel = async () => {
     if (!subscription || !confirm('¿Estás seguro de cancelar tu suscripción?')) return;

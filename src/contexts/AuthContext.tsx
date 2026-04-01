@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Environment, Profile } from '../types';
@@ -178,7 +179,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await createUser(email, password);
     // createUser ya guardó el user en localStorage vía saveCurrentUser()
     // solo actualizar el estado local sin llamar getCurrentUser() de nuevo
-    const { passwordHash: _ph, ...userForState } = result;
+    const { passwordHash, ...userForState } = result;
+    void passwordHash;
     setCurrentUser(userForState as User);
     return result;
   }, []);

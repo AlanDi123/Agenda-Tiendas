@@ -131,7 +131,7 @@ export function useDragDrop(options: DragDropOptions): DragDropResult {
     }, 0);
 
     onDragStart?.(eventId);
-  }, [enabled, events, onDragStart, snapToGridTime]);
+  }, [enabled, events, onDragStart]);
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
