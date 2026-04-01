@@ -408,7 +408,7 @@ function AppContent() {
   // Crear canales de notificación de Android al autenticarse
   useEffect(() => {
     if (isAuthenticated && Capacitor.isNativePlatform()) {
-      initializeNotifications().catch(err =>
+      initializeNotifications().catch((err: unknown) =>
         console.error('Error al inicializar notificaciones:', err)
       );
     }

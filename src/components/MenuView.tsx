@@ -30,7 +30,7 @@ function loadMenu(): WeeklyMenu {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return { ...DEFAULT_MENU, ...JSON.parse(stored) };
   } catch {
-    // localStorage inválido o no disponible
+    // Ignorado intencionalmente
   }
   return DEFAULT_MENU;
 }
@@ -43,7 +43,7 @@ export function MenuView() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(menu));
     } catch {
-      // persistencia opcional — ignorado
+      // Ignorado intencionalmente
     }
   }, [menu]);
 

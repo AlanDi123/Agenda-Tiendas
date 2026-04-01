@@ -15,7 +15,7 @@ function loadItems(): ListItem[] {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return JSON.parse(stored);
   } catch {
-    // JSON inválido o storage no disponible
+    // Ignorado intencionalmente
   }
   return [
     { id: '1', text: 'Leche', checked: false },
@@ -35,7 +35,7 @@ export function ListsView() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch {
-      // persistencia opcional — ignorado
+      // Ignorado intencionalmente
     }
   }, [items]);
 
