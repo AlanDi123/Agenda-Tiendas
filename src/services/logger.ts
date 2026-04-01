@@ -15,7 +15,7 @@ export interface LogEntry {
   message: string;
   context?: string;
   stack?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   userId?: string;
   sessionId: string;
 }
@@ -83,9 +83,9 @@ function getRuntimeContext(): Record<string, unknown> {
 function createLogEntry(
   level: LogEntry['level'],
   message: string,
-  error?: any,
+  error?: unknown,
   context?: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ): LogEntry {
   return {
     id: crypto.randomUUID(),
@@ -165,9 +165,9 @@ export const AppLogger = {
   log: (
     level: LogEntry['level'],
     message: string,
-    error?: any,
+    error?: unknown,
     context?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): void => {
     const logEntry = createLogEntry(level, message, error, context, metadata);
     saveLog(logEntry);
@@ -176,20 +176,27 @@ export const AppLogger = {
     const nativeMethod = level === 'error' ? _native.error : 
                          level === 'warn' ? _native.warn : 
                          level === 'info' ? _native.info : _native.log;
-    nativeMethod(`[${level.toUpperCase()}] ${context || 'App'}: ${message}`, error || '');
+    nativeMethod(
+      `[${level.toUpperCase()}] ${context || 'App'}: ${message}`,
+      error !== undefined && error !== null
+        ? error instanceof Error
+          ? error.message
+          : String(error)
+        : ''
+    );
   },
 
   // Convenience methods
-  error: (message: string, error?: any, context?: string): void =>
+  error: (message: string, error?: unknown, context?: string): void =>
     AppLogger.log('error', message, error, context),
 
-  warn: (message: string, error?: any, context?: string): void =>
+  warn: (message: string, error?: unknown, context?: string): void =>
     AppLogger.log('warn', message, error, context),
 
-  info: (message: string, metadata?: Record<string, any>, context?: string): void =>
+  info: (message: string, metadata?: Record<string, unknown>, context?: string): void =>
     AppLogger.log('info', message, undefined, context, metadata),
 
-  debug: (message: string, metadata?: Record<string, any>, context?: string): void =>
+  debug: (message: string, metadata?: Record<string, unknown>, context?: string): void =>
     AppLogger.log('debug', message, undefined, context, metadata),
 
   // Get logs from storage
@@ -336,12 +343,12 @@ export const AppLogger = {
   },
 
   // Log app lifecycle events
-  logLifecycle: (event: 'app_start' | 'app_resume' | 'app_pause' | 'app_exit', metadata?: Record<string, any>): void => {
+  logLifecycle: (event: 'app_start' | 'app_resume' | 'app_pause' | 'app_exit', metadata?: Record<string, unknown>): void => {
     AppLogger.info(`App ${event}`, metadata, 'Lifecycle');
   },
 
   // Log user actions
-  logUserAction: (action: string, metadata?: Record<string, any>): void => {
+  logUserAction: (action: string, metadata?: Record<string, unknown>): void => {
     AppLogger.info(`User Action: ${action}`, metadata, 'UserAction');
   },
 

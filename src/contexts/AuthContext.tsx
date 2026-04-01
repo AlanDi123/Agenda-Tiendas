@@ -277,7 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const upgradeToPremium = useCallback(async () => {
     if (!currentUser) throw new Error('No user logged in');
-    await upgradeService(currentUser.email);
+    await upgradeService();
     setCurrentUser(prev => prev ? { ...prev, planStatus: 'PREMIUM' } : null);
   }, [currentUser]);
 

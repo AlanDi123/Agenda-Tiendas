@@ -197,8 +197,16 @@ export async function clearUpdatePreferences(): Promise<void> {
         .filter((k: string) => k.startsWith(DISMISSED_PREFIX) || k === LAST_CHECK_KEY)
         .forEach((k: string) => updateKeys.push(k));
     }
-    await Promise.all(updateKeys.map((k) => Preferences.remove({ key: k }).catch(() => {})));
-  } catch {}
+    await Promise.all(
+      updateKeys.map((k) =>
+        Preferences.remove({ key: k }).catch(() => {
+          void 0;
+        })
+      )
+    );
+  } catch {
+    void 0;
+  }
 }
 
 export async function shouldCheckForUpdates(): Promise<boolean> {
@@ -238,5 +246,7 @@ export async function initializeUpdateChecker(
       const dismissed = await isUpdateDismissed(result.updateInfo.latestVersion);
       if (!dismissed) onUpdateAvailable(result.updateInfo);
     }
-  } catch {}
+  } catch {
+    void 0;
+  }
 }

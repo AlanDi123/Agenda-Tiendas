@@ -1,4 +1,4 @@
-import type { Environment, Event } from '../types';
+import type { Environment, Event, Profile } from '../types';
 import { apiFetch } from '../config/api';
 import { getSetting, saveSetting } from './database';
 
@@ -47,8 +47,25 @@ async function clearPersistentPayloadIfMatch(familyCode: string, queuedAt: strin
 /** Checksum simple: suma de longitudes de IDs de eventos activos */
 function computeChecksum(events: Event[]): number {
   return events
-    .filter((e) => !(e as any).deletedAt)
+    .filter((e) => !e.deletedAt)
     .reduce((acc, e) => acc + (e.id?.length ?? 0), 0);
+}
+
+function isAbortError(err: unknown): boolean {
+  if (err instanceof DOMException && err.name === 'AbortError') return true;
+  if (err instanceof Error && err.name === 'AbortError') return true;
+  return false;
+}
+
+/** Respuesta JSON de GET /families/updates/:code */
+interface FamilyUpdatesResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    environment?: Record<string, unknown>;
+    events?: Record<string, unknown>[];
+    hasMore?: boolean;
+  };
 }
 
 // AbortController para cancelar sync en vuelo si el usuario se desconecta
@@ -103,8 +120,8 @@ async function flush(token: string, familyCode?: string): Promise<void> {
       queuedPayload = remaining;
       setTimeout(() => void flush(token, targetFamilyCode), 0);
     }
-  } catch (err) {
-    if ((err as any)?.name === 'AbortError') return; // usuario canceló
+  } catch (err: unknown) {
+    if (isAbortError(err)) return; // usuario canceló
 
     if (retryTimer) clearTimeout(retryTimer);
     const delay = currentRetryDelayMs;
@@ -128,7 +145,10 @@ export function queueCloudFamilySync(environment: Environment, events: Event[]):
     lastSyncMs === null
       ? events
       : events.filter((e) => {
-        const updatedMs = e?.updatedAt ? new Date(e.updatedAt as any).getTime() : 0;
+        const u = e.updatedAt;
+        const updatedMs = u
+          ? (u instanceof Date ? u.getTime() : new Date(String(u)).getTime())
+          : 0;
         return updatedMs > lastSyncMs;
       });
 
@@ -177,35 +197,45 @@ export async function loadFamilySnapshotByCode(familyCode: string): Promise<{
       `/api/v1/families/updates/${encodeURIComponent(familyCode)}?since=${encodeURIComponent(since)}&offset=${offset}&limit=${limit}`,
       { method: 'GET', auth: true }
     );
-    const data = await response.json();
+    const data = (await response.json()) as FamilyUpdatesResponse;
     if (!response.ok || !data?.success) {
       throw new Error(data?.message || 'No se pudo recuperar la familia');
     }
 
-    const rawEnv = data.data.environment as any;
-    if (!environment) {
+    const rawEnvUnknown = data.data?.environment;
+    if (!environment && rawEnvUnknown && typeof rawEnvUnknown === 'object' && !Array.isArray(rawEnvUnknown)) {
+      const rawEnv = rawEnvUnknown as Record<string, unknown>;
+      const profilesRaw = Array.isArray(rawEnv.profiles) ? rawEnv.profiles : [];
       environment = {
-        ...rawEnv,
-        createdAt: new Date(rawEnv.createdAt),
-        profiles: (rawEnv.profiles || []).map((p: any) => ({
-          ...p,
-          createdAt: new Date(p.createdAt),
-        })),
+        ...(rawEnv as unknown as Environment),
+        createdAt: new Date(String(rawEnv.createdAt)),
+        profiles: profilesRaw.map((p: unknown) => {
+          const pr = p as Record<string, unknown>;
+          return {
+            ...(pr as unknown as Profile),
+            createdAt: new Date(String(pr.createdAt)),
+          };
+        }),
       };
     }
 
-    const pageEvents: Event[] = (data.data.events || []).map((e: any) => ({
-      ...e,
-      startDate: new Date(e.startDate),
-      endDate: new Date(e.endDate),
-      createdAt: new Date(e.createdAt),
-      updatedAt: new Date(e.updatedAt),
-      deletedAt: e.deletedAt ? new Date(e.deletedAt) : undefined,
-    }));
+    const pagePayload = data.data;
+    const eventsRaw = Array.isArray(pagePayload?.events) ? pagePayload.events : [];
+    const pageEvents: Event[] = eventsRaw.map((raw: unknown) => {
+      const e = raw as Record<string, unknown>;
+      return {
+        ...(e as unknown as Event),
+        startDate: new Date(String(e.startDate)),
+        endDate: new Date(String(e.endDate)),
+        createdAt: new Date(String(e.createdAt)),
+        updatedAt: new Date(String(e.updatedAt)),
+        deletedAt: e.deletedAt != null ? new Date(String(e.deletedAt)) : undefined,
+      };
+    });
 
     allEvents.push(...pageEvents);
 
-    if (!data.data.hasMore || pageEvents.length === 0) break;
+    if (!pagePayload?.hasMore || pageEvents.length === 0) break;
     offset += pageEvents.length;
   }
 

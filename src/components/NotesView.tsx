@@ -23,7 +23,18 @@ export function NotesView() {
     setNotes(data.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)));
   }, [environment]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!environment) return;
+    let cancelled = false;
+    void (async () => {
+      const data = await getAllNotes(environment.id);
+      if (cancelled) return;
+      setNotes(data.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [environment]);
 
   const handleSave = async () => {
     if (!form.title.trim() || !environment || !activeProfile) return;

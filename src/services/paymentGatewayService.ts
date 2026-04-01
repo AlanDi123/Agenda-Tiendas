@@ -228,13 +228,14 @@ export async function checkPaymentStatus(paymentId?: string): Promise<{
  */
 export async function createGatewayPayment(
   session: PaymentSession,
-  _method: PaymentMethodType
+  method: PaymentMethodType
 ): Promise<{
   success: boolean;
   gatewayUrl?: string;
   gatewayPaymentId?: string;
   error?: string;
 }> {
+  void method;
   const token = getSessionToken();
   if (!token) {
     return { success: false, error: 'Usuario no autenticado. Por favor inicia sesión.' };

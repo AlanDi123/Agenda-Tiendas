@@ -64,7 +64,9 @@ export async function hapticLight(): Promise<void> {
   try {
     const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
     await Haptics.impact({ style: ImpactStyle.Light });
-  } catch {}
+  } catch {
+    void 0;
+  }
 }
 
 export async function hapticMedium(): Promise<void> {
@@ -72,7 +74,9 @@ export async function hapticMedium(): Promise<void> {
   try {
     const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
     await Haptics.impact({ style: ImpactStyle.Medium });
-  } catch {}
+  } catch {
+    void 0;
+  }
 }
 
 export async function hapticSuccess(): Promise<void> {
@@ -80,7 +84,9 @@ export async function hapticSuccess(): Promise<void> {
   try {
     const { Haptics, NotificationType } = await import('@capacitor/haptics');
     await Haptics.notification({ type: NotificationType.Success });
-  } catch {}
+  } catch {
+    void 0;
+  }
 }
 
 // ─── Hardware Back Button ─────────────────────────────────────────────────
@@ -124,9 +130,13 @@ export async function lockOrientationPortrait(): Promise<void> {
       // Screen API nativa — disponible en Capacitor >= 6
       (screen as unknown as { orientation?: { lock?: (mode: string) => Promise<void> } })
         .orientation?.lock?.('portrait-primary')
-        .catch(() => {});
+        .catch(() => {
+          void 0;
+        });
     }
-  } catch {}
+  } catch {
+    void 0;
+  }
 }
 
 // ─── In-App Review ────────────────────────────────────────────────────────
@@ -152,7 +162,9 @@ export async function trackEventCreatedForReview(): Promise<void> {
       if (!reviewMod?.InAppReview) return;
       await reviewMod.InAppReview.requestReview();
       localStorage.setItem(REVIEW_REQUESTED_KEY, 'true');
-    } catch {}
+    } catch {
+      void 0;
+    }
   }
 }
 
@@ -198,5 +210,7 @@ export async function clearWebViewCache(): Promise<void> {
     const cacheNames = await caches.keys();
     await Promise.all(cacheNames.map((name) => caches.delete(name)));
     console.log('[NativeService] Cache limpiado');
-  } catch {}
+  } catch {
+    void 0;
+  }
 }

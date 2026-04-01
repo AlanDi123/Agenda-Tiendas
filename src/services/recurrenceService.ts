@@ -134,13 +134,13 @@ export function expandSeries(
 }
 
 // Helper functions (these would use actual event data in production)
-function eventPhoneFromSeries(_series: RecurrenceSeries): string | undefined {
-  // In production, this would come from the series data
+function eventPhoneFromSeries(series: RecurrenceSeries): string | undefined {
+  void series;
   return undefined;
 }
 
-function isAllDaySeries(_series: RecurrenceSeries): boolean {
-  // In production, this would come from the series data
+function isAllDaySeries(series: RecurrenceSeries): boolean {
+  void series;
   return false;
 }
 
@@ -371,7 +371,7 @@ export function getRecurrenceDescription(rrule: string): string {
     }
 
     return `Se repite ${freq}`;
-  } catch (error) {
+  } catch {
     return 'Evento recurrente';
   }
 }

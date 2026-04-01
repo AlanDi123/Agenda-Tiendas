@@ -294,7 +294,7 @@ export async function saveContact(contact: SharedContact & { environmentId: stri
 export async function getAllContacts(environmentId: string): Promise<(SharedContact & { environmentId: string })[]> {
   const db = await getDB();
   const all = await db.getAll('contacts');
-  return all.filter(c => c.environmentId === environmentId) as any;
+  return all.filter(c => c.environmentId === environmentId) as (SharedContact & { environmentId: string })[];
 }
 
 export async function deleteContact(id: string): Promise<void> {
@@ -314,7 +314,7 @@ export async function saveNote(note: SharedNote & { environmentId: string }): Pr
 export async function getAllNotes(environmentId: string): Promise<(SharedNote & { environmentId: string })[]> {
   const db = await getDB();
   const all = await db.getAll('notes');
-  return all.filter(n => n.environmentId === environmentId) as any;
+  return all.filter(n => n.environmentId === environmentId) as (SharedNote & { environmentId: string })[];
 }
 
 export async function deleteNote(id: string): Promise<void> {

@@ -273,8 +273,13 @@ export async function setupNotificationActions(): Promise<void> {
   }
 }
 
+type NotificationActionPerformed = {
+  actionId: string;
+  notification: { extra?: { eventId?: string; alarmId?: string } };
+};
+
 // Handle notification actions
-function handleNotificationAction(action: any) {
+function handleNotificationAction(action: NotificationActionPerformed): void {
   const { actionId, notification } = action;
   const eventId = notification.extra?.eventId;
   const alarmId = notification.extra?.alarmId;

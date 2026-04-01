@@ -444,7 +444,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
 // PREMIUM (delegated to backend via payment)
 // ============================================
 
-export async function upgradeToPremium(_email: string, _untilDate?: Date): Promise<void> {
+export async function upgradeToPremium(): Promise<void> {
   // Premium status is managed by the backend via webhooks from Mercado Pago.
   // This function exists for compatibility but the real upgrade happens
   // automatically when the payment webhook is processed.
@@ -455,7 +455,7 @@ export async function upgradeToPremium(_email: string, _untilDate?: Date): Promi
   }
 }
 
-export async function downgradeToFree(_email: string): Promise<void> {
+export async function downgradeToFree(): Promise<void> {
   const cached = loadCurrentUser();
   if (cached) {
     cached.planStatus = 'FREE';
