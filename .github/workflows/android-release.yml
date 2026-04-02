@@ -148,7 +148,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew clean assembleRelease --no-daemon --stacktrace
+          ./gradlew clean assembleRelease --no-daemon --stacktrace --info
 
           # Find the APK
           APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" -type f | head -n 1)
