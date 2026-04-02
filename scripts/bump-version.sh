@@ -18,9 +18,9 @@ esac
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
 # Convertir versión a versionCode (matemáticamente para evitar octales con ceros a la izquierda)
-NEW_CODE=$(echo "$NEW_VERSION" | awk -F. '{print $1 * 10000 + $2 * 100 + $3}')
+VERSION_CODE=$(echo "$NEW_VERSION" | awk -F. '{print $1 * 10000 + $2 * 100 + $3}')
 
-echo "🔖 Bumping: $CURRENT → $NEW_VERSION (versionCode: $NEW_CODE)"
+echo "🔖 Bumping: $CURRENT → $NEW_VERSION (versionCode: $VERSION_CODE)"
 
 # ─── Actualizar package.json ─────────────────────────────────────────────────
 npm version "$NEW_VERSION" --no-git-tag-version
@@ -28,7 +28,7 @@ npm version "$NEW_VERSION" --no-git-tag-version
 # ─── Actualizar android/app/build.gradle ─────────────────────────────────────
 GRADLE="android/app/build.gradle"
 sed -i "s/versionName \"[^\"]*\"/versionName \"$NEW_VERSION\"/" "$GRADLE"
-sed -i "s/versionCode [0-9]*/versionCode $NEW_CODE/" "$GRADLE"
+sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" "$GRADLE"
 echo "✅ build.gradle actualizado"
 
 # ─── Commit y tag ────────────────────────────────────────────────────────────

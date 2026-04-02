@@ -78,7 +78,7 @@ jobs:
           fi
 
           # Convert version to code (e.g., 1.4.2 -> 10402)
-          VERSION_CODE=$(echo "$VERSION_NAME" | awk -F. '{ printf "%d%02d%02d", $1, $2, $3 }')
+          VERSION_CODE=$(echo "$VERSION_NAME" | awk -F. '{print $1 * 10000 + $2 * 100 + $3}')
 
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
