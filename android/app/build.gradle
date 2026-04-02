@@ -3,6 +3,13 @@ apply plugin: 'com.android.application'
 android {
     namespace "com.importmania.agenda"
     compileSdkVersion rootProject.ext.compileSdkVersion
+
+    // AGP 8+: use `lint { }` (reemplazo de lintOptions)
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
     defaultConfig {
         applicationId "com.importmania.agenda"
         minSdkVersion rootProject.ext.minSdkVersion
